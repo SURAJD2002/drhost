@@ -1,0 +1,33 @@
+.support {
+    padding: 20px;
+    background-color: #fff;
+    color: #666;
+    font-family: Arial, sans-serif;
+  }
+  
+  .support h1 {
+    color: #007bff;
+    margin-bottom: 20px;
+  }
+  
+  .support-input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    resize: vertical;
+  }
+  
+  .support-btn {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  
+  .support-btn:hover {
+    background-color: #0056b3;
+  }

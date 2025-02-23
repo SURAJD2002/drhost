@@ -1,0 +1,52 @@
+.auth {
+    max-width: 400px;
+    margin: 40px auto;
+    text-align: center;
+  }
+  
+  .auth form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .auth input {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  .auth button {
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  
+  .google-btn {
+    background-color: #4285f4;
+    color: white;
+  }
+  
+  .google-btn:hover {
+    background-color: #357abd;
+  }
+  
+  .auth button[type="submit"] {
+    background-color: #007bff;
+    color: white;
+  }
+  
+  .auth button[type="submit"]:hover {
+    background-color: #0056b3;
+  }
+  
+  .toggle-btn {
+    background: none;
+    color: #007bff;
+    text-decoration: underline;
+  }
+  
+  .toggle-btn:hover {
+    color: #0056b3;
+  }

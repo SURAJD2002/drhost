@@ -1,0 +1,21 @@
+// import { createClient } from '@supabase/supabase-js';
+
+// const supabaseUrl = 'https://ftaefpluizgfwviottma.supabase.co'; // Replace with your Supabase Project URL
+// const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0YWVmcGx1aXpnZnd2aW90dG1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwNzI0OTksImV4cCI6MjA1NTY0ODQ5OX0.PNs2ooNagTX3IrQc7URneG44yWfzW1c9QdhyiwB0V04'; // Replace with your Supabase Anon Key
+
+// export const supabase = createClient(supabaseUrl, supabaseKey);
+
+
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://ftaefpluizgfwviottma.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0YWVmcGx1aXpnZnd2aW90dG1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwNzI0OTksImV4cCI6MjA1NTY0ODQ5OX0.PNs2ooNagTX3IrQc7URneG44yWfzW1c9QdhyiwB0V04'; // From Project Settings > API
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+});
+
