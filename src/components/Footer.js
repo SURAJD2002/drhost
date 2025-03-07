@@ -38,9 +38,9 @@ function Footer() {
         <Link to="/" className={`nav-item ${isActive('/') ? 'active' : ''}`}>
           <FaHome /> Home
         </Link>
-        <Link to="/explore" className={`nav-item ${isActive('/explore') ? 'active' : ''}`}>
+        {/* <Link to="/explore" className={`nav-item ${isActive('/explore') ? 'active' : ''}`}>
           <FaCompass /> Explore
-        </Link>
+        </Link> */}
         <Link to="/categories" className={`nav-item ${isActive('/categories') ? 'active' : ''}`}>
           <FaTh /> Categories
         </Link>
