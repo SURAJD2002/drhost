@@ -1,106 +1,195 @@
+/* src/style/Navbar.css */
+
+/* Navbar container */
 .navbar {
-    background-color: #fff;
-    border-bottom: 1px solid #ddd;
-    padding: 10px 20px;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-  }
-  
+  background-color: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 10px 20px;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+/* Navbar inner container */
+.nav-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 15px;
+}
+
+/* App name / logo */
+.app-name {
+  font-size: 22px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+/* Navigation items */
+.nav-items {
+  display: flex;
+  justify-content: space-around;
+  flex-grow: 1;
+  gap: 20px;
+}
+
+/* Individual nav item */
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: #666;
+  font-size: 14px;
+  padding: 5px;
+  transition: color 0.3s ease;
+  position: relative; /* Needed for cart badge positioning */
+}
+
+/* Active nav item */
+.nav-item.active {
+  color: #007bff;
+}
+
+/* Hover effect */
+.nav-item:hover {
+  color: #007bff;
+}
+
+/* SVG icons inside nav items */
+.nav-item svg {
+  font-size: 22px;
+  margin-bottom: 3px;
+}
+
+/* Cart badge (for cart items count) */
+.cart-badge {
+  position: absolute;
+  top: -5px;
+  right: -8px;
+  background-color: #ff4444;
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+/* Authentication buttons (Login, Register) */
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Authentication links */
+.auth-link {
+  text-decoration: none;
+  color: #007bff;
+  padding: 5px 12px;
+  border: 1px solid #007bff;
+  border-radius: 4px;
+  transition: background-color 0.3s, color 0.3s;
+  font-size: 13px;
+}
+
+.auth-link:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+/* Logout button */
+.logout-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 13px;
+}
+
+.logout-btn:hover {
+  background-color: #c82333;
+}
+
+/* User information */
+.user-info {
+  margin-right: 10px;
+  color: #333;
+  font-size: 14px;
+}
+
+/* Responsive Design for Small Screens */
+@media (max-width: 768px) {
   .nav-container {
-    display: flex;
+    flex-direction: row;
     justify-content: space-between;
-    align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
+    padding: 10px;
   }
-  
+
   .app-name {
-    font-size: 24px;
-    font-weight: bold;
-    color: #007bff;
-    margin-right: 20px;
+    font-size: 20px;
   }
-  
+
   .nav-items {
-    display: flex;
-    justify-content: space-around;
-    flex-grow: 1;
-    gap: 20px;
-  }
-  
-  .nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-decoration: none;
-    color: #666;
-    font-size: 14px;
-    padding: 5px;
-    transition: color 0.3s;
-  }
-  
-  .nav-item.active {
-    color: #007bff;
-  }
-  
-  .nav-item:hover {
-    color: #007bff;
-  }
-  
-  .nav-item svg {
-    font-size: 24px;
-    margin-bottom: 5px;
-  }
-  
-  .cart-badge {
-    background-color: #ff4444;
-    color: white;
-    border-radius: 50%;
-    padding: 2px 8px;
-    font-size: 12px;
-    margin-left: 5px;
+    display: none; /* Hide navigation items by default */
     position: absolute;
-    top: 5px;
-    right: -10px;
-  }
-  
-  .auth-buttons {
-    display: flex;
-    align-items: center;
+    top: 60px;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    flex-direction: column;
+    text-align: center;
     gap: 10px;
+    padding: 10px 0;
+    border-top: 1px solid #ddd;
   }
-  
-  .auth-link {
-    text-decoration: none;
-    color: #007bff;
-    padding: 5px 15px;
-    border: 1px solid #007bff;
-    border-radius: 4px;
-    transition: background-color 0.3s, color 0.3s;
+
+  .nav-items.show {
+    display: flex; /* Show when menu toggled */
   }
-  
-  .auth-link:hover {
-    background-color: #007bff;
-    color: white;
+
+  .nav-item {
+    font-size: 16px;
+    padding: 10px 0;
   }
-  
+
+  .nav-item svg {
+    font-size: 20px;
+  }
+
+  .cart-badge {
+    top: -4px;
+    right: -6px;
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+
+  .auth-buttons {
+    gap: 5px;
+  }
+
+  .auth-link,
   .logout-btn {
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    padding: 5px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s;
+    font-size: 12px;
+    padding: 5px 10px;
   }
-  
-  .logout-btn:hover {
-    background-color: #c82333;
+}
+
+/* Hamburger Menu for Mobile */
+.hamburger {
+  display: none;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+@media (max-width: 768px) {
+  .hamburger {
+    display: block;
   }
-  
-  .user-info {
-    margin-right: 10px;
-    color: #333;
-    font-size: 14px;
-  }
+}

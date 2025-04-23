@@ -1,60 +1,31 @@
-// import React, { useState, useEffect, useCallback } from 'react';
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
 // import { Link, useNavigate } from 'react-router-dom';
 // import { supabase } from '../supabaseClient';
-// import { FaStore, FaBox, FaTruck, FaPlus, FaTrash } from 'react-icons/fa';
-// import { useForm, useFieldArray } from 'react-hook-form';
-
-// // Reusable Modal Component
-// const Modal = ({ children, onClose }) => (
-//   <div className="modal" style={{
-//     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-//     background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center'
-//   }}>
-//     <div className="modal-content" style={{
-//       background: '#fff', padding: '20px', borderRadius: '8px', maxWidth: '500px', width: '100%'
-//     }}>
-//       {children}
-//       <button onClick={onClose} style={{
-//         marginTop: '10px', background: 'gray', color: '#fff', padding: '5px 10px',
-//         border: 'none', borderRadius: '4px'
-//       }}>Close</button>
-//     </div>
-//   </div>
-// );
+// import { LocationContext } from '../App';
+// import {
+//   FaStore,
+//   FaBox,
+//   FaTruck,
+//   FaPlus,
+//   FaTrash,
+//   FaMapMarkerAlt,
+// } from 'react-icons/fa';
+// import '../style/SellerDashboard.css';
 
 // function SellerDashboard() {
 //   const navigate = useNavigate();
+//   const { sellerLocation, setSellerLocation } = useContext(LocationContext);
 //   const [seller, setSeller] = useState(null);
 //   const [products, setProducts] = useState([]);
 //   const [orders, setOrders] = useState([]);
 //   const [categories, setCategories] = useState([]);
-//   const [selectedCategory, setSelectedCategory] = useState(null); // This will be a number (category id)
 //   const [error, setError] = useState(null);
 //   const [loading, setLoading] = useState(true);
 //   const [message, setMessage] = useState('');
-//   const [previewImages, setPreviewImages] = useState([]);
-//   const [showProductForm, setShowProductForm] = useState(false);
+//   const [locationMessage, setLocationMessage] = useState('');
+//   const [address, setAddress] = useState('Not set');
 
-//   // Set up react-hook-form with field array for variants.
-//   const { register, handleSubmit, reset, setValue, watch, formState: { errors }, control } = useForm({
-//     defaultValues: {
-//       variants: [{}],
-//     },
-//   });
-//   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
-//     control,
-//     name: 'variants',
-//   });
-
-//   // Watch category selection so that variant fields update accordingly.
-//   const watchCategoryId = watch('category_id');
-//   useEffect(() => {
-//     if (watchCategoryId) {
-//       setSelectedCategory(parseInt(watchCategoryId, 10));
-//     }
-//   }, [watchCategoryId]);
-
-//   // Fetch categories (each row should include variant_attributes, e.g., ["ram", "storage", "color"] for Mobile)
 //   const fetchCategories = useCallback(async () => {
 //     try {
 //       const { data, error } = await supabase
@@ -64,36 +35,33 @@
 //       if (error) throw error;
 //       setCategories(data || []);
 //     } catch (err) {
-//       console.error("Error fetching categories:", err);
-//       setError("Failed to load categories.");
+//       console.error('Error fetching categories:', err);
+//       setError('Failed to load categories.');
 //     }
 //   }, []);
 
-//   // Fetch seller data (profile, products, orders)
 //   const fetchSellerData = useCallback(async () => {
 //     setLoading(true);
 //     try {
 //       const { data: { session } } = await supabase.auth.getSession();
 //       if (!session?.user) {
-//         setError("You must be logged in.");
+//         setError('You must be logged in.');
 //         setLoading(false);
 //         return;
 //       }
 //       const sellerId = session.user.id;
 
-//       // Check seller permission
-//       const { data: profile } = await supabase
+//       const { data: profile, error: profileError } = await supabase
 //         .from('profiles')
 //         .select('is_seller')
 //         .eq('id', sellerId)
 //         .single();
-//       if (!profile?.is_seller) {
-//         setError("You do not have permission to access seller functions.");
+//       if (profileError || !profile?.is_seller) {
+//         setError('You do not have permission to access seller functions.');
 //         setLoading(false);
 //         return;
 //       }
 
-//       // Fetch seller details
 //       const { data: sellerData, error: sellerError } = await supabase
 //         .from('sellers')
 //         .select('*, profiles(email, full_name, phone_number)')
@@ -102,7 +70,11 @@
 //       if (sellerError) throw sellerError;
 //       setSeller(sellerData);
 
-//       // Fetch products
+//       if (sellerData.latitude && sellerData.longitude) {
+//         setSellerLocation({ lat: sellerData.latitude, lon: sellerData.longitude });
+//         await fetchAddress(sellerData.latitude, sellerData.longitude);
+//       }
+
 //       const { data: productsData, error: productsError } = await supabase
 //         .from('products')
 //         .select('*')
@@ -111,213 +83,135 @@
 //       if (productsError) throw productsError;
 //       setProducts(productsData || []);
 
-//       // Fetch orders
 //       const { data: ordersData, error: ordersError } = await supabase
 //         .from('orders')
-//         .select('*, order_items(*, products(name, price))')
+//         .select('*, order_items(*, products(title, price))')
 //         .eq('seller_id', sellerId);
 //       if (ordersError) throw ordersError;
 //       setOrders(ordersData || []);
 //     } catch (err) {
-//       console.error("Error fetching seller data:", err);
+//       console.error('Error fetching seller data:', err);
 //       setError(`Error: ${err.message}`);
 //     } finally {
 //       setLoading(false);
 //     }
-//   }, [navigate]);
+//   }, [navigate, setSellerLocation]);
 
-//   useEffect(() => {
-//     fetchSellerData();
-//     fetchCategories();
-//   }, [fetchSellerData, fetchCategories]);
-
-//   // Upload image to Supabase Storage
-//   const uploadImage = async (file) => {
-//     setLoading(true);
+//   const fetchAddress = async (lat, lon) => {
 //     try {
-//       if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-//         throw new Error("Invalid image file.");
+//       const response = await fetch(
+//         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+//       );
+//       const data = await response.json();
+//       if (data && data.display_name) {
+//         setAddress(data.display_name);
+//         return data.display_name;
+//       } else {
+//         setAddress('Address not found');
+//         return 'Address not found';
 //       }
-//       const fileExt = file.name.split('.').pop();
-//       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-//       const { error } = await supabase.storage
-//         .from('product-images')
-//         .upload(fileName, file);
-//       if (error) throw error;
-//       const { data: { publicUrl } } = supabase.storage
-//         .from('product-images')
-//         .getPublicUrl(fileName);
-//       return publicUrl;
 //     } catch (err) {
-//       console.error("Upload image error:", err);
-//       setError("Failed to upload image.");
-//       return null;
-//     } finally {
-//       setLoading(false);
+//       console.error('Error fetching address:', err);
+//       setAddress('Error fetching address');
+//       return 'Error fetching address';
 //     }
 //   };
 
-//   // Handle main product images
-//   const handleImageChange = (e) => {
-//     const files = Array.from(e.target.files);
-//     if (!files.length) return;
-//     setValue('images', files);
-//     setPreviewImages(files.map(f => URL.createObjectURL(f)));
-//   };
+//   const handleDetectLocation = async () => {
+//     if (!navigator.geolocation) {
+//       setLocationMessage('Geolocation is not supported by your browser.');
+//       return;
+//     }
 
-//   // Handle variant images
-//   const handleVariantImageChange = (e, index) => {
-//     const files = Array.from(e.target.files);
-//     if (!files.length) return;
-//     setValue(`variants.${index}.images`, files);
-//   };
+//     setLocationMessage('Detecting location...');
+//     navigator.geolocation.getCurrentPosition(
+//       async (position) => {
+//         const lat = position.coords.latitude;
+//         const lon = position.coords.longitude;
+//         const newLocation = { lat, lon };
 
-//   // Show Add Product modal
-//   const handleAddProduct = () => {
-//     setShowProductForm(true);
-//     reset({
-//       title: '',
-//       description: '',
-//       price: '',
-//       stock: '',
-//       category_id: '',
-//       images: [],
-//       variants: [{}],
-//     });
-//     setPreviewImages([]);
-//   };
+//         try {
+//           const { data: existingSeller, error: fetchError } = await supabase
+//             .from('sellers')
+//             .select('store_name, allows_long')
+//             .eq('id', seller.id)
+//             .single();
 
-//   // Insert product and its variants
-//   const onSubmitProduct = async (formData) => {
-//     setLoading(true);
-//     try {
-//       const { data: { session } } = await supabase.auth.getSession();
-//       if (!session?.user) {
-//         setError("You must be logged in.");
-//         setLoading(false);
-//         return;
-//       }
-//       const sellerId = session.user.id;
+//           let storeNameToUse = existingSeller?.store_name || null;
+//           let allowsLong = existingSeller?.allows_long || false;
 
-//       // Verify seller permission
-//       const { data: profile } = await supabase
-//         .from('profiles')
-//         .select('is_seller')
-//         .eq('id', sellerId)
-//         .single();
-//       if (!profile?.is_seller) {
-//         setError("You do not have permission to add products.");
-//         setLoading(false);
-//         return;
-//       }
+//           if (!storeNameToUse) {
+//             storeNameToUse = prompt('Please enter your store name:', 'Default Store');
+//             if (!storeNameToUse) {
+//               setLocationMessage('Store name is required to set location.');
+//               return;
+//             }
+//           }
 
-//       // Check store location
-//       const { data: sellerData } = await supabase
-//         .from('sellers')
-//         .select('location')
-//         .eq('id', sellerId)
-//         .single();
-//       if (!sellerData.location) {
-//         setError("Please set your store location before adding products.");
-//         setLoading(false);
-//         return;
-//       }
+//           const allowLongInput = window.confirm('Allow long-distance delivery (beyond 40km)?');
+//           allowsLong = allowLongInput;
 
-//       // Upload main product images
-//       let imageUrls = [];
-//       if (formData.images && formData.images.length > 0) {
-//         const uploadPromises = formData.images.map(file => uploadImage(file));
-//         const results = await Promise.all(uploadPromises);
-//         imageUrls = results.filter(Boolean);
-//       }
-
-//       // Insert main product
-//       const { data: insertedProduct, error: productError } = await supabase
-//         .from('products')
-//         .insert({
-//           seller_id: sellerId,
-//           category_id: parseInt(formData.category_id, 10),
-//           title: formData.title.trim(),
-//           description: formData.description,
-//           price: parseFloat(formData.price),
-//           stock: parseInt(formData.stock, 10),
-//           images: imageUrls,
-//           is_approved: false,
-//           status: 'active',
-//         })
-//         .select('id')
-//         .single();
-//       if (productError) throw productError;
-//       const newProductId = insertedProduct.id;
-
-//       // Insert each variant using fixed fields based on category.
-//       // For example, if category "Mobile" (id=3) is selected, we use RAM, Storage, Color.
-//       // If category "Footwear" (id=2) is selected, we might use Size and Color.
-//       // In this example, we'll hardcode two cases:
-//       // - For Mobile (category id 3): use ram, storage, color.
-//       // - For Footwear (category id 2): use size and color.
-//       const variantPromises = formData.variants.map(async (variant) => {
-//         let variantImageUrls = [];
-//         if (variant.images && variant.images.length > 0) {
-//           const variantUploads = variant.images.map(file => uploadImage(file));
-//           const results = await Promise.all(variantUploads);
-//           variantImageUrls = results.filter(Boolean);
-//         }
-//         let attributes = {};
-//         if (parseInt(formData.category_id, 10) === 3) {
-//           // Mobile
-//           attributes = {
-//             ram: variant.ram || '',
-//             storage: variant.storage || '',
-//             color: variant.color || '',
-//           };
-//         } else if (parseInt(formData.category_id, 10) === 2) {
-//           // Footwear example: size and color
-//           attributes = {
-//             size: variant.size || '',
-//             color: variant.color || '',
-//           };
-//         } else {
-//           // Default fallback
-//           attributes = {
-//             attribute1: variant.attribute1 || '',
-//           };
-//         }
-//         const { error: variantError } = await supabase
-//           .from('product_variants')
-//           .insert({
-//             product_id: newProductId,
-//             attributes,
-//             price: parseFloat(variant.price) || 0,
-//             stock: parseInt(variant.stock, 10) || 0,
-//             images: variantImageUrls,
-//             status: 'active',
+//           const { error: rpcError } = await supabase.rpc('set_seller_location', {
+//             seller_uuid: seller.id,
+//             user_lat: lat,
+//             user_lon: lon,
+//             store_name_input: storeNameToUse,
+//             allow_long_input: allowsLong,
 //           });
-//         if (variantError) throw variantError;
-//       });
-//       await Promise.all(variantPromises);
 
-//       setMessage("Product added successfully (with variants)!");
-//       reset();
-//       setShowProductForm(false);
-//       setPreviewImages([]);
-//       fetchSellerData();
-//     } catch (err) {
-//       console.error("Error adding product with variants:", err);
-//       setError(`Error: ${err.message}`);
-//     } finally {
-//       setLoading(false);
-//     }
+//           if (rpcError) {
+//             console.error('RPC Error updating location:', rpcError);
+//             setLocationMessage(`Failed to update location: ${rpcError.message || 'Unknown error'}`);
+//             return;
+//           }
+
+//           setSellerLocation(newLocation);
+//           const newAddress = await fetchAddress(lat, lon);
+//           setSeller((prev) => ({
+//             ...prev,
+//             latitude: lat,
+//             longitude: lon,
+//             store_name: storeNameToUse,
+//             allows_long: allowsLong,
+//           }));
+//           setLocationMessage(
+//             `Location ${sellerLocation ? 'updated' : 'set'} successfully! New address: ${newAddress}`
+//           );
+//           fetchSellerData();
+//         } catch (err) {
+//           console.error('Unexpected error updating location:', err);
+//           setLocationMessage(`Unexpected error: ${err.message || 'Something went wrong'}`);
+//         }
+//       },
+//       (geoError) => {
+//         console.error('Error detecting location:', geoError);
+//         let errorMsg = 'Error detecting location: ';
+//         switch (geoError.code) {
+//           case geoError.PERMISSION_DENIED:
+//             errorMsg += 'Permission denied. Please allow location access.';
+//             break;
+//           case geoError.POSITION_UNAVAILABLE:
+//             errorMsg += 'Location unavailable.';
+//             break;
+//           case geoError.TIMEOUT:
+//             errorMsg += 'Request timed out. Please try again.';
+//             break;
+//           default:
+//             errorMsg += 'Unknown error.';
+//         }
+//         setLocationMessage(errorMsg);
+//       },
+//       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+//     );
 //   };
 
-//   // Delete a product
 //   const deleteProduct = async (productId) => {
-//     if (!window.confirm("Are you sure you want to delete this product?")) return;
+//     if (!window.confirm('Are you sure you want to delete this product?')) return;
 //     setLoading(true);
 //     try {
 //       const { data: { session } } = await supabase.auth.getSession();
 //       if (!session?.user) {
-//         setError("You must be logged in.");
+//         setError('You must be logged in.');
 //         setLoading(false);
 //         return;
 //       }
@@ -328,62 +222,98 @@
 //         .eq('id', productId)
 //         .eq('seller_id', sellerId);
 //       if (error) throw error;
-//       setMessage("Product deleted successfully!");
+//       setMessage('Product deleted successfully!');
 //       fetchSellerData();
 //     } catch (err) {
-//       console.error("Error deleting product:", err);
+//       console.error('Error deleting product:', err);
 //       setError(`Error: ${err.message}`);
 //     } finally {
 //       setLoading(false);
 //     }
 //   };
 
-//   // Navigate to order details
 //   const handleOrderClick = (orderId) => {
 //     navigate(`/order-details/${orderId}`);
 //   };
 
-//   if (loading) return <div>Loading...</div>;
-//   if (error) return <div style={{ color: 'red' }}>{error}</div>;
-//   if (!seller) return <div>Seller not found.</div>;
+//   const handleAddProduct = () => {
+//     if (!sellerLocation || !sellerLocation.lat || !sellerLocation.lon) {
+//       setMessage('Please set your store location in the Account page or here before adding products.');
+//       return;
+//     }
+//     navigate('/seller/add-product');
+//   };
+
+//   useEffect(() => {
+//     fetchSellerData();
+//     fetchCategories();
+//   }, [fetchSellerData, fetchCategories]);
+
+//   if (loading) return <div className="loading">Loading...</div>;
+//   if (error) return <div className="error" style={{ color: 'red' }}>{error}</div>;
+//   if (!seller) return <div className="not-found">Seller not found.</div>;
 
 //   return (
 //     <div className="seller-dashboard" style={{ padding: '20px' }}>
-//       <h1>Seller Dashboard - {seller.store_name}</h1>
-//       {message && <p style={{ color: 'green' }}>{message}</p>}
+//       <h1>Seller Dashboard - {seller.store_name || 'Unnamed Store'}</h1>
+//       {message && <p className="success-message" style={{ color: 'green' }}>{message}</p>}
 
-//       {/* Seller Info */}
-//       <section style={{ marginBottom: '20px' }}>
-//         <h2><FaStore /> Store Details</h2>
-//         <p>Email: {seller.profiles.email}</p>
-//         <p>Name: {seller.profiles.full_name}</p>
-//         <p>Location: {seller.location ? 'Set' : 'Not Set'}</p>
+//       <section className="seller-info" style={{ marginBottom: '20px' }}>
+//         <h2>
+//           <FaStore /> Store Details
+//         </h2>
+//         <p>Email: <span>{seller.profiles.email}</span></p>
+//         <p>Name: <span>{seller.profiles.full_name}</span></p>
+//         <p>Phone: <span>{seller.profiles.phone_number || 'Not set'}</span></p>
+//         <p>Location: <span>{address}</span></p>
+//         <p>Long-Distance Delivery: <span>{seller?.allows_long ? 'Yes' : 'No'}</span></p>
+//         <button onClick={handleDetectLocation} className="btn-location">
+//           {sellerLocation ? 'Update Location' : 'Detect & Set Location'} <FaMapMarkerAlt style={{ marginLeft: '5px' }} />
+//         </button>
+//         {locationMessage && (
+//           <p className={`location-message ${locationMessage.includes('Error') ? 'error' : 'success'}`}>
+//             {locationMessage}
+//           </p>
+//         )}
 //       </section>
 
-//       {/* Products List */}
-//       <section style={{ marginBottom: '20px' }}>
-//         <h2><FaBox /> My Products</h2>
-//         <button onClick={handleAddProduct} style={{ marginBottom: '10px' }}>
+//       <section className="products-section" style={{ marginBottom: '20px' }}>
+//         <h2>
+//           <FaBox /> My Products
+//         </h2>
+//         <button onClick={handleAddProduct} className="btn-add" style={{ marginBottom: '10px' }}>
 //           <FaPlus /> Add Product
 //         </button>
 //         {products.length === 0 ? (
 //           <p>No products found.</p>
 //         ) : (
-//           <div>
-//             {products.map(prod => (
-//               <div key={prod.id} style={{ border: '1px solid #ccc', marginBottom: '10px', padding: '10px' }}>
+//           <div className="product-list">
+//             {products.map((prod) => (
+//               <div key={prod.id} className="product-item" style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px' }}>
 //                 <h3>{prod.title}</h3>
-//                 <p>Price: {prod.price || 'N/A'}</p>
+//                 <p>Price: ₹{prod.price?.toLocaleString('en-IN') || 'N/A'}</p>
 //                 <p>Stock: {prod.stock || 'N/A'}</p>
 //                 {prod.images && prod.images.length > 0 ? (
 //                   prod.images.map((img, i) => (
-//                     <img key={i} src={img} alt={`Product ${i}`} style={{ width: '80px', marginRight: '5px' }} />
+//                     <img
+//                       key={i}
+//                       src={img}
+//                       alt={`Product ${i}`}
+//                       style={{ width: '80px', marginRight: '5px' }}
+//                       onError={(e) => { e.target.src = 'https://dummyimage.com/80'; }}
+//                     />
 //                   ))
 //                 ) : (
 //                   <p>No images</p>
 //                 )}
-//                 <Link to={`/product/${prod.id}`} style={{ marginLeft: '10px' }}>View</Link>
-//                 <button onClick={() => deleteProduct(prod.id)} style={{ marginLeft: '10px', color: 'red' }}>
+//                 <Link to={`/product/${prod.id}`} className="btn-view" style={{ marginLeft: '10px' }}>
+//                   View
+//                 </Link>
+//                 <button
+//                   onClick={() => deleteProduct(prod.id)}
+//                   className="btn-delete"
+//                   style={{ marginLeft: '10px', color: 'red' }}
+//                 >
 //                   <FaTrash /> Delete
 //                 </button>
 //               </div>
@@ -392,144 +322,29 @@
 //         )}
 //       </section>
 
-//       {/* Orders Section */}
-//       <section style={{ marginBottom: '20px' }}>
-//         <h2><FaTruck /> Buyer Orders</h2>
+//       <section className="orders-section" style={{ marginBottom: '20px' }}>
+//         <h2>
+//           <FaTruck /> Buyer Orders
+//         </h2>
 //         {orders.length === 0 ? (
 //           <p>No orders found.</p>
 //         ) : (
-//           <div>
-//             {orders.map(order => (
+//           <div className="order-list">
+//             {orders.map((order) => (
 //               <div
 //                 key={order.id}
-//                 style={{ border: '1px solid #ccc', marginBottom: '10px', padding: '10px', cursor: 'pointer' }}
+//                 className="order-item"
+//                 style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px', cursor: 'pointer' }}
 //                 onClick={() => handleOrderClick(order.id)}
 //               >
 //                 <h3>Order #{order.id}</h3>
-//                 <p>Total: {order.total}</p>
-//                 <p>Status: {order.order_status}</p>
+//                 <p>Total: ₹{order.total?.toLocaleString('en-IN') || '0'}</p>
+//                 <p>Status: {order.order_status || 'N/A'}</p>
 //               </div>
 //             ))}
 //           </div>
 //         )}
 //       </section>
-
-//       {/* Add Product Modal */}
-//       {showProductForm && (
-//         <Modal onClose={() => setShowProductForm(false)}>
-//           <h2>Add New Product (with Variants)</h2>
-//           <form onSubmit={handleSubmit(onSubmitProduct)}>
-//             {/* Main Product Fields */}
-//             <input
-//               {...register('title', { required: 'Product name is required' })}
-//               placeholder="Product Name"
-//               style={{ display: 'block', marginBottom: '10px' }}
-//             />
-//             {errors.title && <p style={{ color: 'red' }}>{errors.title.message}</p>}
-
-//             <textarea
-//               {...register('description', { required: 'Description is required' })}
-//               placeholder="Description"
-//               style={{ display: 'block', marginBottom: '10px' }}
-//             />
-//             {errors.description && <p style={{ color: 'red' }}>{errors.description.message}</p>}
-
-//             <input
-//               {...register('price', { required: 'Price is required', min: 0 })}
-//               type="number"
-//               placeholder="Price (₹)"
-//               style={{ display: 'block', marginBottom: '10px' }}
-//             />
-//             {errors.price && <p style={{ color: 'red' }}>{errors.price.message}</p>}
-
-//             <input
-//               {...register('stock', { required: 'Stock is required', min: 0 })}
-//               type="number"
-//               placeholder="Stock"
-//               style={{ display: 'block', marginBottom: '10px' }}
-//             />
-//             {errors.stock && <p style={{ color: 'red' }}>{errors.stock.message}</p>}
-
-//             {/* Category Selection */}
-//             <select {...register('category_id', { required: 'Category is required' })} style={{ display: 'block', marginBottom: '10px' }}>
-//               <option value="">Select Category</option>
-//               <option value="1">Clothing</option>
-//               <option value="2">Footwear</option>
-//               <option value="3">Electronics</option>
-//               <option value="4">Home Appliances</option>
-//               <option value="5">Groceries & Consumables</option>
-//             </select>
-//             {errors.category_id && <p style={{ color: 'red' }}>{errors.category_id.message}</p>}
-
-//             {/* Main Product Images */}
-//             <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'block', marginBottom: '10px' }} />
-//             {previewImages.length > 0 && (
-//               <div style={{ marginBottom: '10px' }}>
-//                 {previewImages.map((src, idx) => (
-//                   <img key={idx} src={src} alt={`Preview ${idx}`} width="80" style={{ marginRight: '5px' }} />
-//                 ))}
-//               </div>
-//             )}
-
-//             {/* Variant Section */}
-//             <h3>Variants</h3>
-//             {variantFields.map((field, index) => {
-//               // Dynamically render inputs based on the selected category.
-//               // For example, if Mobile (category_id 3) is chosen, show ram, storage, color.
-//               // If Footwear (category_id 2) is chosen, show size and color.
-//               // If no matching attributes, fall back to default fields.
-//               let variantInputs = null;
-//               if (selectedCategory === 3) { // Mobile
-//                 variantInputs = (
-//                   <>
-//                     <input {...register(`variants.${index}.ram`)} placeholder="RAM (e.g., 4GB)" style={{ display: 'block', marginBottom: '5px' }} />
-//                     <input {...register(`variants.${index}.storage`)} placeholder="Storage (e.g., 64GB)" style={{ display: 'block', marginBottom: '5px' }} />
-//                     <input {...register(`variants.${index}.color`)} placeholder="Color (e.g., Black)" style={{ display: 'block', marginBottom: '5px' }} />
-//                   </>
-//                 );
-//               } else if (selectedCategory === 2) { // Footwear
-//                 variantInputs = (
-//                   <>
-//                     <input {...register(`variants.${index}.size`)} placeholder="Size (e.g., 9)" style={{ display: 'block', marginBottom: '5px' }} />
-//                     <input {...register(`variants.${index}.color`)} placeholder="Color (e.g., Black)" style={{ display: 'block', marginBottom: '5px' }} />
-//                   </>
-//                 );
-//               } else {
-//                 // Fallback default (for Clothing, Home Appliances, etc.)
-//                 variantInputs = (
-//                   <>
-//                     <input {...register(`variants.${index}.attribute1`)} placeholder="Attribute 1" style={{ display: 'block', marginBottom: '5px' }} />
-//                   </>
-//                 );
-//               }
-//               return (
-//                 <div key={field.id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px' }}>
-//                   {variantInputs}
-//                   <input {...register(`variants.${index}.price`)} type="number" placeholder="Variant Price" style={{ display: 'block', marginBottom: '5px' }} />
-//                   <input {...register(`variants.${index}.stock`)} type="number" placeholder="Variant Stock" style={{ display: 'block', marginBottom: '5px' }} />
-
-//                   {/* Variant Images */}
-//                   <input type="file" multiple accept="image/*" onChange={(e) => handleVariantImageChange(e, index)} style={{ display: 'block', marginBottom: '5px' }} />
-
-//                   <button type="button" onClick={() => removeVariant(index)} style={{ background: 'red', color: '#fff', padding: '5px 10px' }}>
-//                     Remove Variant
-//                   </button>
-//                 </div>
-//               );
-//             })}
-//             <button type="button" onClick={() => appendVariant({ attributes: {} })} style={{ marginTop: '10px' }}>
-//               <FaPlus /> Add Another Variant
-//             </button>
-
-//             <button type="submit" disabled={loading} style={{ marginTop: '20px', background: 'blue', color: '#fff', padding: '8px 16px' }}>
-//               {loading ? 'Saving...' : 'Save'}
-//             </button>
-//             <button type="button" onClick={() => { setShowProductForm(false); reset(); setPreviewImages([]); }} disabled={loading} style={{ marginLeft: '10px', background: 'gray', color: '#fff', padding: '8px 16px' }}>
-//               Cancel
-//             </button>
-//           </form>
-//         </Modal>
-//       )}
 //     </div>
 //   );
 // }
@@ -537,65 +352,26 @@
 // export default SellerDashboard;
 
 
-
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { FaStore, FaBox, FaTruck, FaPlus, FaTrash } from 'react-icons/fa';
-import { useForm, useFieldArray } from 'react-hook-form';
-
-// Reusable Modal Component
-const Modal = ({ children, onClose }) => (
-  <div className="modal" style={{
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center'
-  }}>
-    <div className="modal-content" style={{
-      background: '#fff', padding: '20px', borderRadius: '8px', maxWidth: '500px', width: '100%'
-    }}>
-      {children}
-      <button onClick={onClose} style={{
-        marginTop: '10px', background: 'gray', color: '#fff', padding: '5px 10px',
-        border: 'none', borderRadius: '4px'
-      }}>Close</button>
-    </div>
-  </div>
-);
+import { LocationContext } from '../App';
+import { FaStore, FaBox, FaTruck, FaPlus, FaTrash, FaMapMarkerAlt } from 'react-icons/fa';
+import '../style/SellerDashboard.css';
 
 function SellerDashboard() {
   const navigate = useNavigate();
+  const { sellerLocation, setSellerLocation } = useContext(LocationContext);
   const [seller, setSeller] = useState(null);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null); // This will be a number (category id)
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [previewImages, setPreviewImages] = useState([]);
-  const [showProductForm, setShowProductForm] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('');
+  const [address, setAddress] = useState('Not set');
 
-  // Set up react-hook-form with field array for variants.
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors }, control } = useForm({
-    defaultValues: {
-      variants: [{}],
-    },
-  });
-  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
-    control,
-    name: 'variants',
-  });
-
-  // Watch category selection so that variant fields update accordingly.
-  const watchCategoryId = watch('category_id');
-  useEffect(() => {
-    if (watchCategoryId) {
-      setSelectedCategory(parseInt(watchCategoryId, 10));
-    }
-  }, [watchCategoryId]);
-
-  // Fetch categories (each row should include variant_attributes, e.g., ["ram", "storage", "color"] for Mobile)
   const fetchCategories = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -605,36 +381,34 @@ function SellerDashboard() {
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
-      console.error("Error fetching categories:", err);
-      setError("Failed to load categories.");
+      console.error('Error fetching categories:', err);
+      setError('Failed to load categories.');
     }
   }, []);
 
-  // Fetch seller, products, and orders
   const fetchSellerData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        setError("You must be logged in.");
-        setLoading(false);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        setError('You must be logged in.');
+        navigate('/auth');
         return;
       }
       const sellerId = session.user.id;
 
-      // Check seller permission
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('is_seller')
         .eq('id', sellerId)
         .single();
-      if (!profile?.is_seller) {
-        setError("You do not have permission to access seller functions.");
-        setLoading(false);
+      if (profileError || !profile?.is_seller) {
+        setError('You do not have permission to access seller functions.');
+        navigate('/account');
         return;
       }
 
-      // Fetch seller details
       const { data: sellerData, error: sellerError } = await supabase
         .from('sellers')
         .select('*, profiles(email, full_name, phone_number)')
@@ -643,285 +417,272 @@ function SellerDashboard() {
       if (sellerError) throw sellerError;
       setSeller(sellerData);
 
-      // Fetch products
+      if (sellerData.latitude && sellerData.longitude) {
+        setSellerLocation({ lat: sellerData.latitude, lon: sellerData.longitude });
+        await fetchAddress(sellerData.latitude, sellerData.longitude);
+      }
+
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select('id, title, price, images, stock, product_variants (id, attributes, price, stock, images)')
         .eq('seller_id', sellerId)
         .eq('is_approved', true);
       if (productsError) throw productsError;
-      setProducts(productsData || []);
+      const mappedProducts = productsData.map((product) => {
+        const variants = product.product_variants || [];
+        const primaryVariant = variants.length > 0 ? variants[0] : null;
+        return {
+          id: product.id,
+          title: product.title || 'Unnamed Product',
+          price: primaryVariant?.price > 0 ? primaryVariant.price : product.price || 0,
+          stock: primaryVariant?.stock ?? product.stock ?? 0,
+          images: primaryVariant?.images?.length > 0
+            ? primaryVariant.images
+            : product.images?.length > 0
+              ? product.images
+              : ['https://dummyimage.com/150'],
+          variants: variants.map(variant => ({
+            id: variant.id,
+            attributes: variant.attributes,
+            price: variant.price,
+            stock: variant.stock,
+            images: variant.images,
+          })),
+        };
+      });
+      setProducts(mappedProducts);
 
-      // Fetch orders
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select('*, order_items(*, products(name, price))')
+        .select('*, order_items (product_id, quantity, price, products (title, images))')
         .eq('seller_id', sellerId);
       if (ordersError) throw ordersError;
       setOrders(ordersData || []);
     } catch (err) {
-      console.error("Error fetching seller data:", err);
+      console.error('Error fetching seller data:', err);
       setError(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }, [navigate]);
+  }, [navigate, setSellerLocation]);
+
+  const fetchAddress = async (lat, lon) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`
+      );
+      const data = await response.json();
+      if (data && data.display_name) {
+        setAddress(data.display_name);
+        return data.display_name;
+      } else {
+        setAddress('Address not found');
+        return 'Address not found';
+      }
+    } catch (err) {
+      console.error('Error fetching address:', err);
+      setAddress('Error fetching address');
+      return 'Error fetching address';
+    }
+  };
+
+  const handleDetectLocation = async () => {
+    if (!navigator.geolocation) {
+      setLocationMessage('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setLocationMessage('Detecting location...');
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const newLocation = { lat, lon };
+
+        try {
+          if (!seller?.id) throw new Error('Seller ID not available');
+
+          const { data: existingSeller, error: fetchError } = await supabase
+            .from('sellers')
+            .select('store_name, allows_long')
+            .eq('id', seller.id)
+            .single();
+
+          let storeNameToUse = existingSeller?.store_name || null;
+          let allowsLong = existingSeller?.allows_long || false;
+
+          if (!storeNameToUse) {
+            storeNameToUse = prompt('Please enter your store name:', 'Default Store');
+            if (!storeNameToUse) {
+              setLocationMessage('Store name is required to set location.');
+              return;
+            }
+          }
+
+          const allowLongInput = window.confirm('Allow long-distance delivery (beyond 40km)?');
+          allowsLong = allowLongInput;
+
+          const { error: rpcError } = await supabase.rpc('set_seller_location', {
+            seller_uuid: seller.id,
+            user_lat: lat,
+            user_lon: lon,
+            store_name_input: storeNameToUse,
+            allow_long_input: allowsLong,
+          });
+
+          if (rpcError) throw rpcError;
+
+          setSellerLocation(newLocation);
+          const newAddress = await fetchAddress(lat, lon);
+          setSeller((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lon,
+            store_name: storeNameToUse,
+            allows_long: allowsLong,
+          }));
+          setLocationMessage(`Location ${sellerLocation ? 'updated' : 'set'} successfully! New address: ${newAddress}`);
+          fetchSellerData(); // Refresh data after location update
+        } catch (err) {
+          console.error('Error updating location:', err);
+          setLocationMessage(`Error: ${err.message || 'Something went wrong'}`);
+        }
+      },
+      (geoError) => {
+        console.error('Error detecting location:', geoError);
+        let errorMsg = 'Error detecting location: ';
+        switch (geoError.code) {
+          case geoError.PERMISSION_DENIED:
+            errorMsg += 'Permission denied.';
+            break;
+          case geoError.POSITION_UNAVAILABLE:
+            errorMsg += 'Location unavailable.';
+            break;
+          case geoError.TIMEOUT:
+            errorMsg += 'Request timed out.';
+            break;
+          default:
+            errorMsg += 'Unknown error.';
+        }
+        setLocationMessage(errorMsg);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const deleteProduct = async (productId) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId)
+        .eq('seller_id', seller.id);
+      if (error) throw error;
+      setMessage('Product deleted successfully!');
+      fetchSellerData();
+    } catch (err) {
+      console.error('Error deleting product:', err);
+      setError(`Error deleting product: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOrderClick = (orderId) => {
+    navigate(`/order-details/${orderId}`);
+  };
+
+  const handleAddProduct = () => {
+    if (!sellerLocation || !sellerLocation.lat || !sellerLocation.lon) {
+      setError('Please set your store location before adding products.');
+      return;
+    }
+    navigate('/seller/add-product');
+  };
 
   useEffect(() => {
     fetchSellerData();
     fetchCategories();
   }, [fetchSellerData, fetchCategories]);
 
-  // Upload image to Supabase Storage
-  const uploadImage = async (file) => {
-    setLoading(true);
-    try {
-      if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-        throw new Error("Invalid image file.");
-      }
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const { error } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file);
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(fileName);
-      return publicUrl;
-    } catch (err) {
-      console.error("Upload image error:", err);
-      setError("Failed to upload image.");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle main product images
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setValue('images', files);
-    setPreviewImages(files.map(f => URL.createObjectURL(f)));
-  };
-
-  // Handle variant images
-  const handleVariantImageChange = (e, index) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    setValue(`variants.${index}.images`, files);
-  };
-
-  // Show Add Product modal
-  const handleAddProduct = () => {
-    setShowProductForm(true);
-    reset({
-      title: '',
-      description: '',
-      price: '',
-      stock: '',
-      category_id: '',
-      images: [],
-      variants: [{}],
-    });
-    setPreviewImages([]);
-  };
-
-  // Insert product and its variants
-  const onSubmitProduct = async (formData) => {
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        setError("You must be logged in.");
-        setLoading(false);
-        return;
-      }
-      const sellerId = session.user.id;
-
-      // Verify seller permission
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_seller')
-        .eq('id', sellerId)
-        .single();
-      if (!profile?.is_seller) {
-        setError("You do not have permission to add products.");
-        setLoading(false);
-        return;
-      }
-
-      // Check store location
-      const { data: sellerData } = await supabase
-        .from('sellers')
-        .select('location')
-        .eq('id', sellerId)
-        .single();
-      if (!sellerData.location) {
-        setError("Please set your store location before adding products.");
-        setLoading(false);
-        return;
-      }
-
-      // Upload main product images
-      let imageUrls = [];
-      if (formData.images && formData.images.length > 0) {
-        const uploadPromises = formData.images.map(file => uploadImage(file));
-        const results = await Promise.all(uploadPromises);
-        imageUrls = results.filter(Boolean);
-      }
-
-      // Insert main product
-      const { data: insertedProduct, error: productError } = await supabase
-        .from('products')
-        .insert({
-          seller_id: sellerId,
-          category_id: parseInt(formData.category_id, 10),
-          title: formData.title.trim(),
-          description: formData.description,
-          price: parseFloat(formData.price),
-          stock: parseInt(formData.stock, 10),
-          images: imageUrls,
-          is_approved: false,
-          status: 'active',
-        })
-        .select('id')
-        .single();
-      if (productError) throw productError;
-      const newProductId = insertedProduct.id;
-
-      // Insert each variant using fixed fields based on category.
-      // For example, if category "Mobile" (id=3) is selected, we use ram, storage, color.
-      // If category "Footwear" (id=2) is selected, we might use size and color.
-      const variantPromises = formData.variants.map(async (variant) => {
-        let variantImageUrls = [];
-        if (variant.images && variant.images.length > 0) {
-          const variantUploads = variant.images.map(file => uploadImage(file));
-          const results = await Promise.all(variantUploads);
-          variantImageUrls = results.filter(Boolean);
-        }
-        let attributes = {};
-        if (parseInt(formData.category_id, 10) === 3) {
-          // Mobile
-          attributes = {
-            ram: variant.ram || '',
-            storage: variant.storage || '',
-            color: variant.color || '',
-          };
-        } else if (parseInt(formData.category_id, 10) === 2) {
-          // Footwear example: size and color
-          attributes = {
-            size: variant.size || '',
-            color: variant.color || '',
-          };
-        } else {
-          // Default fallback
-          attributes = {
-            attribute1: variant.attribute1 || '',
-          };
-        }
-        const { error: variantError } = await supabase
-          .from('product_variants')
-          .insert({
-            product_id: newProductId,
-            attributes,
-            price: parseFloat(variant.price) || 0,
-            stock: parseInt(variant.stock, 10) || 0,
-            images: variantImageUrls,
-            status: 'active',
-          });
-        if (variantError) throw variantError;
-      });
-      await Promise.all(variantPromises);
-
-      setMessage("Product added successfully (with variants)!");
-      reset();
-      setShowProductForm(false);
-      setPreviewImages([]);
-      fetchSellerData();
-    } catch (err) {
-      console.error("Error adding product with variants:", err);
-      setError(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Delete a product
-  const deleteProduct = async (productId) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        setError("You must be logged in.");
-        setLoading(false);
-        return;
-      }
-      const sellerId = session.user.id;
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId)
-        .eq('seller_id', sellerId);
-      if (error) throw error;
-      setMessage("Product deleted successfully!");
-      fetchSellerData();
-    } catch (err) {
-      console.error("Error deleting product:", err);
-      setError(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Navigate to order details
-  const handleOrderClick = (orderId) => {
-    navigate(`/order-details/${orderId}`);
-  };
-
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div style={{ color: 'red' }}>{error}</div>;
-  if (!seller) return <div>Seller not found.</div>;
+  if (loading) return <div className="loading">Loading...</div>;
+  if (error && !seller) return <div className="error" style={{ color: 'red' }}>{error}</div>;
 
   return (
     <div className="seller-dashboard" style={{ padding: '20px' }}>
-      <h1>Seller Dashboard - {seller.store_name}</h1>
-      {message && <p style={{ color: 'green' }}>{message}</p>}
+      <h1>Seller Dashboard - {seller?.store_name || 'Unnamed Store'}</h1>
+      {message && <p className="success-message" style={{ color: 'green' }}>{message}</p>}
+      {error && <p className="error-message" style={{ color: 'red' }}>{error}</p>}
 
-      {/* Seller Info */}
-      <section style={{ marginBottom: '20px' }}>
+      <section className="seller-info" style={{ marginBottom: '20px' }}>
         <h2><FaStore /> Store Details</h2>
-        <p>Email: {seller.profiles.email}</p>
-        <p>Name: {seller.profiles.full_name}</p>
-        <p>Location: {seller.location ? 'Set' : 'Not Set'}</p>
+        <p>Email: <span>{seller?.profiles.email}</span></p>
+        <p>Name: <span>{seller?.profiles.full_name || 'Not set'}</span></p>
+        <p>Phone: <span>{seller?.profiles.phone_number || 'Not set'}</span></p>
+        <p>Location: <span>{address}</span></p>
+        <p>Long-Distance Delivery: <span>{seller?.allows_long ? 'Yes' : 'No'}</span></p>
+        <button onClick={handleDetectLocation} className="btn-location">
+          {sellerLocation ? 'Update Location' : 'Detect & Set Location'} <FaMapMarkerAlt style={{ marginLeft: '5px' }} />
+        </button>
+        {locationMessage && (
+          <p className={`location-message ${locationMessage.includes('Error') ? 'error' : 'success'}`}>
+            {locationMessage}
+          </p>
+        )}
       </section>
 
-      {/* Products List */}
-      <section style={{ marginBottom: '20px' }}>
+      <section className="products-section" style={{ marginBottom: '20px' }}>
         <h2><FaBox /> My Products</h2>
-        <button onClick={handleAddProduct} style={{ marginBottom: '10px' }}>
+        <button onClick={handleAddProduct} className="btn-add" style={{ marginBottom: '10px' }}>
           <FaPlus /> Add Product
         </button>
         {products.length === 0 ? (
           <p>No products found.</p>
         ) : (
-          <div>
-            {products.map(prod => (
-              <div key={prod.id} style={{ border: '1px solid #ccc', marginBottom: '10px', padding: '10px' }}>
+          <div className="product-list">
+            {products.map((prod) => (
+              <div key={prod.id} className="product-item" style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px' }}>
                 <h3>{prod.title}</h3>
-                <p>Price: {prod.price || 'N/A'}</p>
-                <p>Stock: {prod.stock || 'N/A'}</p>
-                {prod.images && prod.images.length > 0 ? (
+                <p>Price: ₹{(prod.price || 0).toLocaleString('en-IN')}</p>
+                <p>Stock: {prod.stock}</p>
+                {prod.images?.length > 0 && (
                   prod.images.map((img, i) => (
-                    <img key={i} src={img} alt={`Product ${i}`} style={{ width: '80px', marginRight: '5px' }} />
+                    <img
+                      key={i}
+                      src={img}
+                      alt={`Product ${i}`}
+                      style={{ width: '80px', marginRight: '5px' }}
+                      onError={(e) => { e.target.src = 'https://dummyimage.com/80'; }}
+                    />
                   ))
-                ) : (
-                  <p>No images</p>
                 )}
-                <Link to={`/product/${prod.id}`} style={{ marginLeft: '10px' }}>View</Link>
-                <button onClick={() => deleteProduct(prod.id)} style={{ marginLeft: '10px', color: 'red' }}>
+                {prod.variants.length > 0 && (
+                  <div className="variant-list">
+                    <h4>Variants:</h4>
+                    {prod.variants.map((variant) => (
+                      <div key={variant.id} className="variant-item">
+                        <p>
+                          {Object.entries(variant.attributes)
+                            .filter(([_, value]) => value)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join(', ')}
+                        </p>
+                        <p>Price: ₹{(variant.price || 0).toLocaleString('en-IN')}</p>
+                        <p>Stock: {variant.stock}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Link to={`/product/${prod.id}`} className="btn-view" style={{ marginLeft: '10px' }}>
+                  View
+                </Link>
+                <button
+                  onClick={() => deleteProduct(prod.id)}
+                  className="btn-delete"
+                  style={{ marginLeft: '10px', color: 'red' }}
+                >
                   <FaTrash /> Delete
                 </button>
               </div>
@@ -930,145 +691,37 @@ function SellerDashboard() {
         )}
       </section>
 
-      {/* Orders Section */}
-      <section style={{ marginBottom: '20px' }}>
+      <section className="orders-section" style={{ marginBottom: '20px' }}>
         <h2><FaTruck /> Buyer Orders</h2>
         {orders.length === 0 ? (
           <p>No orders found.</p>
         ) : (
-          <div>
-            {orders.map(order => (
+          <div className="order-list">
+            {orders.map((order) => (
               <div
                 key={order.id}
-                style={{ border: '1px solid #ccc', marginBottom: '10px', padding: '10px', cursor: 'pointer' }}
+                className="order-item"
+                style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px', cursor: 'pointer' }}
                 onClick={() => handleOrderClick(order.id)}
               >
                 <h3>Order #{order.id}</h3>
-                <p>Total: {order.total}</p>
-                <p>Status: {order.order_status}</p>
+                <p>Total: ₹{(order.total || 0).toLocaleString('en-IN')}</p>
+                <p>Status: {order.order_status || 'N/A'}</p>
+                {order.order_items?.length > 0 && (
+                  <div>
+                    <h4>Items:</h4>
+                    {order.order_items.map((item, idx) => (
+                      <p key={`${item.product_id}-${idx}`}>
+                        {item.products?.title || 'Unnamed Product'} - Qty: {item.quantity}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </section>
-
-      {/* Add Product Modal */}
-      {showProductForm && (
-        <Modal onClose={() => setShowProductForm(false)}>
-          <h2>Add New Product (with Variants)</h2>
-          {/* Example Note: */}
-          <p style={{ background: '#f0f0f0', padding: '10px', borderRadius: '4px' }}>
-            <strong>Example for Mobile:</strong> For a mobile product, enter variant values like: RAM: <em>4GB</em>, Storage: <em>64GB</em>, Color: <em>Black</em>.
-          </p>
-          <form onSubmit={handleSubmit(onSubmitProduct)}>
-            {/* Main Product Fields */}
-            <input
-              {...register('title', { required: 'Product name is required' })}
-              placeholder="Product Name"
-              style={{ display: 'block', marginBottom: '10px' }}
-            />
-            {errors.title && <p style={{ color: 'red' }}>{errors.title.message}</p>}
-
-            <textarea
-              {...register('description', { required: 'Description is required' })}
-              placeholder="Description"
-              style={{ display: 'block', marginBottom: '10px' }}
-            />
-            {errors.description && <p style={{ color: 'red' }}>{errors.description.message}</p>}
-
-            <input
-              {...register('price', { required: 'Price is required', min: 0 })}
-              type="number"
-              placeholder="Price (₹)"
-              style={{ display: 'block', marginBottom: '10px' }}
-            />
-            {errors.price && <p style={{ color: 'red' }}>{errors.price.message}</p>}
-
-            <input
-              {...register('stock', { required: 'Stock is required', min: 0 })}
-              type="number"
-              placeholder="Stock"
-              style={{ display: 'block', marginBottom: '10px' }}
-            />
-            {errors.stock && <p style={{ color: 'red' }}>{errors.stock.message}</p>}
-
-            {/* Category Selection */}
-            <select {...register('category_id', { required: 'Category is required' })} style={{ display: 'block', marginBottom: '10px' }}>
-              <option value="">Select Category</option>
-              <option value="1">Clothing</option>
-              <option value="2">Footwear</option>
-              <option value="3">Electronics</option>
-              <option value="4">Home Appliances</option>
-              <option value="5">Groceries & Consumables</option>
-            </select>
-            {errors.category_id && <p style={{ color: 'red' }}>{errors.category_id.message}</p>}
-
-            {/* Main Product Images */}
-            <input type="file" multiple accept="image/*" onChange={handleImageChange} style={{ display: 'block', marginBottom: '10px' }} />
-            {previewImages.length > 0 && (
-              <div style={{ marginBottom: '10px' }}>
-                {previewImages.map((src, idx) => (
-                  <img key={idx} src={src} alt={`Preview ${idx}`} width="80" style={{ marginRight: '5px' }} />
-                ))}
-              </div>
-            )}
-
-            {/* Variant Section */}
-            <h3>Variants</h3>
-            {variantFields.map((field, index) => {
-              let variantInputs = null;
-              if (selectedCategory === 3) { // Mobile
-                variantInputs = (
-                  <>
-                    <input {...register(`variants.${index}.ram`)} placeholder="RAM (e.g., 4GB)" style={{ display: 'block', marginBottom: '5px' }} />
-                    <input {...register(`variants.${index}.storage`)} placeholder="Storage (e.g., 64GB)" style={{ display: 'block', marginBottom: '5px' }} />
-                    <input {...register(`variants.${index}.color`)} placeholder="Color (e.g., Black)" style={{ display: 'block', marginBottom: '5px' }} />
-                  </>
-                );
-              } else if (selectedCategory === 2) { // Footwear
-                variantInputs = (
-                  <>
-                    <input {...register(`variants.${index}.size`)} placeholder="Size (e.g., 9)" style={{ display: 'block', marginBottom: '5px' }} />
-                    <input {...register(`variants.${index}.color`)} placeholder="Color (e.g., Black)" style={{ display: 'block', marginBottom: '5px' }} />
-                  </>
-                );
-              } else {
-                variantInputs = (
-                  <>
-                    <input {...register(`variants.${index}.attribute1`)} placeholder="Attribute 1" style={{ display: 'block', marginBottom: '5px' }} />
-                  </>
-                );
-              }
-              return (
-                <div key={field.id} style={{ border: '1px solid #ccc', padding: '10px', marginBottom: '10px' }}>
-                  {variantInputs}
-                  <input {...register(`variants.${index}.price`)} type="number" placeholder="Variant Price" style={{ display: 'block', marginBottom: '5px' }} />
-                  <input {...register(`variants.${index}.stock`)} type="number" placeholder="Variant Stock" style={{ display: 'block', marginBottom: '5px' }} />
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => handleVariantImageChange(e, index)}
-                    style={{ display: 'block', marginBottom: '5px' }}
-                  />
-                  <button type="button" onClick={() => removeVariant(index)} style={{ background: 'red', color: '#fff', padding: '5px 10px' }}>
-                    Remove Variant
-                  </button>
-                </div>
-              );
-            })}
-            <button type="button" onClick={() => appendVariant({ attributes: {} })} style={{ marginTop: '10px' }}>
-              <FaPlus /> Add Another Variant
-            </button>
-            <button type="submit" disabled={loading} style={{ marginTop: '20px', background: 'blue', color: '#fff', padding: '8px 16px' }}>
-              {loading ? 'Saving...' : 'Save'}
-            </button>
-            <button type="button" onClick={() => { setShowProductForm(false); reset(); setPreviewImages([]); }} disabled={loading} style={{ marginLeft: '10px', background: 'gray', color: '#fff', padding: '8px 16px' }}>
-              Cancel
-            </button>
-          </form>
-        </Modal>
-      )}
     </div>
   );
 }

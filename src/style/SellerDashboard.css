@@ -1,0 +1,262 @@
+/* Container */
+.seller-dashboard {
+  max-width: 1200px;
+  margin: 10px auto; /* Reduced margin */
+  padding: 0 10px;
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+/* Headings */
+.seller-dashboard h1 {
+  font-size: 1.5rem; /* Smaller for mobile */
+  margin-bottom: 15px;
+  text-align: center;
+  color: #007bff;
+}
+
+.seller-info h2,
+.products-section h2,
+.orders-section h2 {
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  color: #007bff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Messages */
+.success-message {
+  color: #28a745;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.error-message {
+  color: #dc3545;
+  margin-bottom: 8px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.location-message {
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+.location-message.error {
+  color: #dc3545;
+}
+.location-message.success {
+  color: #28a745;
+}
+
+/* Loading / Error */
+.loading,
+.error {
+  text-align: center;
+  margin: 15px 0;
+  font-size: 0.9rem;
+  color: #dc3545;
+}
+
+/* Sections */
+.seller-info,
+.products-section,
+.orders-section {
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+/* Seller Info */
+.seller-info p {
+  margin: 4px 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+.seller-info span {
+  color: #333;
+  font-weight: 500;
+}
+
+/* Buttons */
+.btn-location,
+.btn-add,
+.btn-view,
+.btn-delete {
+  padding: 6px 12px; /* Smaller for mobile */
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.btn-location {
+  background-color: #28a745;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+.btn-location:hover {
+  background-color: #218838;
+}
+
+.btn-add {
+  background-color: #007bff;
+  margin-bottom: 8px;
+}
+.btn-add:hover {
+  background-color: #0056b3;
+}
+
+.btn-view {
+  background-color: #17a2b8;
+  text-decoration: none;
+  display: inline-block;
+  margin-left: 8px;
+}
+.btn-view:hover {
+  background-color: #138496;
+}
+
+.btn-delete {
+  background-color: #dc3545;
+  margin-left: 8px;
+}
+.btn-delete:hover {
+  background-color: #c82333;
+}
+
+/* Product List */
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.product-item {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column; /* Stack items vertically on mobile */
+  align-items: center;
+}
+
+.product-item h3 {
+  margin: 0 0 4px 0;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.product-item p {
+  margin: 2px 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.product-item img {
+  width: 60px; /* Smaller for mobile */
+  height: 60px;
+  object-fit: cover;
+  margin: 4px 0;
+  border-radius: 4px;
+}
+
+/* Variant List */
+.variant-list {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.variant-list h4 {
+  margin: 0 0 4px 0;
+  font-size: 0.85rem;
+  color: #007bff;
+}
+
+.variant-item {
+  margin: 4px 0;
+  font-size: 0.8rem;
+}
+
+.variant-item p {
+  margin: 2px 0;
+  color: #666;
+}
+
+/* Order List */
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.order-item {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.order-item:hover {
+  background-color: #f1f1f1;
+}
+
+.order-item h3 {
+  margin: 0 0 4px 0;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.order-item p {
+  margin: 2px 0;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .seller-dashboard {
+    padding: 0 5px;
+  }
+  .product-item img {
+    width: 50px;
+    height: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .seller-dashboard h1 {
+    font-size: 1.3rem;
+  }
+  .seller-info h2,
+  .products-section h2,
+  .orders-section h2 {
+    font-size: 1rem;
+  }
+  .btn-location,
+  .btn-add,
+  .btn-view,
+  .btn-delete {
+    width: 100%; /* Full-width buttons */
+    padding: 8px;
+    margin: 4px 0; /* Stack buttons vertically */
+  }
+  .product-item {
+    text-align: center;
+  }
+  .order-item {
+    padding: 6px;
+  }
+}

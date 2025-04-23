@@ -1,58 +1,82 @@
+/* Footer.css */
 .footer {
-    background-color: #fff;
-    border-top: 1px solid #ddd;
-    padding: 10px 0;
-    margin-top: auto; /* Pushes footer to bottom of page */
-  }
-  
-  .nav-container {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-  }
-  
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: #1e90ff; /* Gahara neela background - trust ke liye */
+  padding: 10px 0;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Thoda sa shadow */
+  z-index: 1000; /* Other content ke upar rahe */
+}
+
+.nav-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  text-decoration: none;
+  font-size: 12px;
+  padding: 5px;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.nav-item:hover {
+  color: #f0f8ff; /* Halka neela hover */
+  transform: scale(1.1); /* Thoda zoom effect */
+}
+
+.nav-item.active {
+  color: #4169e1; /* Neela jab active ho */
+  font-weight: bold;
+}
+
+.nav-item svg {
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.cart-badge {
+  background-color: #dc3545; /* Red badge for cart count */
+  color: white;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 10px;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+}
+
+/* Mobile Optimization (already optimized, but fine-tuning) */
+@media (max-width: 600px) {
   .nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-decoration: none;
-    color: #666;
-    font-size: 14px;
-    padding: 5px;
-    transition: color 0.3s;
+    font-size: 10px;
+    padding: 3px;
   }
-  
-  .nav-item.active {
-    color: #007bff;
-  }
-  
-  .nav-item:hover {
-    color: #007bff;
-  }
-  
+
   .nav-item svg {
-    font-size: 24px;
-    margin-bottom: 5px;
-    border-radius: 50%; /* Circular icons */
-    padding: 5px; /* Add padding for circular effect */
-    background-color: transparent; /* Ensure no background unless active */
+    font-size: 18px;
   }
-  
-  .nav-item.active svg {
-    color: #007bff; /* Blue for active links */
-  }
-  
+
   .cart-badge {
-    background-color: #ff4444;
-    color: white;
-    border-radius: 50%;
-    padding: 2px 8px;
-    font-size: 12px;
-    margin-left: 5px;
-    position: absolute;
-    top: 5px;
-    right: -10px;
+    font-size: 8px;
+    padding: 1px 4px;
+    min-width: 14px;
+    height: 14px;
+    top: -4px;
+    right: -4px;
   }
+}

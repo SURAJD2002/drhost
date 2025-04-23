@@ -1,71 +1,124 @@
+/* Categories.css */
 .categories-page {
-    text-align: center;
-    padding: 20px;
-  }
-  
+  padding: 10px;
+  background-color: #f0f8ff; /* Halka neela background */
+  min-height: 100vh;
+}
+
+.categories-page h1 {
+  text-align: center;
+  color: #1e90ff; /* Gahara neela heading */
+  font-size: 24px;
+  margin-bottom: 15px;
+}
+
+.search-bar {
+  margin-bottom: 15px;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #4169e1; /* Neela border */
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.category-card {
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.category-card:hover {
+  transform: scale(1.05); /* Zoom effect on hover */
+}
+
+.category-card.selected {
+  border: 2px solid #4169e1; /* Neela border jab selected ho */
+}
+
+.category-image {
+  width: 100%;
+  height: 100px;
+  object-fit: cover; /* Image fit properly */
+  border-radius: 5px;
+  margin-bottom: 5px;
+}
+
+.category-card h3 {
+  font-size: 14px;
+  margin: 5px 0;
+  color: #333;
+}
+
+.category-card p {
+  font-size: 12px;
+  margin: 2px 0;
+  color: #555;
+}
+
+.view-products-link {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 5px 10px;
+  background-color: #4169e1; /* Neela button */
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.view-products-link:hover {
+  background-color: #0000cd; /* Gahara neela hover */
+}
+
+.error-message {
+  text-align: center;
+  color: #dc3545; /* Red for error */
+  margin-bottom: 10px;
+}
+
+/* Mobile Optimization */
+@media (max-width: 600px) {
   .categories-page h1 {
-    margin-bottom: 20px;
-    color: #333;
+    font-size: 20px;
   }
-  
+
   .search-bar input {
-    width: 100%;
-    max-width: 400px;
-    padding: 10px;
-    margin: 20px 0;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    font-size: 12px;
+    padding: 8px;
   }
-  
+
   .category-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin-top: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
-  
-  .category-card {
-    border: 1px solid #ddd;
-    padding: 15px;
-    border-radius: 5px;
-    text-align: center;
-    background-color: #fff;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  .category-image {
+    height: 80px; /* Choti screen ke liye image size adjust */
   }
-  
-  .category-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-  }
-  
-  .category-card.selected {
-    border-color: #007bff;
-    background-color: #f0f8ff;
-  }
-  
+
   .category-card h3 {
-    margin: 0 0 10px;
-    color: #007bff;
+    font-size: 12px;
   }
-  
+
   .category-card p {
-    margin: 0 0 10px;
-    color: #666;
-    font-size: 14px;
+    font-size: 10px;
   }
-  
-  .category-card a {
-    display: inline-block;
-    color: #007bff;
-    text-decoration: none;
-    padding: 5px 10px;
-    border: 1px solid #007bff;
-    border-radius: 4px;
+
+  .view-products-link {
+    font-size: 10px;
+    padding: 4px 8px;
   }
-  
-  .category-card a:hover {
-    background-color: #007bff;
-    color: white;
-  }
+}
