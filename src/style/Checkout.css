@@ -1,222 +1,253 @@
-/* Mobile-first styles for FreshCart Checkout */
-
+/* Base styles for mobile */
 .checkout {
-  margin: 10px;
-  padding: 12px;
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: none;
   max-width: 100%;
-  width: 100%;
+  margin: 0 auto;
+  padding: 10px;
+  font-family: Arial, sans-serif;
+  color: #666;
+  background-color: #fff;
 }
 
 .checkout h1 {
-  font-size: 20px;
-  margin-bottom: 16px;
-  text-align: center;
+  font-size: 1.5rem;
   color: #007bff;
+  text-align: center;
+  margin-bottom: 15px;
 }
 
 .checkout p {
-  font-size: 14px;
-  color: #666;
-  margin: 8px 0;
+  font-size: 0.9rem;
+  margin: 5px 0;
+}
+
+.checkout-success h1,
+.checkout-success p {
+  text-align: center;
 }
 
 .checkout-loading,
-.checkout-error,
-.checkout-success {
-  text-align: center;
-  padding: 16px;
-  font-size: 16px;
-  color: #666;
-}
-
 .checkout-error {
-  color: #dc3545;
-}
-
-.checkout-success {
-  color: #28a745;
+  text-align: center;
+  padding: 20px;
+  font-size: 1rem;
+  color: #d9534f;
 }
 
 .checkout-items {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
 }
 
 .checkout-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 12px;
-  background-color: #f9f9f9;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ccc;
   border-radius: 8px;
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.checkout-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  background-color: #f8f9fa;
 }
 
 .checkout-item img {
-  width: 100%;
-  max-width: 180px;
-  height: auto;
+  width: 80px;
+  height: 80px;
   object-fit: cover;
   border-radius: 5px;
-  margin-bottom: 10px;
 }
 
 .checkout-item-details {
-  text-align: center;
-  width: 100%;
+  flex: 1;
 }
 
 .checkout-item-details h3 {
-  font-size: 18px;
-  margin: 4px 0;
+  font-size: 1rem;
   color: #007bff;
+  margin: 0;
 }
 
 .checkout-item-details p {
-  font-size: 14px;
-  margin: 4px 0;
-  color: #666;
+  font-size: 0.85rem;
+  margin: 2px 0;
 }
 
 .checkout-details {
-  padding: 16px;
-  background-color: #f9f9f9;
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px solid #007bff;
   border-radius: 8px;
+  background-color: #fff;
 }
 
 .checkout-details h2,
 .checkout-details h3 {
-  font-size: 16px;
-  margin: 12px 0 8px;
+  font-size: 1.2rem;
   color: #007bff;
+  margin-bottom: 10px;
 }
 
-.address-input,
-.payment-select,
-.checkout-details textarea,
-.checkout-details select {
+textarea {
   width: 100%;
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-bottom: 12px;
-  transition: border-color 0.3s;
+  padding: 8px;
+  border: 1px solid #007bff;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  box-sizing: border-box;
 }
 
-.address-input:focus,
-.payment-select:focus,
-.checkout-details textarea:focus,
-.checkout-details select:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.checkout-btn {
-  display: block;
+select {
   width: 100%;
-  padding: 14px;
-  background-color: #007bff;
-  color: white;
-  font-size: 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.3s, transform 0.2s;
+  padding: 8px;
+  border: 1px solid #007bff;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  background-color: #fff;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.action-bar {
+  padding: 15px 10px;
+  background-color: #fff;
+  border-top: 1px solid #007bff;
   text-align: center;
+  margin-top: 20px;
 }
 
-.checkout-btn:hover {
+button {
+  width: 100%;
+  max-width: 300px;
+  padding: 12px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
   background-color: #0056b3;
-  transform: scale(1.02);
 }
 
-.checkout-btn:disabled {
+button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
 }
 
 .footer {
-  background-color: #f8f9fa;
-  padding: 12px 0;
+  padding: 10px;
   text-align: center;
-  color: #666;
+  background-color: #f8f9fa;
   margin-top: 20px;
 }
 
 .footer-icons {
   display: flex;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 8px;
+  gap: 15px;
+  margin-bottom: 10px;
 }
 
 .icon-circle {
-  background-color: #007bff;
-  border-radius: 50%;
   width: 40px;
   height: 40px;
+  background-color: #007bff;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 18px;
+  color: #fff;
+  font-size: 1.2rem;
 }
 
+.footer p {
+  font-size: 0.9rem;
+  color: #007bff;
+}
+
+/* Media query for tablets and desktops (min-width: 768px) */
 @media (min-width: 768px) {
-  /* Desktop styles restored */
   .checkout {
-    max-width: 800px;
-    margin: 20px auto;
+    max-width: 600px;
     padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .checkout h1 {
-    font-size: 24px;
+    font-size: 2rem;
+  }
+
+  .checkout p {
+    font-size: 1rem;
   }
 
   .checkout-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 15px;
   }
 
   .checkout-item {
-    flex-direction: row;
-    align-items: center;
+    flex-direction: column;
+    text-align: center;
   }
 
   .checkout-item img {
     width: 150px;
-    margin-bottom: 0;
-    margin-right: 15px;
+    height: 150px;
   }
 
   .checkout-item-details {
-    text-align: left;
+    margin-top: 10px;
+  }
+
+  .checkout-item-details h3 {
+    font-size: 1.2rem;
+  }
+
+  .checkout-item-details p {
+    font-size: 1rem;
+  }
+
+  .checkout-details {
+    margin-top: 30px;
+    padding: 15px;
   }
 
   .checkout-details h2,
   .checkout-details h3 {
-    font-size: 20px;
+    font-size: 1.5rem;
   }
 
-  .address-input,
-  .payment-select {
-    font-size: 14px;
+  textarea,
+  select {
+    font-size: 1rem;
   }
 
-  .checkout-btn {
-    font-size: 16px;
-    padding: 12px 20px;
+  .action-bar {
+    padding: 20px 10px;
+    margin-top: 30px;
+  }
+
+  button {
+    padding: 15px;
+    font-size: 1.1rem;
+    max-width: 400px;
+  }
+
+  .footer-icons {
+    gap: 20px;
+  }
+
+  .icon-circle {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+
+  .footer p {
+    font-size: 1rem;
   }
 }
