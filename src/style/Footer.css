@@ -1,4 +1,3 @@
-/* Footer.css */
 .footer {
   position: fixed;
   bottom: 0;
@@ -8,6 +7,7 @@
   padding: 10px 0;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1); /* Thoda sa shadow */
   z-index: 1000; /* Other content ke upar rahe */
+  height: 60px; /* Explicit height to calculate padding in checkout */
 }
 
 .nav-container {

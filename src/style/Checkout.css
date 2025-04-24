@@ -3,9 +3,11 @@
   max-width: 100%;
   margin: 0 auto;
   padding: 10px;
+  padding-bottom: 70px; /* Space for footer (adjust based on footer height) */
   font-family: Arial, sans-serif;
   color: #666;
   background-color: #fff;
+  position: relative;
 }
 
 .checkout h1 {
@@ -113,6 +115,10 @@ select {
   border-top: 1px solid #007bff;
   text-align: center;
   margin-top: 20px;
+  /* Optional: Make it sticky if preferred */
+  /* position: sticky;
+  bottom: 70px; /* Adjust based on footer height */
+  /* z-index: 1001; */
 }
 
 button {
@@ -173,6 +179,7 @@ button:disabled {
   .checkout {
     max-width: 600px;
     padding: 20px;
+    padding-bottom: 80px; /* Increased for larger screens */
   }
 
   .checkout h1 {
