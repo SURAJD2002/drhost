@@ -4500,6 +4500,294 @@
 // export default React.memo(Home);
 
 
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import '../style/Home.css';
+
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || sellerLoc.lat === null || sellerLoc.lon === null) return null;
+//   const R = 6371; // Earth's radius in km
+//   const latDiff = ((sellerLoc.lat - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.lon - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//       Math.cos(sellerLoc.lat * (Math.PI / 180)) *
+//       Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Fetch nearby products only when a valid buyer location is available.
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       console.warn('No buyer location provided.');
+//       setLoading(false);
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       console.log('Auth Session:', session, 'Session Error:', sessionError);
+//       if (session?.user) {
+//         const { data: profileData, error: profileError } = await supabase
+//           .from('profiles')
+//           .select('is_seller')
+//           .eq('id', session.user.id)
+//           .single();
+//         if (profileError) throw profileError;
+//         setIsSeller(profileData?.is_seller || false);
+//         console.log('User Role:', profileData?.is_seller ? 'Seller' : 'Buyer');
+//       } else {
+//         console.log('No user logged in, proceeding as anonymous');
+//         setIsSeller(false);
+//       }
+
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude, allows_long');
+//       if (sellersError) throw sellersError;
+//       console.log('All Sellers:', allSellers);
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           if (seller.latitude === null || seller.longitude === null) return false;
+//           const distance = calculateDistance(buyerLocation, { lat: seller.latitude, lon: seller.longitude });
+//           return distance !== null && (distance <= 40 || seller.allows_long);
+//         })
+//         .map((seller) => seller.id);
+//       console.log('Nearby Seller IDs:', nearbySellerIds);
+
+//       if (nearbySellerIds.length === 0) {
+//         console.log('No nearby sellers found.');
+//         setProducts([]);
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+//       console.log('Products Response:', data);
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       console.log('Mapped Products:', mappedProducts);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError(`Error: ${err.message || 'Failed to fetch products.'}`);
+//       setProducts([]);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images from Supabase storage.
+//   const fetchBannerImages = useCallback(async () => {
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       console.log('Banner Storage Response:', data);
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       console.log('Mapped Banners:', banners);
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     }
+//   }, []);
+
+//   // Add a product to the cart with validations for stock and user authentication.
+//   const addToCart = async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Cannot add invalid product to cart.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Product out of stock.');
+//       return;
+//     }
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Please log in to add items to your cart.');
+//         navigate('/auth');
+//         return;
+//       }
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+//       const existing = storedCart.find((item) => item.id === product.id);
+//       if (existing) {
+//         if (existing.quantity >= product.stock) {
+//           setError('Cannot add more items than available stock.');
+//           return;
+//         }
+//         existing.quantity += 1;
+//       } else {
+//         storedCart.push({
+//           id: product.id,
+//           title: product.name,
+//           price: product.price,
+//           quantity: 1,
+//           image: product.images[0],
+//           stock: product.stock,
+//         });
+//       }
+//       localStorage.setItem('cart', JSON.stringify(storedCart));
+//       console.log('Added to cart:', product);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError(`Error: ${err.message || 'Failed to add product to cart.'}`);
+//     }
+//   };
+
+//   // Use effect to fetch banner images and products.
+//   // Only call fetchNearbyProducts if buyerLocation is available.
+//   useEffect(() => {
+//     fetchBannerImages();
+//   }, [fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products based on search term.
+//   const filteredProducts = useMemo(
+//     () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
+//     [products, searchTerm]
+//   );
+
+//   if (loading) return <div className="home-loading">Loading...</div>;
+
+//   return (
+//     <div className="home">
+//       <h1 className="home-title">FreshCart</h1>
+//       <div className="search-bar">
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           value={searchTerm}
+//           onChange={(e) => setSearchTerm(e.target.value)}
+//         />
+//       </div>
+//       <div className="banner-slider">
+//         <Slider dots infinite speed={500} slidesToShow={1} slidesToScroll={1} autoplay autoplaySpeed={3000}>
+//           {bannerImages.map((banner, i) => (
+//             <Link key={i} to={`/product/${i + 1}`}>
+//               <img src={banner.url} alt={`Banner ${banner.name}`} />
+//             </Link>
+//           ))}
+//         </Slider>
+//       </div>
+//       {error && (
+//         <div className="home-error">
+//           <p>{error}</p>
+//         </div>
+//       )}
+//       <section className="products-section">
+//         <h2>Products Near You (40km)</h2>
+//         {filteredProducts.length === 0 ? (
+//           <p>
+//             {searchTerm
+//               ? 'No products found matching your search.'
+//               : 'No products available within 40km.'}
+//           </p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//               >
+//                 <img src={product.images[0]} alt={product.name} />
+//                 <h3>{product.name}</h3>
+//                 <p>
+//                   ₹{product.price.toLocaleString('en-IN', {
+//                     minimumFractionDigits: 2,
+//                     maximumFractionDigits: 2,
+//                   })}
+//                 </p>
+//                 <p className="product-stock">
+//                   {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+//                 </p>
+//                 <div className="product-buttons">
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       addToCart(product);
+//                     }}
+//                     className="add-to-cart-btn"
+//                     disabled={product.stock <= 0}
+//                   >
+//                     Add to Cart
+//                   </button>
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       navigate('/cart', { state: { product } });
+//                     }}
+//                     className="buy-now-btn"
+//                     disabled={product.stock <= 0}
+//                   >
+//                     Buy Now
+//                   </button>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+//       <div className="cart-icon">
+//         <Link to="/cart">
+//           <FaShoppingCart size={30} color="#007bff" />
+//         </Link>
+//       </div>
+//       {isSeller && (
+//         <button onClick={() => navigate('/seller')} className="btn-seller-dashboard">
+//           Go to Seller Dashboard
+//         </button>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -4510,16 +4798,17 @@ import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import '../style/Home.css';
 
+// Distance calculation (standardized to latitude/longitude)
 function calculateDistance(userLoc, sellerLoc) {
-  if (!userLoc || !sellerLoc || sellerLoc.lat === null || sellerLoc.lon === null) return null;
-  const R = 6371; // Earth's radius in km
-  const latDiff = ((sellerLoc.lat - userLoc.lat) * Math.PI) / 180;
-  const lonDiff = ((sellerLoc.lon - userLoc.lon) * Math.PI) / 180;
+  if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+  const R = 6371; // Earth's radius in kilometers
+  const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+  const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
   const a =
     Math.sin(latDiff / 2) ** 2 +
     Math.cos(userLoc.lat * (Math.PI / 180)) *
-      Math.cos(sellerLoc.lat * (Math.PI / 180)) *
-      Math.sin(lonDiff / 2) ** 2;
+    Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+    Math.sin(lonDiff / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -4534,7 +4823,7 @@ function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSeller, setIsSeller] = useState(false);
 
-  // Fetch nearby products only when a valid buyer location is available.
+  // Fetch nearby products within 40 km
   const fetchNearbyProducts = useCallback(async () => {
     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
       console.warn('No buyer location provided.');
@@ -4561,21 +4850,21 @@ function Home() {
 
       const { data: allSellers, error: sellersError } = await supabase
         .from('sellers')
-        .select('id, latitude, longitude, allows_long');
+        .select('id, latitude, longitude');
       if (sellersError) throw sellersError;
       console.log('All Sellers:', allSellers);
 
       const nearbySellerIds = allSellers
         .filter((seller) => {
-          if (seller.latitude === null || seller.longitude === null) return false;
-          const distance = calculateDistance(buyerLocation, { lat: seller.latitude, lon: seller.longitude });
-          return distance !== null && (distance <= 40 || seller.allows_long);
+          const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+          console.log(`Seller ${seller.id} Distance: ${distance !== null ? distance.toFixed(2) : 'N/A'} km`);
+          return distance !== null && distance <= 40; // Strict 40 km radius
         })
         .map((seller) => seller.id);
       console.log('Nearby Seller IDs:', nearbySellerIds);
 
       if (nearbySellerIds.length === 0) {
-        console.log('No nearby sellers found.');
+        console.log('No nearby sellers found within 40km.');
         setProducts([]);
         return;
       }
@@ -4606,14 +4895,18 @@ function Home() {
     }
   }, [buyerLocation]);
 
-  // Fetch banner images from Supabase storage.
+  // Fetch banner images from Supabase storage
   const fetchBannerImages = useCallback(async () => {
     try {
       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
       console.log('Banner Storage Response:', data);
       const banners = await Promise.all(
         data
-          .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+          .filter((file) => {
+            const isImage = /\.(jpg|jpeg|png|gif)$/i.test(file.name);
+            if (!isImage) console.warn(`Excluded non-image file: ${file.name}`);
+            return isImage;
+          })
           .map(async (file) => {
             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
             return { url: publicUrl, name: file.name };
@@ -4627,7 +4920,7 @@ function Home() {
     }
   }, []);
 
-  // Add a product to the cart with validations for stock and user authentication.
+  // Add a product to the cart with stock and authentication validation
   const addToCart = async (product) => {
     if (!product || !product.id || !product.name || product.price === undefined) {
       setError('Cannot add invalid product to cart.');
@@ -4671,8 +4964,7 @@ function Home() {
     }
   };
 
-  // Use effect to fetch banner images and products.
-  // Only call fetchNearbyProducts if buyerLocation is available.
+  // Use effect to fetch banner images and products
   useEffect(() => {
     fetchBannerImages();
   }, [fetchBannerImages]);
@@ -4683,13 +4975,24 @@ function Home() {
     }
   }, [buyerLocation, fetchNearbyProducts]);
 
-  // Filter products based on search term.
+  // Filter products based on search term
   const filteredProducts = useMemo(
     () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
     [products, searchTerm]
   );
 
   if (loading) return <div className="home-loading">Loading...</div>;
+
+  // Slider settings
+  const sliderSettings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    autoplay: true,
+    autoplaySpeed: 3000,
+  };
 
   return (
     <div className="home">
@@ -4703,7 +5006,7 @@ function Home() {
         />
       </div>
       <div className="banner-slider">
-        <Slider dots infinite speed={500} slidesToShow={1} slidesToScroll={1} autoplay autoplaySpeed={3000}>
+        <Slider {...sliderSettings}>
           {bannerImages.map((banner, i) => (
             <Link key={i} to={`/product/${i + 1}`}>
               <img src={banner.url} alt={`Banner ${banner.name}`} />
@@ -4732,7 +5035,11 @@ function Home() {
                 className="product-card"
                 onClick={() => navigate(`/product/${product.id}`)}
               >
-                <img src={product.images[0]} alt={product.name} />
+                <img
+                  src={product.images[0]}
+                  alt={product.name}
+                  onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+                />
                 <h3>{product.name}</h3>
                 <p>
                   ₹{product.price.toLocaleString('en-IN', {
@@ -4752,7 +5059,7 @@ function Home() {
                     className="add-to-cart-btn"
                     disabled={product.stock <= 0}
                   >
-                    Add to Cart
+                    <FaShoppingCart /> Add to Cart
                   </button>
                   <button
                     onClick={(e) => {
@@ -4785,4 +5092,3 @@ function Home() {
 }
 
 export default React.memo(Home);
-

@@ -1,5 +1,5 @@
+// src/components/ErrorBoundary.js
 import React, { Component } from 'react';
-import { Link } from 'react-router-dom'; // Added import for Link
 
 class ErrorBoundary extends Component {
   state = { hasError: false, error: null };
@@ -8,13 +8,17 @@ class ErrorBoundary extends Component {
     return { hasError: true, error };
   }
 
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ color: '#ff0000', padding: '20px' }}>
-          <h1>Oops! Something went wrong.</h1>
-          <p>{this.state.error.message}</p>
-          <Link to="/" style={{ color: '#007bff', textDecoration: 'none' }}>Go Home</Link>
+        <div className="error-boundary">
+          <h1>Something went wrong.</h1>
+          <p>{this.state.error?.message || 'Unknown error'}</p>
+          <button onClick={() => window.location.reload()}>Reload</button>
         </div>
       );
     }
