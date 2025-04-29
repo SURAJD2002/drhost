@@ -1,208 +1,475 @@
-/* Home.css */
-.home {
-  padding: 10px;
-  background-color: #f0f8ff; /* Halka neela background - soothing effect */
-  min-height: 100vh;
-}
-
-.home-title {
-  text-align: center;
-  color: #1e90ff; /* Gahara neela title - trust ke liye */
-  font-size: 24px;
-  margin-bottom: 15px;
-}
-
-.search-bar {
-  margin-bottom: 15px;
-}
-
-.search-bar input {
-  width: 100%;
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #4169e1; /* Neela border */
-  border-radius: 5px;
+/* Ensure global box-sizing to prevent padding/margin issues */
+* {
   box-sizing: border-box;
 }
 
+/* Base container */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 10px;
+  background-color: #f9fafb;
+  min-height: 100vh;
+  height: auto; /* Allow content to grow */
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+  overflow-y: auto; /* Enable vertical scrolling */
+  padding-bottom: 70px; /* Space for fixed footer */
+}
+
+/* Header (for context, assuming it exists) */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  width: 100%;
+}
+
+.header h1 {
+  font-size: 20px;
+  color: #007bff; /* Changed to blue for trust */
+}
+
+.header p {
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.logout-btn {
+  padding: 6px 12px;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background-color: #dc2626;
+}
+
+/* Sticky Search Bar */
+.search-bar {
+  position: sticky;
+  top: 10px;
+  z-index: 10;
+  background-color: white;
+  padding: 10px;
+  border: 1px solid #007bff; /* Changed to blue for trust */
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box; /* Ensure padding doesn’t overflow */
+}
+
+/* Search bar elements */
+.search-icon {
+  color: #6b7280;
+}
+
+.search-bar input {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Banner Slider */
 .banner-slider {
-  margin-bottom: 20px;
+  position: relative;
+  max-height: 200px;
+  overflow: hidden;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .banner-slider img {
   width: 100%;
-  height: auto;
-  border-radius: 5px;
+  height: 200px;
+  object-fit: cover;
 }
 
+.banner-skeleton {
+  width: 100%;
+  height: 200px;
+  background-color: #e5e7eb;
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Error Message */
+.home-error {
+  padding: 15px;
+  background-color: #fee2e2;
+  border-radius: 6px;
+  text-align: center;
+  color: #6b7280;
+  width: 100%;
+  max-width: 100%;
+}
+
+.home-error button {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #007bff; /* Changed to blue for trust */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.home-error button:hover {
+  background-color: #0056b3; /* Darker blue for hover */
+}
+
+/* Products Section */
 .products-section {
-  margin-bottom: 60px; /* Cart icon ke liye space */
+  padding: 20px 0;
+  width: 100%;
+  max-width: 100%;
 }
 
-.products-section h2 {
-  color: #1e90ff; /* Gahara neela heading */
-  font-size: 20px;
-  margin-bottom: 10px;
+.section-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1f2937;
+  margin-bottom: 15px;
 }
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .product-card {
   background-color: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  padding: 10px;
-  text-align: center;
+  border-radius: 8px;
+  padding: 8px;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.3s ease;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .product-card:hover {
-  transform: scale(1.05); /* Thoda zoom effect */
+  transform: translateY(-3px);
 }
 
-.product-card img {
+.product-image-wrapper {
   width: 100%;
   height: 100px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.product-image-wrapper img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 5px;
 }
 
-.product-card h3 {
-  font-size: 14px;
-  margin: 5px 0;
-  color: #333;
+.product-info {
+  padding-top: 6px;
 }
 
-.product-card p {
+.product-name {
   font-size: 12px;
-  margin: 2px 0;
-  color: #555;
+  font-weight: 500;
+  color: #1f2937;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webpkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.product-price {
+  font-size: 11px;
+  font-weight: 500;
+  color: #007bff; /* Changed to blue for trust */
+  margin-bottom: 4px;
 }
 
 .product-stock {
-  color: #dc3545; /* Red for out of stock warning */
+  font-size: 10px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.out-of-stock {
+  color: #ef4444;
 }
 
 .product-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+  width: 100%;
+  flex-wrap: nowrap;
 }
 
-.add-to-cart-btn, .buy-now-btn {
-  padding: 8px;
+.add-to-cart-btn,
+.buy-now-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
   border: none;
-  border-radius: 5px;
-  font-size: 12px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.3s ease;
+  max-width: 80px;
+  white-space: nowrap;
+}
+
+.add-to-cart-btn svg {
+  font-size: 12px;
 }
 
 .add-to-cart-btn {
-  background-color: #4169e1; /* Neela add to cart button */
+  background-color: #007bff; /* Changed to blue for trust */
   color: white;
 }
 
 .add-to-cart-btn:hover {
-  background-color: #0000cd; /* Gahara neela hover */
+  background-color: #0056b3; /* Darker blue for hover */
+}
+
+.add-to-cart-btn:disabled {
+  background-color: #a3bffa;
+  cursor: not-allowed;
 }
 
 .buy-now-btn {
-  background-color: #28a745; /* Green for buy now */
+  background-color: #007bff; /* Changed to blue for trust */
   color: white;
 }
 
 .buy-now-btn:hover {
-  background-color: #218838; /* Gahara green hover */
+  background-color: #0056b3; /* Darker blue for hover */
 }
 
-.add-to-cart-btn:disabled, .buy-now-btn:disabled {
-  background-color: #ccc;
+.buy-now-btn:disabled {
+  background-color: #a3bffa;
   cursor: not-allowed;
 }
 
-.cart-icon {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: #1e90ff; /* Gahara neela cart icon */
-  border-radius: 50%;
-  padding: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+/* Product Card Skeleton */
+.product-card-skeleton {
+  background-color: #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  height: 180px;
+  animation: pulse 1.5s infinite;
+  width: 100%;
 }
 
-.cart-icon a {
-  color: white;
-  text-decoration: none;
+.skeleton-image {
+  width: 100%;
+  height: 100px;
+  background-color: #d1d5db;
+  border-radius: 6px;
 }
 
-.btn-seller-dashboard {
-  display: block;
-  margin: 10px auto;
-  padding: 10px 20px;
-  background-color: #6a5acd; /* Slate blue for seller button */
-  color: white;
-  border: none;
-  border-radius: 5px;
+.skeleton-text {
+  width: 80%;
+  height: 12px;
+  background-color: #d1d5db;
+  border-radius: 4px;
+  margin: 6px 0;
+}
+
+.skeleton-text.short {
+  width: 50%;
+}
+
+.skeleton-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.skeleton-btn {
+  flex: 1;
+  height: 24px;
+  background-color: #d1d5db;
+  border-radius: 6px;
+}
+
+/* No Products */
+.no-products {
   font-size: 14px;
-  cursor: pointer;
+  color: #6b7280;
+  text-align: center;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  width: 100%;
 }
 
-.btn-seller-dashboard:hover {
-  background-color: #483d8b; /* Gahara slate blue */
+/* Footer */
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  padding: 10px 0;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  width: 100%;
+  max-width: 100%;
 }
 
-/* Mobile Optimization */
-@media (max-width: 600px) {
-  .home-title {
-    font-size: 20px;
+.footer-icons {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+}
+
+.footer-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  color: #6b7280;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.footer-icon.active {
+  color: #007bff; /* Changed to blue for trust */
+}
+
+/* Loading Spinner */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  width: 100%;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  height: 40px;
+  width: 40px;
+}
+
+.path {
+  stroke: #007bff; /* Changed to blue for trust */
+  fill: none;
+  stroke-width: 5;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
-  .search-bar input {
-    font-size: 12px;
-    padding: 8px;
+/* Responsive Design */
+@media (min-width: 640px) {
+  .home {
+    padding: 20px;
+    max-width: 800px;
+    padding-bottom: 70px; /* Space for footer */
   }
 
   .product-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
   }
 
-  .product-card img {
-    height: 80px;
+  .product-card {
+    padding: 10px;
   }
 
-  .product-card h3 {
+  .product-image-wrapper {
+    height: 150px;
+  }
+
+  .product-name {
+    font-size: 14px;
+  }
+
+  .product-price {
+    font-size: 13px;
+  }
+
+  .product-stock {
     font-size: 12px;
   }
 
-  .product-card p {
-    font-size: 10px;
+  .product-buttons {
+    gap: 10px;
   }
 
-  .add-to-cart-btn, .buy-now-btn {
-    font-size: 10px;
-    padding: 6px;
+  .add-to-cart-btn,
+  .buy-now-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    max-width: 100px;
   }
 
-  .cart-icon {
-    bottom: 15px;
-    right: 15px;
-    padding: 8px;
+  .add-to-cart-btn svg {
+    font-size: 14px;
+  }
+
+  .banner-slider img {
+    height: 250px;
   }
 }
 
-.home-loading {
-  text-align: center;
-  color: #1e90ff;
-  font-size: 18px;
-}
+@media (min-width: 768px) {
+  .home {
+    padding: 25px;
+    max-width: 960px;
+    padding-bottom: 70px; /* Space for footer */
+  }
 
-.home-error {
-  text-align: center;
-  color: #dc3545;
-  margin-bottom: 10px;
+  .product-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .product-image-wrapper {
+    height: 180px;
+  }
+
+  .banner-slider img {
+    height: 300px;
+  }
 }

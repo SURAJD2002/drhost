@@ -1,4 +1,4 @@
-.auth {
+/* .auth {
     max-width: 400px;
     margin: 40px auto;
     text-align: center;
@@ -223,4 +223,131 @@
   
   .back-link:hover {
     text-decoration: underline;
-  }
+  } */
+
+
+  /* Auth.css */
+.auth {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.auth h1 {
+  font-size: 24px;
+  color: #007bff;
+  margin-bottom: 20px;
+}
+
+.google-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #db4437;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.google-btn:disabled {
+  background-color: #a3322a;
+  cursor: not-allowed;
+}
+
+.auth-form,
+.otp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.auth-form input,
+.otp-section input {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.seller-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+}
+
+.auth-button,
+.otp-btn {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.auth-button:disabled,
+.otp-btn:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.auth-toggle {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.auth-toggle:disabled {
+  color: #6c757d;
+  cursor: not-allowed;
+}
+
+.back-link {
+  color: #007bff;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.auth-message {
+  color: #dc3545;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.auth-footer {
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+.auth-footer a {
+  color: #007bff;
+  text-decoration: none;
+  margin-right: 10px;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: #eee;
+  margin: 15px 0;
+}

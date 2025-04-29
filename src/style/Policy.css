@@ -1,0 +1,122 @@
+/* Policy.css */
+.policy-container {
+    padding: 15px;
+    background-color: #f9fafb;
+    min-height: 100vh;
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    overflow-y: auto;
+    padding-bottom: 70px; /* Space for footer if needed */
+  }
+  
+  .policy-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .policy-title {
+    font-size: 20px;
+    color: #007bff; /* Trust-building blue */
+  }
+  
+  .btn-back {
+    padding: 6px 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+  }
+  
+  .btn-back:hover {
+    background-color: #0056b3; /* Darker blue for hover */
+  }
+  
+  .policy-section {
+    margin-bottom: 20px;
+  }
+  
+  .section-heading {
+    font-size: 18px;
+    font-weight: bold;
+    color: #1f2937;
+    margin-bottom: 10px;
+  }
+  
+  .policy-section p {
+    font-size: 14px;
+    color: #6b7280;
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+  
+  .policy-section ul {
+    list-style-type: disc;
+    padding-left: 20px;
+    margin-bottom: 10px;
+  }
+  
+  .policy-section li {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 5px;
+  }
+  
+  .policy-section a {
+    color: #007bff;
+    text-decoration: none;
+  }
+  
+  .policy-section a:hover {
+    text-decoration: underline;
+  }
+  
+  .policy-footer {
+    margin-top: 30px;
+    text-align: center;
+  }
+  
+  .policy-footer p {
+    font-size: 14px;
+    color: #6b7280;
+  }
+  
+  .policy-footer a {
+    color: #007bff;
+    text-decoration: none;
+  }
+  
+  .policy-footer a:hover {
+    text-decoration: underline;
+  }
+  
+  /* Responsive Design */
+  @media (min-width: 640px) {
+    .policy-container {
+      padding: 20px;
+    }
+  
+    .policy-title {
+      font-size: 24px;
+    }
+  
+    .section-heading {
+      font-size: 20px;
+    }
+  
+    .policy-section p,
+    .policy-section li,
+    .policy-footer p {
+      font-size: 16px;
+    }
+  
+    .btn-back {
+      font-size: 16px;
+      padding: 8px 16px;
+    }
+  }

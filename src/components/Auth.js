@@ -982,6 +982,225 @@
 
 
 
+// import React, { useState, useEffect } from 'react';
+// import { useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import '../style/Auth.css';
+
+// export default function Auth() {
+//   const navigate = useNavigate();
+//   const [mode, setMode] = useState('login'); // 'login' or 'signup'
+//   const [email, setEmail] = useState('');
+//   const [password, setPassword] = useState('');
+//   const [fullName, setFullName] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+//   const [phone, setPhone] = useState('');
+//   const [otp, setOtp] = useState('');
+//   const [otpSent, setOtpSent] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [message, setMessage] = useState('');
+
+//   // on mount, redirect if already authenticated and subscribe to auth events
+//   useEffect(() => {
+//     supabase.auth.getSession().then(({ data: { session } }) => {
+//       if (session) navigate('/account', { replace: true });
+//     });
+//     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+//       if (event === 'SIGNED_IN') navigate('/account', { replace: true });
+//       if (event === 'SIGNED_OUT') navigate('/auth', { replace: true });
+//     });
+//     return () => subscription.unsubscribe();
+//   }, [navigate]);
+
+//   // Google OAuth
+//   const handleGoogle = async () => {
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+//       if (error) throw error;
+//     } catch (err) {
+//       console.error(err);
+//       setMessage('Google sign-in failed');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // send OTP
+//   const sendOtp = async () => {
+//     if (!/^\+?[0-9]{10,13}$/.test(phone)) {
+//       setMessage('Enter a valid phone number');
+//       return;
+//     }
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.signInWithOtp({ phone });
+//       if (error) throw error;
+//       setOtpSent(true);
+//       setMessage('OTP sent');
+//     } catch (err) {
+//       console.error(err);
+//       setMessage('Failed to send OTP');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // verify OTP
+//   const verifyOtp = async () => {
+//     if (!otp) return setMessage('Enter OTP');
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
+//       if (error) throw error;
+//       setMessage('Phone verified');
+//       if (mode === 'signup') await handleEmailAuth();
+//     } catch (err) {
+//       console.error(err);
+//       setMessage('Invalid OTP');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // email/password auth
+//   const handleEmailAuth = async (e) => {
+//     if (e?.preventDefault) e.preventDefault();
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       if (mode === 'signup') {
+//         if (!email && !phone) {
+//           setMessage('Provide email or phone');
+//           return;
+//         }
+//         if (phone && !otpSent) {
+//           setMessage('Verify phone first');
+//           return;
+//         }
+//         const { data: { user }, error } = await supabase.auth.signUp({ email, password });
+//         if (error) throw error;
+//         await supabase.from('profiles').upsert({
+//           id: user.id,
+//           full_name: fullName || user.email?.split('@')[0],
+//           is_seller: isSeller,
+//           phone_number: phone || null,
+//         });
+//         if (isSeller) {
+//           await supabase.from('sellers').upsert({ id: user.id, store_name: `${fullName || user.email.split('@')[0]} Store` });
+//         }
+//         setMessage('Sign-up successful, check your email to confirm.');
+//       } else {
+//         const { error } = await supabase.auth.signInWithPassword({ email, password });
+//         if (error) throw error;
+//         // onAuthStateChange will handle redirect
+//       }
+//     } catch (err) {
+//       console.error(err);
+//       setMessage(err.message);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   return (
+//     <div className="auth">
+//       <h1>{mode === 'signup' ? 'FreshCart Sign Up' : 'FreshCart Login'}</h1>
+//       <button onClick={handleGoogle} disabled={loading} className="google-btn">
+//         {loading ? 'Please wait...' : 'Sign in with Google'}
+//       </button>
+//       <hr />
+//       <form onSubmit={handleEmailAuth} className="auth-form">
+//         {mode === 'signup' && (
+//           <>
+//             <input
+//               type="text"
+//               placeholder="Full Name"
+//               value={fullName}
+//               onChange={(e) => setFullName(e.target.value)}
+//               disabled={loading}
+//               required={!email}
+//             />
+//             <label className="seller-checkbox">
+//               <input type="checkbox" checked={isSeller} onChange={() => setIsSeller(!isSeller)} disabled={loading} />
+//               Are you a Seller?
+//             </label>
+//           </>
+//         )}
+//         <input
+//           type="email"
+//           placeholder="Email"
+//           value={email}
+//           onChange={(e) => setEmail(e.target.value)}
+//           disabled={loading || phone}
+//           required={!phone}
+//         />
+//         <input
+//           type="password"
+//           placeholder="Password"
+//           value={password}
+//           onChange={(e) => setPassword(e.target.value)}
+//           disabled={loading}
+//           required={mode === 'signup'}
+//         />
+//         <button type="submit" disabled={loading} className="auth-button">
+//           {mode === 'signup' ? 'Sign Up' : 'Login'}
+//         </button>
+//       </form>
+//       <hr />
+//       <div className="otp-section">
+//         <input
+//           type="tel"
+//           placeholder="+91 Phone"
+//           value={phone}
+//           onChange={(e) => setPhone(e.target.value)}
+//           disabled={loading || otpSent}
+//           required={!email}
+//         />
+//         {!otpSent ? (
+//           <button onClick={sendOtp} disabled={loading} className="otp-btn">
+//             Send OTP
+//           </button>
+//         ) : (
+//           <>
+//             <input
+//               type="text"
+//               placeholder="OTP"
+//               value={otp}
+//               onChange={(e) => setOtp(e.target.value)}
+//               disabled={loading}
+//             />
+//             <button onClick={verifyOtp} disabled={loading} className="otp-btn">
+//               Verify OTP
+//             </button>
+//           </>
+//         )}
+//       </div>
+//       {message && <p className="auth-message">{message}</p>}
+//       <button
+//         onClick={() => {
+//           setMode(mode === 'signup' ? 'login' : 'signup');
+//           setMessage('');
+//           setOtpSent(false);
+//           setOtp('');
+//         }}
+//         disabled={loading}
+//         className="auth-toggle"
+//       >
+//         {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
+//       </button>
+//       <Link to="/" className="back-link">
+//         Back to Home
+//       </Link>
+//     </div>
+//   );
+// }
+
+
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -1021,7 +1240,7 @@ export default function Auth() {
       if (error) throw error;
     } catch (err) {
       console.error(err);
-      setMessage('Google sign-in failed');
+      setMessage('Google sign-in failed. Please try again or use another method.');
     } finally {
       setLoading(false);
     }
@@ -1030,7 +1249,7 @@ export default function Auth() {
   // send OTP
   const sendOtp = async () => {
     if (!/^\+?[0-9]{10,13}$/.test(phone)) {
-      setMessage('Enter a valid phone number');
+      setMessage('Enter a valid phone number (e.g., +919876543210)');
       return;
     }
     setLoading(true);
@@ -1039,10 +1258,10 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOtp({ phone });
       if (error) throw error;
       setOtpSent(true);
-      setMessage('OTP sent');
+      setMessage('OTP sent to your phone. Please check.');
     } catch (err) {
       console.error(err);
-      setMessage('Failed to send OTP');
+      setMessage('Failed to send OTP. Please try again or use email.');
     } finally {
       setLoading(false);
     }
@@ -1050,17 +1269,20 @@ export default function Auth() {
 
   // verify OTP
   const verifyOtp = async () => {
-    if (!otp) return setMessage('Enter OTP');
+    if (!otp) {
+      setMessage('Please enter the OTP received on your phone.');
+      return;
+    }
     setLoading(true);
     setMessage('');
     try {
       const { error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
       if (error) throw error;
-      setMessage('Phone verified');
+      setMessage('Phone verified successfully.');
       if (mode === 'signup') await handleEmailAuth();
     } catch (err) {
       console.error(err);
-      setMessage('Invalid OTP');
+      setMessage('Invalid OTP. Please try again or request a new one.');
     } finally {
       setLoading(false);
     }
@@ -1074,11 +1296,11 @@ export default function Auth() {
     try {
       if (mode === 'signup') {
         if (!email && !phone) {
-          setMessage('Provide email or phone');
+          setMessage('Please provide an email or phone number.');
           return;
         }
         if (phone && !otpSent) {
-          setMessage('Verify phone first');
+          setMessage('Please verify your phone number first.');
           return;
         }
         const { data: { user }, error } = await supabase.auth.signUp({ email, password });
@@ -1092,7 +1314,7 @@ export default function Auth() {
         if (isSeller) {
           await supabase.from('sellers').upsert({ id: user.id, store_name: `${fullName || user.email.split('@')[0]} Store` });
         }
-        setMessage('Sign-up successful, check your email to confirm.');
+        setMessage('Sign-up successful. Please check your email to confirm your account.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -1100,7 +1322,7 @@ export default function Auth() {
       }
     } catch (err) {
       console.error(err);
-      setMessage(err.message);
+      setMessage(err.message || 'Authentication failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -1192,6 +1414,14 @@ export default function Auth() {
       >
         {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
       </button>
+      <div className="auth-footer">
+        <Link to="/policy" style={{ color: '#007bff', marginRight: '10px' }}>
+          Policies
+        </Link>
+        <Link to="/privacy" style={{ color: '#007bff' }}>
+          Privacy Policy
+        </Link>
+      </div>
       <Link to="/" className="back-link">
         Back to Home
       </Link>

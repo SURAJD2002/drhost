@@ -4788,84 +4788,2371 @@
 
 
 
+// // import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// // import { Link, useNavigate } from 'react-router-dom';
+// // import { supabase } from '../supabaseClient';
+// // import { LocationContext } from '../App';
+// // import { FaShoppingCart } from 'react-icons/fa';
+// // import Slider from 'react-slick';
+// // import 'slick-carousel/slick/slick.css';
+// // import 'slick-carousel/slick/slick-theme.css';
+// // import '../style/Home.css';
+
+// // // Distance calculation (standardized to latitude/longitude)
+// // function calculateDistance(userLoc, sellerLoc) {
+// //   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+// //   const R = 6371; // Earth's radius in kilometers
+// //   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+// //   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+// //   const a =
+// //     Math.sin(latDiff / 2) ** 2 +
+// //     Math.cos(userLoc.lat * (Math.PI / 180)) *
+// //     Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+// //     Math.sin(lonDiff / 2) ** 2;
+// //   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+// //   return R * c;
+// // }
+
+// // function Home() {
+// //   const { buyerLocation } = useContext(LocationContext);
+// //   const navigate = useNavigate();
+// //   const [products, setProducts] = useState([]);
+// //   const [bannerImages, setBannerImages] = useState([]);
+// //   const [error, setError] = useState(null);
+// //   const [loading, setLoading] = useState(true);
+// //   const [searchTerm, setSearchTerm] = useState('');
+// //   const [isSeller, setIsSeller] = useState(false);
+
+// //   // Fetch nearby products within 40 km
+// //   const fetchNearbyProducts = useCallback(async () => {
+// //     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+// //       console.warn('No buyer location provided.');
+// //       setLoading(false);
+// //       return;
+// //     }
+// //     setLoading(true);
+// //     try {
+// //       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+// //       console.log('Auth Session:', session, 'Session Error:', sessionError);
+// //       if (session?.user) {
+// //         const { data: profileData, error: profileError } = await supabase
+// //           .from('profiles')
+// //           .select('is_seller')
+// //           .eq('id', session.user.id)
+// //           .single();
+// //         if (profileError) throw profileError;
+// //         setIsSeller(profileData?.is_seller || false);
+// //         console.log('User Role:', profileData?.is_seller ? 'Seller' : 'Buyer');
+// //       } else {
+// //         console.log('No user logged in, proceeding as anonymous');
+// //         setIsSeller(false);
+// //       }
+
+// //       const { data: allSellers, error: sellersError } = await supabase
+// //         .from('sellers')
+// //         .select('id, latitude, longitude');
+// //       if (sellersError) throw sellersError;
+// //       console.log('All Sellers:', allSellers);
+
+// //       const nearbySellerIds = allSellers
+// //         .filter((seller) => {
+// //           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+// //           console.log(`Seller ${seller.id} Distance: ${distance !== null ? distance.toFixed(2) : 'N/A'} km`);
+// //           return distance !== null && distance <= 40; // Strict 40 km radius
+// //         })
+// //         .map((seller) => seller.id);
+// //       console.log('Nearby Seller IDs:', nearbySellerIds);
+
+// //       if (nearbySellerIds.length === 0) {
+// //         console.log('No nearby sellers found within 40km.');
+// //         setProducts([]);
+// //         return;
+// //       }
+
+// //       const { data, error } = await supabase
+// //         .from('products')
+// //         .select('id, title, price, images, seller_id, stock')
+// //         .eq('is_approved', true)
+// //         .in('seller_id', nearbySellerIds);
+// //       if (error) throw error;
+// //       console.log('Products Response:', data);
+
+// //       const mappedProducts = data.map((product) => ({
+// //         id: product.id,
+// //         name: product.title || 'Unnamed Product',
+// //         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+// //         price: parseFloat(product.price) || 0,
+// //         stock: product.stock || 0,
+// //       }));
+// //       setProducts(mappedProducts);
+// //       console.log('Mapped Products:', mappedProducts);
+// //     } catch (err) {
+// //       console.error('Error fetching products:', err);
+// //       setError(`Error: ${err.message || 'Failed to fetch products.'}`);
+// //       setProducts([]);
+// //     } finally {
+// //       setLoading(false);
+// //     }
+// //   }, [buyerLocation]);
+
+// //   // Fetch banner images from Supabase storage
+// //   const fetchBannerImages = useCallback(async () => {
+// //     try {
+// //       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+// //       console.log('Banner Storage Response:', data);
+// //       const banners = await Promise.all(
+// //         data
+// //           .filter((file) => {
+// //             const isImage = /\.(jpg|jpeg|png|gif)$/i.test(file.name);
+// //             if (!isImage) console.warn(`Excluded non-image file: ${file.name}`);
+// //             return isImage;
+// //           })
+// //           .map(async (file) => {
+// //             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+// //             return { url: publicUrl, name: file.name };
+// //           })
+// //       );
+// //       console.log('Mapped Banners:', banners);
+// //       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+// //     } catch (err) {
+// //       console.error('Error fetching banner images:', err);
+// //       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+// //     }
+// //   }, []);
+
+// //   // Add a product to the cart with stock and authentication validation
+// //   const addToCart = async (product) => {
+// //     if (!product || !product.id || !product.name || product.price === undefined) {
+// //       setError('Cannot add invalid product to cart.');
+// //       return;
+// //     }
+// //     if (product.stock <= 0) {
+// //       setError('Product out of stock.');
+// //       return;
+// //     }
+// //     try {
+// //       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+// //       if (sessionError || !session?.user) {
+// //         setError('Please log in to add items to your cart.');
+// //         navigate('/auth');
+// //         return;
+// //       }
+// //       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+// //       const existing = storedCart.find((item) => item.id === product.id);
+// //       if (existing) {
+// //         if (existing.quantity >= product.stock) {
+// //           setError('Cannot add more items than available stock.');
+// //           return;
+// //         }
+// //         existing.quantity += 1;
+// //       } else {
+// //         storedCart.push({
+// //           id: product.id,
+// //           title: product.name,
+// //           price: product.price,
+// //           quantity: 1,
+// //           image: product.images[0],
+// //           stock: product.stock,
+// //         });
+// //       }
+// //       localStorage.setItem('cart', JSON.stringify(storedCart));
+// //       console.log('Added to cart:', product);
+// //       setError(null);
+// //     } catch (err) {
+// //       console.error('Error adding to cart:', err);
+// //       setError(`Error: ${err.message || 'Failed to add product to cart.'}`);
+// //     }
+// //   };
+
+// //   // Use effect to fetch banner images and products
+// //   useEffect(() => {
+// //     fetchBannerImages();
+// //   }, [fetchBannerImages]);
+
+// //   useEffect(() => {
+// //     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+// //       fetchNearbyProducts();
+// //     }
+// //   }, [buyerLocation, fetchNearbyProducts]);
+
+// //   // Filter products based on search term
+// //   const filteredProducts = useMemo(
+// //     () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
+// //     [products, searchTerm]
+// //   );
+
+// //   if (loading) return <div className="home-loading">Loading...</div>;
+
+// //   // Slider settings
+// //   const sliderSettings = {
+// //     dots: true,
+// //     infinite: true,
+// //     speed: 500,
+// //     slidesToShow: 1,
+// //     slidesToScroll: 1,
+// //     autoplay: true,
+// //     autoplaySpeed: 3000,
+// //   };
+
+// //   return (
+// //     <div className="home">
+// //       <h1 className="home-title">FreshCart</h1>
+// //       <div className="search-bar">
+// //         <input
+// //           type="text"
+// //           placeholder="Search products..."
+// //           value={searchTerm}
+// //           onChange={(e) => setSearchTerm(e.target.value)}
+// //         />
+// //       </div>
+// //       <div className="banner-slider">
+// //         <Slider {...sliderSettings}>
+// //           {bannerImages.map((banner, i) => (
+// //             <Link key={i} to={`/product/${i + 1}`}>
+// //               <img src={banner.url} alt={`Banner ${banner.name}`} />
+// //             </Link>
+// //           ))}
+// //         </Slider>
+// //       </div>
+// //       {error && (
+// //         <div className="home-error">
+// //           <p>{error}</p>
+// //         </div>
+// //       )}
+// //       <section className="products-section">
+// //         <h2>Products Near You (40km)</h2>
+// //         {filteredProducts.length === 0 ? (
+// //           <p>
+// //             {searchTerm
+// //               ? 'No products found matching your search.'
+// //               : 'No products available within 40km.'}
+// //           </p>
+// //         ) : (
+// //           <div className="product-grid">
+// //             {filteredProducts.map((product) => (
+// //               <div
+// //                 key={product.id}
+// //                 className="product-card"
+// //                 onClick={() => navigate(`/product/${product.id}`)}
+// //               >
+// //                 <img
+// //                   src={product.images[0]}
+// //                   alt={product.name}
+// //                   onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+// //                 />
+// //                 <h3>{product.name}</h3>
+// //                 <p>
+// //                   ₹{product.price.toLocaleString('en-IN', {
+// //                     minimumFractionDigits: 2,
+// //                     maximumFractionDigits: 2,
+// //                   })}
+// //                 </p>
+// //                 <p className="product-stock">
+// //                   {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+// //                 </p>
+// //                 <div className="product-buttons">
+// //                   <button
+// //                     onClick={(e) => {
+// //                       e.stopPropagation();
+// //                       addToCart(product);
+// //                     }}
+// //                     className="add-to-cart-btn"
+// //                     disabled={product.stock <= 0}
+// //                   >
+// //                     <FaShoppingCart /> Add to Cart
+// //                   </button>
+// //                   <button
+// //                     onClick={(e) => {
+// //                       e.stopPropagation();
+// //                       navigate('/cart', { state: { product } });
+// //                     }}
+// //                     className="buy-now-btn"
+// //                     disabled={product.stock <= 0}
+// //                   >
+// //                     Buy Now
+// //                   </button>
+// //                 </div>
+// //               </div>
+// //             ))}
+// //           </div>
+// //         )}
+// //       </section>
+// //       <div className="cart-icon">
+// //         <Link to="/cart">
+// //           <FaShoppingCart size={30} color="#007bff" />
+// //         </Link>
+// //       </div>
+// //       {isSeller && (
+// //         <button onClick={() => navigate('/seller')} className="btn-seller-dashboard">
+// //           Go to Seller Dashboard
+// //         </button>
+// //       )}
+// //     </div>
+// //   );
+// // }
+
+// // export default React.memo(Home);
+
+
+
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation (standardized to latitude/longitude)
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371; // Earth's radius in kilometers
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+//     Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role (buyer/seller)
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products within 40 km
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available. Please enable location services or log in to set your location.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40; // Strict 40 km radius
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers found within 40km.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products. Please try again.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images from Supabase storage
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images. Using default banner.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add a product to the cart with stock, authentication, and Supabase validation
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Cannot add invalid product to cart.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Product out of stock.');
+//       return;
+//     }
+//     try {
+//       if (!session?.user) {
+//         setError('Please log in to add items to your cart.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       // Check if product already exists in cart
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError; // PGRST116: no rows found
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Cannot add more items than available stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//             image: product.images[0],
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       setError(null);
+//       alert('Product added to cart successfully!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add product to cart. Please try again.');
+//     }
+//   }, [session, navigate]);
+
+//   // Fetch data on mount
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//   }, [fetchUserRole, fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products based on search term
+//   const filteredProducts = useMemo(
+//     () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
+//     [products, searchTerm]
+//   );
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   return (
+//     <div className="home">
+//       <h1 className="home-title">FreshCart</h1>
+//       <div className="search-bar">
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner, i) => (
+//               <Link key={i} to={`/product/${i + 1}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+//       {error && (
+//         <div className="home-error">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+//       <section className="products-section">
+//         <h2>Products Near You (40km)</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p>
+//             {searchTerm
+//               ? 'No products found matching your search.'
+//               : 'No products available within 40km.'}
+//           </p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <img
+//                   src={product.images[0]}
+//                   alt={product.name}
+//                   onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                 />
+//                 <h3>{product.name}</h3>
+//                 <p className="product-price">
+//                   ₹{product.price.toLocaleString('en-IN', {
+//                     minimumFractionDigits: 2,
+//                     maximumFractionDigits: 2,
+//                   })}
+//                 </p>
+//                 <p className="product-stock">
+//                   {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+//                 </p>
+//                 <div className="product-buttons">
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       addToCart(product);
+//                     }}
+//                     className="add-to-cart-btn"
+//                     disabled={product.stock <= 0}
+//                     aria-label={`Add ${product.name} to cart`}
+//                   >
+//                     <FaShoppingCart /> Add to Cart
+//                   </button>
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       navigate('/cart', { state: { product } });
+//                     }}
+//                     className="buy-now-btn"
+//                     disabled={product.stock <= 0}
+//                     aria-label={`Buy ${product.name} now`}
+//                   >
+//                     Buy Now
+//                   </button>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+//       <div className="cart-icon">
+//         <Link to="/cart" aria-label="View cart">
+//           <FaShoppingCart size={30} color="#007bff" />
+//         </Link>
+//       </div>
+//       {isSeller && (
+//         <button
+//           onClick={() => navigate('/seller')}
+//           className="btn-seller-dashboard"
+//           aria-label="Go to seller dashboard"
+//         >
+//           Go to Seller Dashboard
+//         </button>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation (standardized to latitude/longitude)
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371; // Earth's radius in kilometers
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+//     Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role (buyer/seller)
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products within 40 km
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available. Please enable location services or log in to set your location.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40; // Strict 40 km radius
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers found within 40km.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products. Please try again.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images from Supabase storage
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images. Using default banner.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add a product to the cart with stock, authentication, and Supabase validation
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Cannot add invalid product to cart.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Product out of stock.');
+//       return;
+//     }
+//     try {
+//       if (!session?.user) {
+//         setError('Please log in to add items to your cart.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       // Check if product already exists in cart
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError; // PGRST116: no rows found
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Cannot add more items than available stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       setError(null);
+//       alert('Product added to cart successfully!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add product to cart. Please try again.');
+//     }
+//   }, [session, navigate, setError]); // Dependencies are correctly specified
+
+//   // Fetch data on mount
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//   }, [fetchUserRole, fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products based on search term
+//   const filteredProducts = useMemo(
+//     () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
+//     [products, searchTerm]
+//   );
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   return (
+//     <div className="home">
+//       <h1 className="home-title">FreshCart</h1>
+//       <div className="search-bar">
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner, i) => (
+//               <Link key={i} to={`/product/${i + 1}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+//       {error && (
+//         <div className="home-error">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+//       <section className="products-section">
+//         <h2>Products Near You (40km)</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p>
+//             {searchTerm
+//               ? 'No products found matching your search.'
+//               : 'No products available within 40km.'}
+//           </p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <img
+//                   src={product.images[0]}
+//                   alt={product.name}
+//                   onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                 />
+//                 <h3>{product.name}</h3>
+//                 <p className="product-price">
+//                   ₹{product.price.toLocaleString('en-IN', {
+//                     minimumFractionDigits: 2,
+//                     maximumFractionDigits: 2,
+//                   })}
+//                 </p>
+//                 <p className="product-stock">
+//                   {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+//                 </p>
+//                 <div className="product-buttons">
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       addToCart(product);
+//                     }}
+//                     className="add-to-cart-btn"
+//                     disabled={product.stock <= 0}
+//                     aria-label={`Add ${product.name} to cart`}
+//                   >
+//                     <FaShoppingCart /> Add to Cart
+//                   </button>
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       navigate('/cart', { state: { product } });
+//                     }}
+//                     className="buy-now-btn"
+//                     disabled={product.stock <= 0}
+//                     aria-label={`Buy ${product.name} now`}
+//                   >
+//                     Buy Now
+//                   </button>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+//       <div className="cart-icon">
+//         <Link to="/cart" aria-label="View cart">
+//           <FaShoppingCart size={30} color="#007bff" />
+//         </Link>
+//       </div>
+//       {isSeller && (
+//         <button
+//           onClick={() => navigate('/seller')}
+//           className="btn-seller-dashboard"
+//           aria-label="Go to seller dashboard"
+//         >
+//           Go to Seller Dashboard
+//         </button>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaMoon, FaSun, FaSearch, FaArrowRight } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+//   const [isDarkMode, setIsDarkMode] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers within 40km.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Invalid product.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Out of stock.');
+//       return;
+//     }
+//     try {
+//       if (!session?.user) {
+//         setError('Please log in.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Exceeds stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       setError(null);
+//       alert('Added to cart!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   }, [session, navigate, setError]);
+
+//   // Fetch data on mount
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//   }, [fetchUserRole, fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(
+//     () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
+//     [products, searchTerm]
+//   );
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   // Toggle dark mode
+//   const toggleDarkMode = () => {
+//     setIsDarkMode(!isDarkMode);
+//     document.body.classList.toggle('dark-mode');
+//   };
+
+//   return (
+//     <div className={`home ${isDarkMode ? 'dark-mode' : ''}`}>
+//       {/* Dark Mode Toggle */}
+//       <button
+//         onClick={toggleDarkMode}
+//         className="dark-mode-toggle"
+//         aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+//       >
+//         {isDarkMode ? <FaSun size={20} /> : <FaMoon size={20} />}
+//       </button>
+
+//       {/* Hero Section */}
+//       <div className="hero-section">
+//         <h1 className="hero-title">Welcome to FreshCart</h1>
+//         <p className="hero-subtitle">Shop the best products near you!</p>
+//         <button
+//           onClick={() => navigate('/products')}
+//           className="hero-cta"
+//           aria-label="Shop now"
+//         >
+//           Shop Now <FaArrowRight />
+//         </button>
+//       </div>
+
+//       {/* Sticky Search Bar */}
+//       <div className="search-bar sticky">
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner, i) => (
+//               <Link key={i} to={`/product/${i + 1}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Error Message */}
+//       {error && (
+//         <div className="home-error">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Products Near You (40km)</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products within 40km.'}</p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <p className="product-price">
+//                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                   <p className={`product-stock ${product.stock <= 0 ? 'out-of-stock' : ''}`}>
+//                     {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+//                   </p>
+//                   <div className="product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="add-to-cart-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         navigate('/cart', { state: { product } });
+//                       }}
+//                       className="buy-now-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       {/* Cart Icon */}
+//       <div className="cart-icon">
+//         <Link to="/cart" aria-label="View cart">
+//           <FaShoppingCart size={28} />
+//         </Link>
+//       </div>
+
+//       {/* Seller Dashboard Button */}
+//       {isSeller && (
+//         <button
+//           onClick={() => navigate('/seller')}
+//           className="btn-seller-dashboard"
+//           aria-label="Go to seller dashboard"
+//         >
+//           Go to Seller Dashboard <FaArrowRight />
+//         </button>
+//       )}
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaMoon, FaSun, FaSearch, FaArrowRight } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+//   const [isDarkMode, setIsDarkMode] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers within 40km.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Invalid product.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Out of stock.');
+//       return;
+//     }
+//     try {
+//       if (!session?.user) {
+//         setError('Please log in.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Exceeds stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       setError(null);
+//       alert('Added to cart!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   }, [navigate, session]);
+
+//   // Fetch data on mount
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//   }, [fetchUserRole, fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(() => {
+//     if (!searchTerm) return products;
+//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+//   }, [products, searchTerm]);
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   // Toggle dark mode
+//   const toggleDarkMode = () => {
+//     setIsDarkMode(!isDarkMode);
+//     document.body.classList.toggle('dark-mode');
+//   };
+
+//   return (
+//     <div className={`home ${isDarkMode ? 'dark-mode' : ''}`}>
+//       {/* Dark Mode Toggle */}
+//       <button
+//         onClick={toggleDarkMode}
+//         className="dark-mode-toggle"
+//         aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+//       >
+//         {isDarkMode ? <FaSun size={20} /> : <FaMoon size={20} />}
+//       </button>
+
+//       {/* Hero Section */}
+//       <div className="hero-section">
+//         <h1 className="hero-title">Welcome to FreshCart</h1>
+//         <p className="hero-subtitle">Shop the best products near you!</p>
+//         <button
+//           onClick={() => navigate('/products')}
+//           className="hero-cta"
+//           aria-label="Shop now"
+//         >
+//           Shop Now <FaArrowRight />
+//         </button>
+//       </div>
+
+//       {/* Sticky Search Bar */}
+//       <div className="search-bar sticky">
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner) => (
+//               <Link key={banner.name} to={`/product/${banner.name}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Error Message */}
+//       {error && (
+//         <div className="home-error" aria-live="polite">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Products Near You (40km)</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products within 40km.'}</p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <p className="product-price">
+//                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                   <p className={`product-stock ${product.stock <= 0 ? 'out-of-stock' : ''}`}>
+//                     {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
+//                   </p>
+//                   <div className="product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="add-to-cart-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         navigate('/cart', { state: { product } });
+//                       }}
+//                       className="buy-now-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       {/* Cart Icon */}
+//       <div className="cart-icon">
+//         <Link to="/cart" aria-label="View cart">
+//           <FaShoppingCart size={28} />
+//         </Link>
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaSearch, FaHome, FaList, FaUser } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers within 40km.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Invalid product.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Out of stock.');
+//       return;
+//     }
+//     try {
+//       if (!session?.user) {
+//         setError('Please log in.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Exceeds stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       setError(null);
+//       alert('Added to cart!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   }, [navigate, session]);
+
+//   // Fetch data on mount
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//   }, [fetchUserRole, fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(() => {
+//     if (!searchTerm) return products;
+//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+//   }, [products, searchTerm]);
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   if (loadingProducts && loadingBanners) return (
+//     <div className="loading">
+//       <svg className="spinner" viewBox="0 0 50 50">
+//         <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   return (
+//     <div className="home">
+//       {/* Sticky Search Bar */}
+//       <div className="search-bar sticky">
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner) => (
+//               <Link key={banner.name} to={`/product/${banner.name}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Error Message */}
+//       {error && (
+//         <div className="home-error" aria-live="polite">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Products Near You (40km)</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products within 40km.'}</p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <p className="product-price">
+//                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                   <p className={`product-stock ${product.stock <= 0 ? 'out-of-stock' : ''}`}>
+//                     In Stock: {product.stock > 0 ? product.stock : 'Out of Stock'}
+//                   </p>
+//                   <div className="product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="add-to-cart-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         navigate('/cart', { state: { product } });
+//                       }}
+//                       className="buy-now-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       {/* Footer */}
+//       <footer className="footer">
+//         <div className="footer-icons">
+//           <Link to="/" className="footer-icon active">
+//             <FaHome size={24} />
+//             <span>Home</span>
+//           </Link>
+//           <Link to="/categories" className="footer-icon">
+//             <FaList size={24} />
+//             <span>Category</span>
+//           </Link>
+//           <Link to="/account" className="footer-icon">
+//             <FaUser size={24} />
+//             <span>Account</span>
+//           </Link>
+//           <Link to="/cart" className="footer-icon">
+//             <FaShoppingCart size={24} />
+//             <span>Cart</span>
+//           </Link>
+//         </div>
+//       </footer>
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+
+
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { LocationContext } from '../App';
-import { FaShoppingCart } from 'react-icons/fa';
+import { FaShoppingCart, FaSearch, FaHome, FaList, FaUser } from 'react-icons/fa';
 import Slider from 'react-slick';
-import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
+import 'slick-carousel/slick/slick.css';
 import '../style/Home.css';
+import Footer from './Footer'; // Import Footer component
 
-// Distance calculation (standardized to latitude/longitude)
+// Utility to debounce a function
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
+// Distance calculation
 function calculateDistance(userLoc, sellerLoc) {
   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
-  const R = 6371; // Earth's radius in kilometers
+  const R = 6371;
   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-  const a =
-    Math.sin(latDiff / 2) ** 2 +
-    Math.cos(userLoc.lat * (Math.PI / 180)) *
-    Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
-    Math.sin(lonDiff / 2) ** 2;
+  const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
 function Home() {
-  const { buyerLocation } = useContext(LocationContext);
+  const { buyerLocation, session } = useContext(LocationContext);
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [bannerImages, setBannerImages] = useState([]);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingBanners, setLoadingBanners] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSeller, setIsSeller] = useState(false);
 
-  // Fetch nearby products within 40 km
-  const fetchNearbyProducts = useCallback(async () => {
-    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
-      console.warn('No buyer location provided.');
-      setLoading(false);
+  // Debounced search handler
+  const debouncedSetSearchTerm = useCallback(
+    debounce((value) => {
+      setSearchTerm(value);
+    }, 300),
+    []
+  );
+
+  // Fetch user role
+  const fetchUserRole = useCallback(async () => {
+    if (!session?.user) {
+      setIsSeller(false);
       return;
     }
-    setLoading(true);
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('Auth Session:', session, 'Session Error:', sessionError);
-      if (session?.user) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_seller')
-          .eq('id', session.user.id)
-          .single();
-        if (profileError) throw profileError;
-        setIsSeller(profileData?.is_seller || false);
-        console.log('User Role:', profileData?.is_seller ? 'Seller' : 'Buyer');
-      } else {
-        console.log('No user logged in, proceeding as anonymous');
-        setIsSeller(false);
-      }
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_seller')
+        .eq('id', session.user.id)
+        .single();
+      if (profileError) throw profileError;
+      setIsSeller(profileData?.is_seller || false);
+    } catch (err) {
+      console.error('Error fetching user role:', err);
+      setError('Failed to fetch user role.');
+    }
+  }, [session]);
 
+  // Fetch nearby products
+  const fetchNearbyProducts = useCallback(async () => {
+    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+      setError('No buyer location available.');
+      setLoadingProducts(false);
+      return;
+    }
+    setLoadingProducts(true);
+    try {
       const { data: allSellers, error: sellersError } = await supabase
         .from('sellers')
-        .select('id, latitude, longitude');
+        .select('id, latitude, longitude')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
       if (sellersError) throw sellersError;
-      console.log('All Sellers:', allSellers);
 
       const nearbySellerIds = allSellers
         .filter((seller) => {
           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
-          console.log(`Seller ${seller.id} Distance: ${distance !== null ? distance.toFixed(2) : 'N/A'} km`);
-          return distance !== null && distance <= 40; // Strict 40 km radius
+          return distance !== null && distance <= 40;
         })
         .map((seller) => seller.id);
-      console.log('Nearby Seller IDs:', nearbySellerIds);
 
       if (nearbySellerIds.length === 0) {
-        console.log('No nearby sellers found within 40km.');
         setProducts([]);
+        setError('No sellers within 40km.');
         return;
       }
 
@@ -4875,7 +7162,6 @@ function Home() {
         .eq('is_approved', true)
         .in('seller_id', nearbySellerIds);
       if (error) throw error;
-      console.log('Products Response:', data);
 
       const mappedProducts = data.map((product) => ({
         id: product.id,
@@ -4885,89 +7171,112 @@ function Home() {
         stock: product.stock || 0,
       }));
       setProducts(mappedProducts);
-      console.log('Mapped Products:', mappedProducts);
+      setError(null);
     } catch (err) {
       console.error('Error fetching products:', err);
-      setError(`Error: ${err.message || 'Failed to fetch products.'}`);
+      setError('Failed to fetch products.');
       setProducts([]);
     } finally {
-      setLoading(false);
+      setLoadingProducts(false);
     }
   }, [buyerLocation]);
 
-  // Fetch banner images from Supabase storage
+  // Fetch banner images
   const fetchBannerImages = useCallback(async () => {
+    setLoadingBanners(true);
     try {
       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
-      console.log('Banner Storage Response:', data);
       const banners = await Promise.all(
         data
-          .filter((file) => {
-            const isImage = /\.(jpg|jpeg|png|gif)$/i.test(file.name);
-            if (!isImage) console.warn(`Excluded non-image file: ${file.name}`);
-            return isImage;
-          })
+          .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
           .map(async (file) => {
             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
             return { url: publicUrl, name: file.name };
           })
       );
-      console.log('Mapped Banners:', banners);
       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
     } catch (err) {
       console.error('Error fetching banner images:', err);
       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+      setError('Failed to load banner images.');
+    } finally {
+      setLoadingBanners(false);
     }
   }, []);
 
-  // Add a product to the cart with stock and authentication validation
-  const addToCart = async (product) => {
+  // Add to cart
+  const addToCart = useCallback(async (product) => {
     if (!product || !product.id || !product.name || product.price === undefined) {
-      setError('Cannot add invalid product to cart.');
+      setError('Invalid product.');
       return;
     }
     if (product.stock <= 0) {
-      setError('Product out of stock.');
+      setError('Out of stock.');
       return;
     }
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.user) {
-        setError('Please log in to add items to your cart.');
+      if (!session?.user) {
+        setError('Please log in.');
         navigate('/auth');
         return;
       }
-      const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-      const existing = storedCart.find((item) => item.id === product.id);
-      if (existing) {
-        if (existing.quantity >= product.stock) {
-          setError('Cannot add more items than available stock.');
+
+      // Check if product already exists in cart
+      const { data: existingCartItem, error: fetchError } = await supabase
+        .from('cart')
+        .select('id, quantity, product_id')
+        .eq('user_id', session.user.id)
+        .eq('product_id', product.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Fetch Error:', fetchError);
+        throw fetchError;
+      }
+
+      if (existingCartItem) {
+        const newQuantity = existingCartItem.quantity + 1;
+        if (newQuantity > product.stock) {
+          setError('Exceeds stock.');
           return;
         }
-        existing.quantity += 1;
+        const { error: updateError } = await supabase
+          .from('cart')
+          .update({ quantity: newQuantity })
+          .eq('id', existingCartItem.id);
+        if (updateError) {
+          console.error('Update Error:', updateError);
+          throw updateError;
+        }
       } else {
-        storedCart.push({
-          id: product.id,
-          title: product.name,
-          price: product.price,
-          quantity: 1,
-          image: product.images[0],
-          stock: product.stock,
-        });
+        const { error: insertError } = await supabase
+          .from('cart')
+          .insert({
+            user_id: session.user.id,
+            product_id: product.id,
+            quantity: 1,
+            price: product.price,
+            title: product.name,
+          });
+        if (insertError) {
+          console.error('Insert Error:', insertError);
+          throw insertError;
+        }
       }
-      localStorage.setItem('cart', JSON.stringify(storedCart));
-      console.log('Added to cart:', product);
+
       setError(null);
+      alert('Added to cart!');
     } catch (err) {
       console.error('Error adding to cart:', err);
-      setError(`Error: ${err.message || 'Failed to add product to cart.'}`);
+      setError(`Failed to add to cart: ${err.message || 'Unknown error'}`);
     }
-  };
+  }, [navigate, session]);
 
-  // Use effect to fetch banner images and products
+  // Fetch data on mount
   useEffect(() => {
+    fetchUserRole();
     fetchBannerImages();
-  }, [fetchBannerImages]);
+  }, [fetchUserRole, fetchBannerImages]);
 
   useEffect(() => {
     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
@@ -4975,13 +7284,11 @@ function Home() {
     }
   }, [buyerLocation, fetchNearbyProducts]);
 
-  // Filter products based on search term
-  const filteredProducts = useMemo(
-    () => products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase())),
-    [products, searchTerm]
-  );
-
-  if (loading) return <div className="home-loading">Loading...</div>;
+  // Filter products
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return products;
+    return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [products, searchTerm]);
 
   // Slider settings
   const sliderSettings = {
@@ -4992,41 +7299,83 @@ function Home() {
     slidesToScroll: 1,
     autoplay: true,
     autoplaySpeed: 3000,
+    arrows: true,
   };
+
+  if (loadingProducts && loadingBanners) return (
+    <div className="loading">
+      <svg className="spinner" viewBox="0 0 50 50">
+        <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+      </svg>
+      Loading...
+    </div>
+  );
 
   return (
     <div className="home">
-      <h1 className="home-title">FreshCart</h1>
-      <div className="search-bar">
+      {/* Sticky Search Bar */}
+      <div className="search-bar sticky">
+        <FaSearch className="search-icon" />
         <input
           type="text"
           placeholder="Search products..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+          aria-label="Search products"
         />
       </div>
+
+      {/* Banner Slider */}
       <div className="banner-slider">
-        <Slider {...sliderSettings}>
-          {bannerImages.map((banner, i) => (
-            <Link key={i} to={`/product/${i + 1}`}>
-              <img src={banner.url} alt={`Banner ${banner.name}`} />
-            </Link>
-          ))}
-        </Slider>
+        {loadingBanners ? (
+          <div className="banner-skeleton" />
+        ) : (
+          <Slider {...sliderSettings}>
+            {bannerImages.map((banner) => (
+              <Link key={banner.name} to={`/product/${banner.name}`} aria-label={`Banner ${banner.name}`}>
+                <img src={banner.url} alt={`Banner ${banner.name}`} />
+              </Link>
+            ))}
+          </Slider>
+        )}
       </div>
+
+      {/* Error Message */}
       {error && (
-        <div className="home-error">
+        <div className="home-error" aria-live="polite">
           <p>{error}</p>
+          {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+            <button
+              onClick={() => {
+                if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+                if (error.includes('Failed to load banner images')) fetchBannerImages();
+              }}
+              className="retry-btn"
+            >
+              Retry
+            </button>
+          )}
         </div>
       )}
+
+      {/* Products Section */}
       <section className="products-section">
-        <h2>Products Near You (40km)</h2>
-        {filteredProducts.length === 0 ? (
-          <p>
-            {searchTerm
-              ? 'No products found matching your search.'
-              : 'No products available within 40km.'}
-          </p>
+        <h2 className="section-title">Products Near You (40km)</h2>
+        {loadingProducts ? (
+          <div className="product-grid">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="product-card-skeleton">
+                <div className="skeleton-image" />
+                <div className="skeleton-text" />
+                <div className="skeleton-text short" />
+                <div className="skeleton-buttons">
+                  <div className="skeleton-btn" />
+                  <div className="skeleton-btn" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <p className="no-products">{searchTerm ? 'No products found.' : 'No products within 40km.'}</p>
         ) : (
           <div className="product-grid">
             {filteredProducts.map((product) => (
@@ -5034,59 +7383,59 @@ function Home() {
                 key={product.id}
                 className="product-card"
                 onClick={() => navigate(`/product/${product.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+                aria-label={`View ${product.name}`}
               >
-                <img
-                  src={product.images[0]}
-                  alt={product.name}
-                  onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
-                />
-                <h3>{product.name}</h3>
-                <p>
-                  ₹{product.price.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-                <p className="product-stock">
-                  {product.stock > 0 ? `In Stock: ${product.stock}` : 'Out of Stock'}
-                </p>
-                <div className="product-buttons">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToCart(product);
-                    }}
-                    className="add-to-cart-btn"
-                    disabled={product.stock <= 0}
-                  >
-                    <FaShoppingCart /> Add to Cart
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate('/cart', { state: { product } });
-                    }}
-                    className="buy-now-btn"
-                    disabled={product.stock <= 0}
-                  >
-                    Buy Now
-                  </button>
+                <div className="product-image-wrapper">
+                  <img
+                    src={product.images[0]}
+                    alt={product.name}
+                    onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+                    loading="lazy"
+                  />
+                </div>
+                <div className="product-info">
+                  <h3 className="product-name">{product.name}</h3>
+                  <p className="product-price">
+                    ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className={`product-stock ${product.stock <= 0 ? 'out-of-stock' : ''}`}>
+                    In Stock: {product.stock > 0 ? product.stock : 'Out of Stock'}
+                  </p>
+                  <div className="product-buttons">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product);
+                      }}
+                      className="add-to-cart-btn"
+                      disabled={product.stock <= 0}
+                      aria-label={`Add ${product.name} to cart`}
+                    >
+                      <FaShoppingCart /> Add to Cart
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate('/cart', { state: { product } });
+                      }}
+                      className="buy-now-btn"
+                      disabled={product.stock <= 0}
+                      aria-label={`Buy ${product.name} now`}
+                    >
+                      Buy Now
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
-      <div className="cart-icon">
-        <Link to="/cart">
-          <FaShoppingCart size={30} color="#007bff" />
-        </Link>
-      </div>
-      {isSeller && (
-        <button onClick={() => navigate('/seller')} className="btn-seller-dashboard">
-          Go to Seller Dashboard
-        </button>
-      )}
+
+      <Footer /> {/* Use Footer component instead of inline footer */}
     </div>
   );
 }

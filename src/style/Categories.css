@@ -1,124 +1,193 @@
 /* Categories.css */
-.categories-page {
-  padding: 10px;
-  background-color: #f0f8ff; /* Halka neela background */
-  min-height: 100vh;
+* {
+  box-sizing: border-box;
 }
 
-.categories-page h1 {
-  text-align: center;
-  color: #1e90ff; /* Gahara neela heading */
-  font-size: 24px;
-  margin-bottom: 15px;
+.categories-page {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 10px;
+  background-color: #f9fafb;
+  min-height: 100vh;
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
+}
+
+.categories-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  width: 100%;
+}
+
+.categories-header h1 {
+  font-size: 20px;
+  color: #007bff; /* Changed to blue for trust */
 }
 
 .search-bar {
-  margin-bottom: 15px;
+  position: sticky;
+  top: 10px;
+  z-index: 10;
+  background-color: white;
+  padding: 10px;
+  border: 1px solid #007bff; /* Changed to blue for trust */
+  border-radius: 6px;
+  width: 100%;
+  max-width: 100%;
 }
 
-.search-bar input {
+.search-input {
   width: 100%;
-  padding: 10px;
+  padding: 8px;
+  border: none;
   font-size: 14px;
-  border: 1px solid #4169e1; /* Neela border */
-  border-radius: 5px;
+  outline: none;
   box-sizing: border-box;
+}
+
+.error-message {
+  padding: 15px;
+  background-color: #fee2e2;
+  border-radius: 6px;
+  text-align: center;
+  color: #6b7280;
+  width: 100%;
+  max-width: 100%;
 }
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .category-card {
   background-color: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  padding: 10px;
-  text-align: center;
+  border-radius: 8px;
+  padding: 8px;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: transform 0.3s ease;
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
 }
 
 .category-card:hover {
-  transform: scale(1.05); /* Zoom effect on hover */
+  transform: translateY(-3px);
 }
 
 .category-card.selected {
-  border: 2px solid #4169e1; /* Neela border jab selected ho */
+  border: 2px solid #007bff; /* Changed to blue for trust */
+}
+
+.category-image-wrapper {
+  width: 100%;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 6px;
 }
 
 .category-image {
   width: 100%;
-  height: 100px;
-  object-fit: cover; /* Image fit properly */
-  border-radius: 5px;
-  margin-bottom: 5px;
+  height: 100%;
+  object-fit: cover;
 }
 
-.category-card h3 {
-  font-size: 14px;
-  margin: 5px 0;
-  color: #333;
-}
-
-.category-card p {
+.category-name {
   font-size: 12px;
-  margin: 2px 0;
-  color: #555;
+  font-weight: 500;
+  color: #1f2937;
+  margin: 6px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.category-parent {
+  font-size: 10px;
+  color: #6b7280;
+  margin: 4px 0;
 }
 
 .view-products-link {
   display: inline-block;
-  margin-top: 5px;
-  padding: 5px 10px;
-  background-color: #4169e1; /* Neela button */
+  padding: 4px 8px;
+  background-color: #007bff; /* Changed to blue for trust */
   color: white;
+  border-radius: 6px;
   text-decoration: none;
-  border-radius: 5px;
-  font-size: 12px;
+  font-size: 11px;
+  margin-top: 6px;
 }
 
 .view-products-link:hover {
-  background-color: #0000cd; /* Gahara neela hover */
+  background-color: #0056b3; /* Darker blue for hover */
 }
 
-.error-message {
+.no-categories {
+  font-size: 14px;
+  color: #6b7280;
   text-align: center;
-  color: #dc3545; /* Red for error */
-  margin-bottom: 10px;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  width: 100%;
 }
 
-/* Mobile Optimization */
-@media (max-width: 600px) {
-  .categories-page h1 {
-    font-size: 20px;
-  }
-
-  .search-bar input {
-    font-size: 12px;
-    padding: 8px;
+/* Responsive Design */
+@media (min-width: 640px) {
+  .categories-page {
+    padding: 20px;
+    max-width: 800px;
   }
 
   .category-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
   }
 
-  .category-image {
-    height: 80px; /* Choti screen ke liye image size adjust */
+  .category-card {
+    padding: 10px;
   }
 
-  .category-card h3 {
+  .category-image-wrapper {
+    height: 150px;
+  }
+
+  .category-name {
+    font-size: 14px;
+  }
+
+  .category-parent {
     font-size: 12px;
   }
 
-  .category-card p {
-    font-size: 10px;
+  .view-products-link {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 768px) {
+  .categories-page {
+    padding: 25px;
+    max-width: 960px;
   }
 
-  .view-products-link {
-    font-size: 10px;
-    padding: 4px 8px;
+  .category-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .category-image-wrapper {
+    height: 180px;
   }
 }

@@ -2924,6 +2924,1892 @@
 
 
 
+// import React, { useState, useEffect } from 'react';
+// import { useParams, Link, useNavigate } from 'react-router-dom';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import { supabase } from '../supabaseClient';
+// import '../style/ProductPage.css';
+
+// function ProductPage() {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [product, setProduct] = useState(null);
+//   const [variants, setVariants] = useState([]);
+//   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [reviews, setReviews] = useState([]);
+
+//   // Local storage for cart & wishlist
+//   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || []);
+//   const [wishlist, setWishlist] = useState(JSON.parse(localStorage.getItem('wishlist')) || []);
+
+//   useEffect(() => {
+//     setReviews([]);
+//     fetchProductAndVariants();
+//   }, [id]);
+
+//   // -------------------------
+//   // Fetch product & variants
+//   // -------------------------
+//   const fetchProductAndVariants = async () => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       // 1) Fetch product
+//       const { data: productData, error: productError } = await supabase
+//         .from('products')
+//         .select('*, sellers(latitude, longitude, store_name)')
+//         .eq('id', parseInt(id, 10))
+//         .eq('is_approved', true)
+//         .maybeSingle();
+//       if (productError) throw productError;
+//       if (!productData) {
+//         setError('Product not found.');
+//         return;
+//       }
+//       setProduct(productData);
+
+//       // 2) Fetch variants
+//       const { data: variantData, error: variantError } = await supabase
+//         .from('product_variants')
+//         .select('*')
+//         .eq('product_id', parseInt(id, 10));
+//       if (variantError) throw variantError;
+//       setVariants(variantData || []);
+
+//       // 3) Fetch reviews
+//       const reviewsData = await fetchProductReviews(parseInt(id, 10));
+//       setReviews(reviewsData);
+//     } catch (err) {
+//       console.error('Error fetching product or variants:', err);
+//       setError(`Error: ${err.message || 'Failed to load product.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // -------------------------
+//   // Fetch reviews from DB
+//   // -------------------------
+//   const fetchProductReviews = async (productId) => {
+//     try {
+//       // 1) Get order_items for this product
+//       const { data: orderItemsData, error: orderItemsError } = await supabase
+//         .from('order_items')
+//         .select('order_id, product_id')
+//         .eq('product_id', productId);
+//       if (orderItemsError) throw orderItemsError;
+//       if (!orderItemsData || orderItemsData.length === 0) {
+//         return [];
+//       }
+
+//       // 2) Unique order IDs
+//       const orderIds = [...new Set(orderItemsData.map(item => item.order_id))];
+
+//       // 3) Fetch reviews for those orders
+//       const { data: reviewsData, error: reviewsError } = await supabase
+//         .from('reviews')
+//         .select(`
+//           id,
+//           order_id,
+//           reviewer_id,
+//           reviewed_id,
+//           rating,
+//           review_text,
+//           reply_text,
+//           created_at,
+//           updated_at
+//         `)
+//         .in('order_id', orderIds);
+//       if (reviewsError) throw reviewsError;
+//       if (!reviewsData || reviewsData.length === 0) {
+//         return [];
+//       }
+
+//       // 4) Fetch reviewer/reviewed names
+//       const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
+//       const reviewedIds = [...new Set(reviewsData.map(r => r.reviewed_id))];
+//       const { data: profilesData, error: profilesError } = await supabase
+//         .from('profiles')
+//         .select('id, name')
+//         .in('id', [...reviewerIds, ...reviewedIds]);
+//       if (profilesError) throw profilesError;
+
+//       // 5) Map user names
+//       const mappedReviews = reviewsData.map(review => ({
+//         ...review,
+//         reviewer_name:
+//           profilesData.find(p => p.id === review.reviewer_id)?.name || 'Unknown User',
+//         reviewed_name:
+//           profilesData.find(p => p.id === review.reviewed_id)?.name || 'Unknown User',
+//       }));
+
+//       return mappedReviews;
+//     } catch (error) {
+//       console.error('Error fetching reviews:', error);
+//       return [];
+//     }
+//   };
+
+//   // -------------------------
+//   // Calculate rating summary
+//   // -------------------------
+//   const averageRating =
+//     reviews.length > 0
+//       ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+//       : 0;
+
+//   const totalReviewsCount = reviews.length;
+
+//   // Which variant is selected
+//   const getActiveVariant = () => {
+//     if (variants.length > 0) {
+//       const clampedIndex = Math.min(selectedVariantIndex, variants.length - 1);
+//       return variants[clampedIndex];
+//     }
+//     return null;
+//   };
+
+//   // Merge product + variant images
+//   const getDisplayedImages = () => {
+//     const activeVariant = getActiveVariant();
+//     const productImages = product?.images || [];
+//     const variantImages = activeVariant?.images || [];
+
+//     const mergedImages = [...new Set([...productImages, ...variantImages])];
+//     return mergedImages.length > 0 ? mergedImages : ['https://dummyimage.com/300'];
+//   };
+
+//   // react-slick settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     arrows: true,
+//     autoplay: false,
+//   };
+
+//   // -------------------------
+//   // Add item to cart
+//   // -------------------------
+//   const addToCart = async () => {
+//     if (!product) return;
+//     const activeVariant = getActiveVariant();
+//     const cartItem = {
+//       ...product,
+//       selectedVariant: activeVariant || null,
+//       price: activeVariant?.price || product.price,
+//       images:
+//         activeVariant?.images && activeVariant.images.length > 0
+//           ? activeVariant.images
+//           : product.images,
+//     };
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         // Add to Supabase cart table
+//         const { error } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             variant_id: activeVariant?.id || null,
+//             quantity: 1,
+//           });
+//         if (error) throw error;
+//       } else {
+//         // Fallback to local storage
+//         const updatedCart = [...cart, cartItem];
+//         setCart(updatedCart);
+//         localStorage.setItem('cart', JSON.stringify(updatedCart));
+//       }
+//       alert(`${product.title || product.name} added to cart!`);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   };
+
+//   // -------------------------
+//   // Add item to wishlist
+//   // -------------------------
+//   const addToWishlist = async () => {
+//     if (!product) return;
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         // Add to Supabase wishlist table (assuming it exists)
+//         const { error } = await supabase
+//           .from('wishlist')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//           });
+//         if (error) throw error;
+//         alert(`${product.title || product.name} added to wishlist!`);
+//       } else {
+//         // Fallback to local storage
+//         if (!wishlist.some(item => item.id === product.id)) {
+//           const updatedWishlist = [...wishlist, product];
+//           setWishlist(updatedWishlist);
+//           localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
+//           alert(`${product.title || product.name} added to wishlist!`);
+//         } else {
+//           alert(`${product.title || product.name} is already in your wishlist!`);
+//         }
+//       }
+//     } catch (err) {
+//       console.error('Error adding to wishlist:', err);
+//       setError('Failed to add to wishlist.');
+//     }
+//   };
+
+//   // -------------------------
+//   // Render price & discount
+//   // -------------------------
+//   const renderPriceSection = () => {
+//     const activeVariant = getActiveVariant();
+//     const variantPrice = activeVariant?.price;
+//     const mainPrice = variantPrice || product?.price || 0;
+
+//     const originalPrice =
+//       activeVariant?.original_price || product?.original_price || null;
+//     if (originalPrice && originalPrice > mainPrice) {
+//       const discount = Math.round(((originalPrice - mainPrice) / originalPrice) * 100);
+//       return (
+//         <div className="price-section">
+//           <span className="current-price">₹{mainPrice}</span>
+//           <span className="original-price">₹{originalPrice}</span>
+//           <span className="discount">{discount}% off</span>
+//         </div>
+//       );
+//     }
+//     return (
+//       <div className="price-section">
+//         <span className="current-price">₹{mainPrice}</span>
+//       </div>
+//     );
+//   };
+
+//   // -------------------------
+//   // Render logic
+//   // -------------------------
+//   if (loading) return <div className="loading">Loading...</div>;
+//   if (error) return <div className="error">{error} <button onClick={() => navigate('/products')}>Back to Products</button></div>;
+//   if (!product) return <div className="error">Product not found <button onClick={() => navigate('/products')}>Back to Products</button></div>;
+
+//   const displayedImages = getDisplayedImages();
+//   const activeVariant = getActiveVariant();
+
+//   // Filter variants by color or capacity
+//   const colorVariants = variants.filter(v => v.attributes?.color);
+//   const capacityVariants = variants.filter(v => v.attributes?.capacity);
+
+//   return (
+//     <div className="product-page-container">
+//       {/* LEFT SECTION: Images */}
+//       <div className="product-image-section">
+//         <div className="image-slider-container">
+//           {displayedImages.length > 1 ? (
+//             <Slider {...sliderSettings}>
+//               {displayedImages.map((imgUrl, i) => (
+//                 <div key={i} className="slider-image-wrapper">
+//                   <img
+//                     src={imgUrl}
+//                     alt={`Slide ${i}`}
+//                     onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                   />
+//                 </div>
+//               ))}
+//             </Slider>
+//           ) : (
+//             <div className="single-image-wrapper">
+//               <img
+//                 src={displayedImages[0]}
+//                 alt="Product"
+//                 onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//               />
+//             </div>
+//           )}
+//         </div>
+
+//         <div className="view-360">
+//           <button disabled>View in 360° (Coming Soon)</button>
+//         </div>
+//       </div>
+
+//       {/* RIGHT SECTION: Details */}
+//       <div className="product-details-section">
+//         <h1 className="product-title">{product.title || product.name}</h1>
+
+//         {/* Price & discount */}
+//         {renderPriceSection()}
+
+//         {/* Product highlights */}
+//         <ul className="product-highlights">
+//           {product.description?.split(';').map((point, idx) => (
+//             <li key={idx}>{point.trim()}</li>
+//           )) || <li>No description available</li>}
+//         </ul>
+
+//         {/* Color selection */}
+//         {colorVariants.length > 0 && (
+//           <div className="variant-color-section">
+//             <h4>Color:</h4>
+//             <div className="color-options">
+//               {colorVariants.map((v) => {
+//                 const idx = variants.indexOf(v);
+//                 return (
+//                   <button
+//                     key={v.id}
+//                     className={`color-button ${idx === selectedVariantIndex ? 'active' : ''}`}
+//                     onClick={() => setSelectedVariantIndex(idx)}
+//                   >
+//                     {v.attributes.color}
+//                   </button>
+//                 );
+//               })}
+//             </div>
+//           </div>
+//         )}
+
+//         {/* Storage selection */}
+//         {capacityVariants.length > 0 && (
+//           <div className="variant-capacity-section">
+//             <h4>Storage (RAM + ROM):</h4>
+//             <div className="capacity-options">
+//               {capacityVariants.map((v) => {
+//                 const idx = variants.indexOf(v);
+//                 return (
+//                   <button
+//                     key={v.id}
+//                     className={`capacity-button ${idx === selectedVariantIndex ? 'active' : ''}`}
+//                     onClick={() => setSelectedVariantIndex(idx)}
+//                   >
+//                     {v.attributes.capacity}
+//                   </button>
+//                 );
+//               })}
+//             </div>
+//           </div>
+//         )}
+
+//         {/* All variant buttons */}
+//         {variants.length > 0 && (
+//           <div className="variant-raw-section">
+//             <h4>Other Variants:</h4>
+//             {variants.map((v, idx) => {
+//               const attrText = Object.entries(v.attributes || {})
+//                 .map(([key, val]) => `${key}: ${val}`)
+//                 .join(', ');
+//               return (
+//                 <button
+//                   key={v.id}
+//                   onClick={() => setSelectedVariantIndex(idx)}
+//                   className={`variant-button ${idx === selectedVariantIndex ? 'active' : ''}`}
+//                 >
+//                   {attrText || `Variant #${idx + 1}`}
+//                 </button>
+//               );
+//             })}
+//           </div>
+//         )}
+
+//         {/* Stock info */}
+//         <p className="stock-info">
+//           <strong>Stock:</strong>{' '}
+//           {activeVariant && activeVariant.stock
+//             ? activeVariant.stock
+//             : product.stock || 'N/A'}
+//         </p>
+
+//         {/* Action buttons */}
+//         <div className="action-buttons">
+//           <button onClick={addToCart} className="add-to-cart-button">
+//             Add to Cart
+//           </button>
+//           <button className="buy-now-button" onClick={() => navigate('/checkout')}>
+//             Buy Now
+//           </button>
+//           <button onClick={addToWishlist} className="wishlist-button">
+//             Add to Wishlist
+//           </button>
+//         </div>
+
+//         {/* Seller info */}
+//         <div className="seller-info">
+//           <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+//           <Link to={`/seller/${product.seller_id}`} className="seller-link">
+//             View Seller Profile
+//           </Link>
+//         </div>
+//       </div>
+
+//       {/* RATINGS & REVIEWS */}
+//       <div className="ratings-summary">
+//         <h3>Ratings & Reviews</h3>
+//         <p className="by-verified">by verified customers</p>
+
+//         <div className="rating-score">
+//           <span className="rating-value">{averageRating.toFixed(1)}/5</span>
+//           <span className="rating-count">
+//             ({totalReviewsCount} {totalReviewsCount === 1 ? 'review' : 'reviews'})
+//           </span>
+//         </div>
+//       </div>
+
+//       {/* DETAILED REVIEWS LIST */}
+//       <div className="reviews-section">
+//         <h3>Customer Reviews</h3>
+//         {reviews.length > 0 ? (
+//           reviews.map((review, index) => (
+//             <div key={index} className="review-item">
+//               <div className="review-header">
+//                 <strong className="review-author">{review.reviewer_name}</strong>
+//                 <span className="review-rating">{review.rating}/5</span>
+//               </div>
+//               <p className="review-text">{review.review_text}</p>
+
+//               {review.reply_text && (
+//                 <div className="review-reply">
+//                   <strong>Seller Reply:</strong> {review.reply_text}
+//                 </div>
+//               )}
+
+//               <small className="review-date">
+//                 {new Date(review.created_at).toLocaleDateString()}
+//               </small>
+//             </div>
+//           ))
+//         ) : (
+//           <p className="no-reviews">No reviews yet.</p>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default ProductPage;
+
+
+
+
+// import React, { useState, useEffect } from 'react';
+// import { useParams, Link, useNavigate } from 'react-router-dom';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import { supabase } from '../supabaseClient';
+// import '../style/ProductPage.css';
+
+// function ProductPage() {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [product, setProduct] = useState(null);
+//   const [variants, setVariants] = useState([]);
+//   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [reviews, setReviews] = useState([]);
+
+//   // Local storage for cart & wishlist
+//   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || []);
+//   const [wishlist, setWishlist] = useState(JSON.parse(localStorage.getItem('wishlist')) || []);
+
+//   useEffect(() => {
+//     setReviews([]);
+//     fetchProductAndVariants();
+//   }, [id]);
+
+//   // -------------------------
+//   // Fetch product & variants
+//   // -------------------------
+//   const fetchProductAndVariants = async () => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       // 1) Fetch product with specifications
+//       const { data: productData, error: productError } = await supabase
+//         .from('products')
+//         .select('*, sellers(latitude, longitude, store_name)')
+//         .eq('id', parseInt(id, 10))
+//         .eq('is_approved', true)
+//         .maybeSingle();
+//       if (productError) throw productError;
+//       if (!productData) {
+//         setError('Product not found.');
+//         return;
+//       }
+//       // Mock specifications if not available
+//       if (!productData.specifications || Object.keys(productData.specifications).length === 0) {
+//         productData.specifications = {
+//           Material: "Cotton",
+//           Size: "M",
+//           Color: "Red",
+//           Weight: "200g",
+//           Warranty: "1 Year",
+//         };
+//       }
+//       setProduct(productData);
+
+//       // 2) Fetch variants
+//       const { data: variantData, error: variantError } = await supabase
+//         .from('product_variants')
+//         .select('*')
+//         .eq('product_id', parseInt(id, 10));
+//       if (variantError) throw variantError;
+//       setVariants(variantData || []);
+
+//       // 3) Fetch reviews
+//       const reviewsData = await fetchProductReviews(parseInt(id, 10));
+//       setReviews(reviewsData);
+//     } catch (err) {
+//       console.error('Error fetching product or variants:', err);
+//       setError(`Error: ${err.message || 'Failed to load product.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // -------------------------
+//   // Fetch reviews from DB
+//   // -------------------------
+//   const fetchProductReviews = async (productId) => {
+//     try {
+//       // 1) Get order_items for this product
+//       const { data: orderItemsData, error: orderItemsError } = await supabase
+//         .from('order_items')
+//         .select('order_id, product_id')
+//         .eq('product_id', productId);
+//       if (orderItemsError) throw orderItemsError;
+//       if (!orderItemsData || orderItemsData.length === 0) {
+//         return [];
+//       }
+
+//       // 2) Unique order IDs
+//       const orderIds = [...new Set(orderItemsData.map(item => item.order_id))];
+
+//       // 3) Fetch reviews for those orders
+//       const { data: reviewsData, error: reviewsError } = await supabase
+//         .from('reviews')
+//         .select(`
+//           id,
+//           order_id,
+//           reviewer_id,
+//           reviewed_id,
+//           rating,
+//           review_text,
+//           reply_text,
+//           created_at,
+//           updated_at
+//         `)
+//         .in('order_id', orderIds);
+//       if (reviewsError) throw reviewsError;
+//       if (!reviewsData || reviewsData.length === 0) {
+//         return [];
+//       }
+
+//       // 4) Fetch reviewer/reviewed names
+//       const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
+//       const reviewedIds = [...new Set(reviewsData.map(r => r.reviewed_id))];
+//       const { data: profilesData, error: profilesError } = await supabase
+//         .from('profiles')
+//         .select('id, name')
+//         .in('id', [...reviewerIds, ...reviewedIds]);
+//       if (profilesError) throw profilesError;
+
+//       // 5) Map user names
+//       const mappedReviews = reviewsData.map(review => ({
+//         ...review,
+//         reviewer_name:
+//           profilesData.find(p => p.id === review.reviewer_id)?.name || 'Unknown User',
+//         reviewed_name:
+//           profilesData.find(p => p.id === review.reviewed_id)?.name || 'Unknown User',
+//       }));
+
+//       return mappedReviews;
+//     } catch (error) {
+//       console.error('Error fetching reviews:', error);
+//       return [];
+//     }
+//   };
+
+//   // -------------------------
+//   // Calculate rating summary
+//   // -------------------------
+//   const averageRating =
+//     reviews.length > 0
+//       ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+//       : 0;
+
+//   const totalReviewsCount = reviews.length;
+
+//   // Which variant is selected
+//   const getActiveVariant = () => {
+//     if (variants.length > 0) {
+//       const clampedIndex = Math.min(selectedVariantIndex, variants.length - 1);
+//       return variants[clampedIndex];
+//     }
+//     return null;
+//   };
+
+//   // Merge product + variant images
+//   const getDisplayedImages = () => {
+//     const activeVariant = getActiveVariant();
+//     const productImages = product?.images || [];
+//     const variantImages = activeVariant?.images || [];
+
+//     const mergedImages = [...new Set([...productImages, ...variantImages])];
+//     return mergedImages.length > 0 ? mergedImages : ['https://dummyimage.com/300'];
+//   };
+
+//   // react-slick settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     arrows: true,
+//     autoplay: false,
+//   };
+
+//   // -------------------------
+//   // Add item to cart
+//   // -------------------------
+//   const addToCart = async () => {
+//     if (!product) return;
+//     const activeVariant = getActiveVariant();
+//     const cartItem = {
+//       ...product,
+//       selectedVariant: activeVariant || null,
+//       price: activeVariant?.price || product.price,
+//       images:
+//         activeVariant?.images && activeVariant.images.length > 0
+//           ? activeVariant.images
+//           : product.images,
+//     };
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         // Add to Supabase cart table
+//         const { error } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             variant_id: activeVariant?.id || null,
+//             quantity: 1,
+//           });
+//         if (error) throw error;
+//       } else {
+//         // Fallback to local storage
+//         const updatedCart = [...cart, cartItem];
+//         setCart(updatedCart);
+//         localStorage.setItem('cart', JSON.stringify(updatedCart));
+//       }
+//       alert(`${product.title || product.name} added to cart!`);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   };
+
+//   // -------------------------
+//   // Add item to wishlist
+//   // -------------------------
+//   const addToWishlist = async () => {
+//     if (!product) return;
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         // Add to Supabase wishlist table (assuming it exists)
+//         const { error } = await supabase
+//           .from('wishlist')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//           });
+//         if (error) throw error;
+//         alert(`${product.title || product.name} added to wishlist!`);
+//       } else {
+//         // Fallback to local storage
+//         if (! wishlist.some(item => item.id === product.id)) {
+//           const updatedWishlist = [...wishlist, product];
+//           setWishlist(updatedWishlist);
+//           localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
+//           alert(`${product.title || product.name} added to wishlist!`);
+//         } else {
+//           alert(`${product.title || product.name} is already in your wishlist!`);
+//         }
+//       }
+//     } catch (err) {
+//       console.error('Error adding to wishlist:', err);
+//       setError('Failed to add to wishlist.');
+//     }
+//   };
+
+//   // -------------------------
+//   // Render price & discount
+//   // -------------------------
+//   const renderPriceSection = () => {
+//     const activeVariant = getActiveVariant();
+//     const variantPrice = activeVariant?.price;
+//     const mainPrice = variantPrice || product?.price || 0;
+
+//     const originalPrice =
+//       activeVariant?.original_price || product?.original_price || null;
+//     if (originalPrice && originalPrice > mainPrice) {
+//       const discount = Math.round(((originalPrice - mainPrice) / originalPrice) * 100);
+//       return (
+//         <div className="price-section">
+//           <span className="current-price">₹{mainPrice}</span>
+//           <span className="original-price">₹{originalPrice}</span>
+//           <span className="discount">{discount}% off</span>
+//         </div>
+//       );
+//     }
+//     return (
+//       <div className="price-section">
+//         <span className="current-price">₹{mainPrice}</span>
+//       </div>
+//     );
+//   };
+
+//   // -------------------------
+//   // Render logic
+//   // -------------------------
+//   if (loading) return <div className="loading">Loading...</div>;
+//   if (error) return <div className="error">{error} <button onClick={() => navigate('/products')}>Back to Products</button></div>;
+//   if (!product) return <div className="error">Product not found <button onClick={() => navigate('/products')}>Back to Products</button></div>;
+
+//   const displayedImages = getDisplayedImages();
+//   const activeVariant = getActiveVariant();
+
+//   // Filter variants by color or capacity
+//   const colorVariants = variants.filter(v => v.attributes?.color);
+//   const capacityVariants = variants.filter(v => v.attributes?.capacity);
+
+//   return (
+//     <div className="product-page-container">
+//       {/* LEFT SECTION: Images */}
+//       <div className="product-image-section">
+//         <div className="image-slider-container">
+//           {displayedImages.length > 1 ? (
+//             <Slider {...sliderSettings}>
+//               {displayedImages.map((imgUrl, i) => (
+//                 <div key={i} className="slider-image-wrapper">
+//                   <img
+//                     src={imgUrl}
+//                     alt={`Slide ${i}`}
+//                     onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                   />
+//                 </div>
+//               ))}
+//             </Slider>
+//           ) : (
+//             <div className="single-image-wrapper">
+//               <img
+//                 src={displayedImages[0]}
+//                 alt="Product"
+//                 onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//               />
+//             </div>
+//           )}
+//         </div>
+
+//         <div className="view-360">
+//           <button disabled>View in 360° (Coming Soon)</button>
+//         </div>
+//       </div>
+
+//       {/* RIGHT SECTION: Details */}
+//       <div className="product-details-section">
+//         <h1 className="product-title">{product.title || product.name}</h1>
+
+//         {/* Price & discount */}
+//         {renderPriceSection()}
+
+//         {/* Product highlights */}
+//         <ul className="product-highlights">
+//           {product.description?.split(';').map((point, idx) => (
+//             <li key={idx}>{point.trim()}</li>
+//           )) || <li>No description available</li>}
+//         </ul>
+
+//         {/* Color selection */}
+//         {colorVariants.length > 0 && (
+//           <div className="variant-color-section">
+//             <h4>Color:</h4>
+//             <div className="color-options">
+//               {colorVariants.map((v) => {
+//                 const idx = variants.indexOf(v);
+//                 return (
+//                   <button
+//                     key={v.id}
+//                     className={`color-button ${idx === selectedVariantIndex ? 'active' : ''}`}
+//                     onClick={() => setSelectedVariantIndex(idx)}
+//                   >
+//                     {v.attributes.color}
+//                   </button>
+//                 );
+//               })}
+//             </div>
+//           </div>
+//         )}
+
+//         {/* Storage selection */}
+//         {capacityVariants.length > 0 && (
+//           <div className="variant-capacity-section">
+//             <h4>Storage (RAM + ROM):</h4>
+//             <div className="capacity-options">
+//               {capacityVariants.map((v) => {
+//                 const idx = variants.indexOf(v);
+//                 return (
+//                   <button
+//                     key={v.id}
+//                     className={`capacity-button ${idx === selectedVariantIndex ? 'active' : ''}`}
+//                     onClick={() => setSelectedVariantIndex(idx)}
+//                   >
+//                     {v.attributes.capacity}
+//                   </button>
+//                 );
+//               })}
+//             </div>
+//           </div>
+//         )}
+
+//         {/* All variant buttons */}
+//         {variants.length > 0 && (
+//           <div className="variant-raw-section">
+//             <h4>Other Variants:</h4>
+//             {variants.map((v, idx) => {
+//               const attrText = Object.entries(v.attributes || {})
+//                 .map(([key, val]) => `${key}: ${val}`)
+//                 .join(', ');
+//               return (
+//                 <button
+//                   key={v.id}
+//                   onClick={() => setSelectedVariantIndex(idx)}
+//                   className={`variant-button ${idx === selectedVariantIndex ? 'active' : ''}`}
+//                 >
+//                   {attrText || `Variant #${idx + 1}`}
+//                 </button>
+//               );
+//             })}
+//           </div>
+//         )}
+
+//         {/* Stock info */}
+//         <p className="stock-info">
+//           <strong>Stock:</strong>{' '}
+//           {activeVariant && activeVariant.stock
+//             ? activeVariant.stock
+//             : product.stock || 'N/A'}
+//         </p>
+
+//         {/* Action buttons */}
+//         <div className="action-buttons">
+//           <button onClick={addToCart} className="add-to-cart-button">
+//             Add to Cart
+//           </button>
+//           <button className="buy-now-button" onClick={() => navigate('/checkout')}>
+//             Buy Now
+//           </button>
+//           <button onClick={addToWishlist} className="wishlist-button">
+//             Add to Wishlist
+//           </button>
+//         </div>
+
+//         {/* Seller info */}
+//         <div className="seller-info">
+//           <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+//           <Link to={`/seller/${product.seller_id}`} className="seller-link">
+//             View Seller Profile
+//           </Link>
+//         </div>
+//       </div>
+
+//       {/* RATINGS & REVIEWS */}
+//       <div className="ratings-summary">
+//         <h3>Ratings & Reviews</h3>
+//         <p className="by-verified">by verified customers</p>
+
+//         <div className="rating-score">
+//           <span className="rating-value">{averageRating.toFixed(1)}/5</span>
+//           <span className="rating-count">
+//             ({totalReviewsCount} {totalReviewsCount === 1 ? 'review' : 'reviews'})
+//           </span>
+//         </div>
+//       </div>
+
+//       {/* SPECIFICATIONS SECTION */}
+//       <div className="specifications-section">
+//         <h3>Specifications</h3>
+//         {product.specifications && Object.keys(product.specifications).length > 0 ? (
+//           <div className="specifications-list">
+//             {Object.entries(product.specifications).map(([key, value], idx) => (
+//               <div key={idx} className="spec-item">
+//                 <span className="spec-key">{key}</span>
+//                 <span className="spec-value">{value}</span>
+//               </div>
+//             ))}
+//           </div>
+//         ) : (
+//           <p className="no-specs">No specifications available.</p>
+//         )}
+//       </div>
+
+//       {/* DETAILED REVIEWS LIST */}
+//       <div className="reviews-section">
+//         <h3>Customer Reviews</h3>
+//         {reviews.length > 0 ? (
+//           reviews.map((review, index) => (
+//             <div key={index} className="review-item">
+//               <div className="review-header">
+//                 <strong className="review-author">{review.reviewer_name}</strong>
+//                 <span className="review-rating">{review.rating}/5</span>
+//               </div>
+//               <p className="review-text">{review.review_text}</p>
+
+//               {review.reply_text && (
+//                 <div className="review-reply">
+//                   <strong>Seller Reply:</strong> {review.reply_text}
+//                 </div>
+//               )}
+
+//               <small className="review-date">
+//                 {new Date(review.created_at).toLocaleDateString()}
+//               </small>
+//             </div>
+//           ))
+//         ) : (
+//           <p className="no-reviews">No reviews yet.</p>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default ProductPage;
+
+
+
+// import React, { useState, useEffect } from 'react';
+// import { useParams, Link, useNavigate } from 'react-router-dom';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import { supabase } from '../supabaseClient';
+// import '../style/ProductPage.css';
+
+// function ProductPage() {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [product, setProduct] = useState(null);
+//   const [variants, setVariants] = useState([]);
+//   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [reviews, setReviews] = useState([]);
+
+//   // Local storage for cart & wishlist
+//   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || []);
+//   const [wishlist, setWishlist] = useState(JSON.parse(localStorage.getItem('wishlist')) || []);
+
+//   useEffect(() => {
+//     setReviews([]);
+//     fetchProductAndVariants();
+//   }, [id]);
+
+//   // Fetch product & variants
+//   const fetchProductAndVariants = async () => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data: productData, error: productError } = await supabase
+//         .from('products')
+//         .select('*, sellers(latitude, longitude, store_name)')
+//         .eq('id', parseInt(id, 10))
+//         .eq('is_approved', true)
+//         .maybeSingle();
+//       if (productError) throw productError;
+//       if (!productData) {
+//         setError('Product not found.');
+//         setLoading(false);
+//         return;
+//       }
+//       setProduct(productData);
+
+//       const { data: variantData, error: variantError } = await supabase
+//         .from('product_variants')
+//         .select('*')
+//         .eq('product_id', parseInt(id, 10));
+//       if (variantError) throw variantError;
+//       setVariants(variantData || []);
+
+//       const reviewsData = await fetchProductReviews(parseInt(id, 10));
+//       setReviews(reviewsData);
+//     } catch (err) {
+//       console.error('Error fetching product or variants:', err);
+//       setError(`Error: ${err.message || 'Failed to load product.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Fetch reviews from DB
+//   const fetchProductReviews = async (productId) => {
+//     try {
+//       const { data: orderItemsData, error: orderItemsError } = await supabase
+//         .from('order_items')
+//         .select('order_id, product_id')
+//         .eq('product_id', productId);
+//       if (orderItemsError) throw orderItemsError;
+//       if (!orderItemsData || orderItemsData.length === 0) return [];
+
+//       const orderIds = [...new Set(orderItemsData.map(item => item.order_id))];
+
+//       const { data: reviewsData, error: reviewsError } = await supabase
+//         .from('reviews')
+//         .select(`
+//           id,
+//           order_id,
+//           reviewer_id,
+//           reviewed_id,
+//           rating,
+//           review_text,
+//           reply_text,
+//           created_at,
+//           updated_at
+//         `)
+//         .in('order_id', orderIds);
+//       if (reviewsError) throw reviewsError;
+//       if (!reviewsData || reviewsData.length === 0) return [];
+
+//       const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
+//       const reviewedIds = [...new Set(reviewsData.map(r => r.reviewed_id))];
+//       const { data: profilesData, error: profilesError } = await supabase
+//         .from('profiles')
+//         .select('id, name')
+//         .in('id', [...reviewerIds, ...reviewedIds]);
+//       if (profilesError) throw profilesError;
+
+//       return reviewsData.map(review => ({
+//         ...review,
+//         reviewer_name: profilesData.find(p => p.id === review.reviewer_id)?.name || 'Unknown User',
+//         reviewed_name: profilesData.find(p => p.id === review.reviewed_id)?.name || 'Unknown User',
+//       }));
+//     } catch (error) {
+//       console.error('Error fetching reviews:', error);
+//       return [];
+//     }
+//   };
+
+//   // Calculate rating summary
+//   const averageRating = reviews.length > 0
+//     ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+//     : 0;
+//   const totalReviewsCount = reviews.length;
+
+//   // Which variant is selected
+//   const getActiveVariant = () => {
+//     if (variants.length > 0) {
+//       const clampedIndex = Math.min(selectedVariantIndex, variants.length - 1);
+//       return variants[clampedIndex];
+//     }
+//     return null;
+//   };
+
+//   // Merge product + variant images
+//   const getDisplayedImages = () => {
+//     const activeVariant = getActiveVariant();
+//     const productImages = product?.images || [];
+//     const variantImages = activeVariant?.images || [];
+//     const mergedImages = [...new Set([...productImages, ...variantImages])];
+//     return mergedImages.length > 0 ? mergedImages : ['https://dummyimage.com/300'];
+//   };
+
+//   // react-slick settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     arrows: true,
+//     autoplay: false,
+//   };
+
+//   // Add item to cart
+//   const addToCart = async () => {
+//     if (!product) return;
+//     const activeVariant = getActiveVariant();
+//     const cartItem = {
+//       ...product,
+//       selectedVariant: activeVariant || null,
+//       price: activeVariant?.price || product.price,
+//       images: activeVariant?.images && activeVariant.images.length > 0
+//         ? activeVariant.images
+//         : product.images,
+//     };
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         const { error } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             variant_id: activeVariant?.id || null,
+//             quantity: 1,
+//           });
+//         if (error) throw error;
+//       } else {
+//         const updatedCart = [...cart, cartItem];
+//         setCart(updatedCart);
+//         localStorage.setItem('cart', JSON.stringify(updatedCart));
+//       }
+//       alert(`${product.title || product.name} added to cart!`);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   };
+
+//   // Add item to wishlist
+//   const addToWishlist = async () => {
+//     if (!product) return;
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         const { error } = await supabase
+//           .from('wishlist')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//           });
+//         if (error) throw error;
+//         alert(`${product.title || product.name} added to wishlist!`);
+//       } else {
+//         if (!wishlist.some(item => item.id === product.id)) {
+//           const updatedWishlist = [...wishlist, product];
+//           setWishlist(updatedWishlist);
+//           localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
+//           alert(`${product.title || product.name} added to wishlist!`);
+//         } else {
+//           alert(`${product.title || product.name} is already in your wishlist!`);
+//         }
+//       }
+//     } catch (err) {
+//       console.error('Error adding to wishlist:', err);
+//       setError('Failed to add to wishlist.');
+//     }
+//   };
+
+//   // Render price & discount
+//   const renderPriceSection = () => {
+//     const activeVariant = getActiveVariant();
+//     const variantPrice = activeVariant?.price;
+//     const mainPrice = variantPrice || product?.price || 0;
+//     const originalPrice = activeVariant?.original_price || product?.original_price || null;
+
+//     if (originalPrice && originalPrice > mainPrice) {
+//       const discount = Math.round(((originalPrice - mainPrice) / originalPrice) * 100);
+//       return (
+//         <div className="price-section">
+//           <span className="current-price">₹{mainPrice.toLocaleString('en-IN')}</span>
+//           <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
+//           <span className="discount">{discount}% off</span>
+//         </div>
+//       );
+//     }
+//     return (
+//       <div className="price-section">
+//         <span className="current-price">₹{mainPrice.toLocaleString('en-IN')}</span>
+//       </div>
+//     );
+//   };
+
+//   // Render logic
+//   if (loading) return (
+//     <div className="loading">
+//       <svg className="spinner" viewBox="0 0 50 50">
+//         <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   if (error) return (
+//     <div className="error">
+//       {error}
+//       <div className="error-actions">
+//         <button onClick={fetchProductAndVariants} className="retry-btn">Retry</button>
+//         <button onClick={() => navigate('/products')} className="back-btn">Back to Products</button>
+//       </div>
+//     </div>
+//   );
+
+//   if (!product) return (
+//     <div className="error">
+//       Product not found
+//       <button onClick={() => navigate('/products')} className="back-btn">Back to Products</button>
+//     </div>
+//   );
+
+//   const displayedImages = getDisplayedImages();
+//   const activeVariant = getActiveVariant();
+
+//   // Unified variant selection with specific attributes
+//   const variantAttributes = variants.map(v => ({
+//     id: v.id,
+//     index: variants.indexOf(v),
+//     color: v.attributes?.color || '',
+//     model: v.attributes?.model || '',
+//     attributes: Object.entries(v.attributes || {})
+//       .map(([key, val]) => `${key}: ${val}`)
+//       .join(', '),
+//   }));
+
+//   return (
+//     <div className="product-page-container">
+//       <button onClick={() => navigate('/products')} className="back-to-products-btn">
+//         ← Back to Products
+//       </button>
+
+//       {/* Main Content */}
+//       <div className="main-content">
+//         {/* LEFT SECTION: Images */}
+//         <div className="product-image-section">
+//           <div className="image-slider-container">
+//             {displayedImages.length > 1 ? (
+//               <Slider {...sliderSettings}>
+//                 {displayedImages.map((imgUrl, i) => (
+//                   <div key={i} className="slider-image-wrapper">
+//                     <img
+//                       src={imgUrl}
+//                       alt={`Slide ${i}`}
+//                       onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                     />
+//                   </div>
+//                 ))}
+//               </Slider>
+//             ) : (
+//               <div className="single-image-wrapper">
+//                 <img
+//                   src={displayedImages[0]}
+//                   alt="Product"
+//                   onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                 />
+//               </div>
+//             )}
+//           </div>
+
+//           <div className="view-360">
+//             <button disabled>View in 360° (Coming Soon)</button>
+//           </div>
+//         </div>
+
+//         {/* RIGHT SECTION: Details */}
+//         <div className="product-details-section">
+//           <h1 className="product-title">{product.title || product.name}</h1>
+
+//           {/* Price & discount */}
+//           {renderPriceSection()}
+
+//           {/* Product highlights */}
+//           <ul className="product-highlights">
+//             {product.description?.split(';').filter(point => point.trim()).map((point, idx) => (
+//               <li key={idx}>{point.trim()}</li>
+//             )) || <li>No description available</li>}
+//           </ul>
+
+//           {/* Variant Selection */}
+//           {variants.length > 0 && (
+//             <div className="variant-section">
+//               <h4>Variants:</h4>
+//               <div className="variant-options">
+//                 {variantAttributes.map((v) => (
+//                   <button
+//                     key={v.id}
+//                     className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
+//                     onClick={() => setSelectedVariantIndex(v.index)}
+//                   >
+//                     {v.color && v.model ? `Color: ${v.color}, Model: ${v.model}` : v.attributes || `Variant #${v.index + 1}`}
+//                   </button>
+//                 ))}
+//               </div>
+//             </div>
+//           )}
+
+//           {/* Stock info */}
+//           <p className="stock-info">
+//             <strong>Stock:</strong>{' '}
+//             {activeVariant?.stock ?? product.stock ?? 'N/A'}
+//           </p>
+
+//           {/* Action buttons */}
+//           <div className="action-buttons">
+//             <button onClick={addToCart} className="add-to-cart-button">
+//               Add to Cart
+//             </button>
+//             <button className="buy-now-button" onClick={() => navigate('/checkout')}>
+//               Buy Now
+//             </button>
+//             <button onClick={addToWishlist} className="wishlist-button">
+//               Add to Wishlist
+//             </button>
+//           </div>
+
+//           {/* Seller info */}
+//           <div className="seller-info">
+//             <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+//             <Link to={`/seller/${product.seller_id}`} className="seller-link">
+//               View Seller Profile
+//             </Link>
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* RATINGS & REVIEWS */}
+//       <div className="ratings-reviews-section">
+//         <h3>Ratings & Reviews</h3>
+//         <p className="by-verified">By verified customers</p>
+//         <div className="rating-score">
+//           <span className="rating-value">{averageRating.toFixed(1)}/5</span>
+//           <span className="rating-count">
+//             ({totalReviewsCount} {totalReviewsCount === 1 ? 'review' : 'reviews'})
+//           </span>
+//         </div>
+
+//         {reviews.length > 0 ? (
+//           reviews.map((review, index) => (
+//             <div key={index} className="review-item">
+//               <div className="review-header">
+//                 <strong className="review-author">{review.reviewer_name}</strong>
+//                 <span className="review-rating">{review.rating}/5</span>
+//               </div>
+//               <p className="review-text">{review.review_text}</p>
+//               {review.reply_text && (
+//                 <div className="review-reply">
+//                   <strong>Seller Reply:</strong> {review.reply_text}
+//                 </div>
+//               )}
+//               <small className="review-date">
+//                 {new Date(review.created_at).toLocaleDateString('en-IN', {
+//                   year: 'numeric',
+//                   month: 'long',
+//                   day: 'numeric',
+//                 })}
+//               </small>
+//             </div>
+//           ))
+//         ) : (
+//           <p className="no-reviews">No reviews yet.</p>
+//         )}
+//       </div>
+
+//       {/* SPECIFICATIONS SECTION */}
+//       <div className="specifications-section">
+//         <h3>Specifications</h3>
+//         {product.specifications && Object.keys(product.specifications).length > 0 ? (
+//           <div className="specifications-list">
+//             {Object.entries(product.specifications).map(([key, value], idx) => (
+//               <div key={idx} className="spec-item">
+//                 <span className="spec-key">{key}</span>
+//                 <span className="spec-value">{value}</span>
+//               </div>
+//             ))}
+//           </div>
+//         ) : (
+//           <p className="no-specs">No specifications available.</p>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default ProductPage;
+
+
+
+
+
+// import React, { useState, useEffect } from 'react';
+// import { useParams, Link, useNavigate } from 'react-router-dom';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import { supabase } from '../supabaseClient';
+// import '../style/ProductPage.css';
+
+// // Star Rating Component (Read-Only for Display)
+// const StarRatingDisplay = ({ rating }) => {
+//   const stars = [1, 2, 3, 4, 5];
+//   return (
+//     <div className="star-rating-display">
+//       {stars.map((star) => (
+//         <span
+//           key={star}
+//           className={`star ${star <= Math.round(rating) ? 'filled' : ''}`}
+//         >
+//           ★
+//         </span>
+//       ))}
+//     </div>
+//   );
+// };
+
+// function ProductPage() {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [product, setProduct] = useState(null);
+//   const [variants, setVariants] = useState([]);
+//   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [reviews, setReviews] = useState([]);
+
+//   // Local storage for cart & wishlist
+//   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || []);
+//   const [wishlist, setWishlist] = useState(JSON.parse(localStorage.getItem('wishlist')) || []);
+
+//   useEffect(() => {
+//     setReviews([]);
+//     fetchProductAndVariants();
+//   }, [id]);
+
+//   // Fetch product & variants
+//   const fetchProductAndVariants = async () => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data: productData, error: productError } = await supabase
+//         .from('products')
+//         .select('*, sellers(latitude, longitude, store_name)')
+//         .eq('id', parseInt(id, 10))
+//         .eq('is_approved', true)
+//         .maybeSingle();
+//       if (productError) throw productError;
+//       if (!productData) {
+//         setError('Product not found.');
+//         setLoading(false);
+//         return;
+//       }
+//       setProduct(productData);
+
+//       const { data: variantData, error: variantError } = await supabase
+//         .from('product_variants')
+//         .select('*')
+//         .eq('product_id', parseInt(id, 10));
+//       if (variantError) throw variantError;
+//       // Filter out invalid variants (e.g., those with "attribute1" as the only key with empty value)
+//       const validVariants = variantData?.filter(variant => {
+//         const attributes = variant.attributes || {};
+//         const hasValidAttributes = Object.entries(attributes).some(([key, value]) => key !== 'attribute1' || (key === 'attribute1' && value));
+//         return hasValidAttributes;
+//       }) || [];
+//       setVariants(validVariants);
+
+//       const reviewsData = await fetchProductReviews(parseInt(id, 10));
+//       setReviews(reviewsData);
+//     } catch (err) {
+//       console.error('Error fetching product or variants:', err);
+//       setError(`Error: ${err.message || 'Failed to load product.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Fetch reviews from DB
+//   const fetchProductReviews = async (productId) => {
+//     try {
+//       const { data: orderItemsData, error: orderItemsError } = await supabase
+//         .from('order_items')
+//         .select('order_id, product_id')
+//         .eq('product_id', productId);
+//       if (orderItemsError) throw orderItemsError;
+//       if (!orderItemsData || orderItemsData.length === 0) return [];
+
+//       const orderIds = [...new Set(orderItemsData.map(item => item.order_id))];
+
+//       const { data: reviewsData, error: reviewsError } = await supabase
+//         .from('reviews')
+//         .select(`
+//           id,
+//           order_id,
+//           reviewer_id,
+//           reviewed_id,
+//           rating,
+//           review_text,
+//           reply_text,
+//           created_at,
+//           updated_at
+//         `)
+//         .in('order_id', orderIds);
+//       if (reviewsError) throw reviewsError;
+//       if (!reviewsData || reviewsData.length === 0) return [];
+
+//       const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
+//       const reviewedIds = [...new Set(reviewsData.map(r => r.reviewed_id))];
+//       const { data: profilesData, error: profilesError } = await supabase
+//         .from('profiles')
+//         .select('id, name')
+//         .in('id', [...reviewerIds, ...reviewedIds]);
+//       if (profilesError) throw profilesError;
+
+//       return reviewsData.map(review => ({
+//         ...review,
+//         reviewer_name: profilesData.find(p => p.id === review.reviewer_id)?.name || 'Unknown User',
+//         reviewed_name: profilesData.find(p => p.id === review.reviewed_id)?.name || 'Unknown User',
+//       }));
+//     } catch (error) {
+//       console.error('Error fetching reviews:', error);
+//       return [];
+//     }
+//   };
+
+//   // Calculate rating summary
+//   const averageRating = reviews.length > 0
+//     ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+//     : 0;
+//   const totalReviewsCount = reviews.length;
+
+//   // Which variant is selected
+//   const getActiveVariant = () => {
+//     if (variants.length > 0) {
+//       const clampedIndex = Math.min(selectedVariantIndex, variants.length - 1);
+//       return variants[clampedIndex];
+//     }
+//     return null;
+//   };
+
+//   // Merge product + variant images
+//   const getDisplayedImages = () => {
+//     const activeVariant = getActiveVariant();
+//     const productImages = product?.images || [];
+//     const variantImages = activeVariant?.images || [];
+//     const mergedImages = [...new Set([...productImages, ...variantImages])];
+//     return mergedImages.length > 0 ? mergedImages : ['https://dummyimage.com/300'];
+//   };
+
+//   // react-slick settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     arrows: true,
+//     autoplay: false,
+//   };
+
+//   // Add item to cart
+//   const addToCart = async () => {
+//     if (!product) return;
+//     const activeVariant = getActiveVariant();
+//     const cartItem = {
+//       ...product,
+//       selectedVariant: activeVariant || null,
+//       price: activeVariant?.price || product.price,
+//       images: activeVariant?.images && activeVariant.images.length > 0
+//         ? activeVariant.images
+//         : product.images,
+//     };
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         const { error } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             variant_id: activeVariant?.id || null,
+//             quantity: 1,
+//           });
+//         if (error) throw error;
+//       } else {
+//         const updatedCart = [...cart, cartItem];
+//         setCart(updatedCart);
+//         localStorage.setItem('cart', JSON.stringify(updatedCart));
+//       }
+//       alert(`${product.title || product.name} added to cart!`);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError('Failed to add to cart.');
+//     }
+//   };
+
+//   // Add item to wishlist
+//   const addToWishlist = async () => {
+//     if (!product) return;
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         const { error } = await supabase
+//           .from('wishlist')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//           });
+//         if (error) throw error;
+//         alert(`${product.title || product.name} added to wishlist!`);
+//       } else {
+//         if (!wishlist.some(item => item.id === product.id)) {
+//           const updatedWishlist = [...wishlist, product];
+//           setWishlist(updatedWishlist);
+//           localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
+//           alert(`${product.title || product.name} added to wishlist!`);
+//         } else {
+//           alert(`${product.title || product.name} is already in your wishlist!`);
+//         }
+//       }
+//     } catch (err) {
+//       console.error('Error adding to wishlist:', err);
+//       setError('Failed to add to wishlist.');
+//     }
+//   };
+
+//   // Render price & discount
+//   const renderPriceSection = () => {
+//     const activeVariant = getActiveVariant();
+//     const variantPrice = activeVariant?.price;
+//     const mainPrice = variantPrice || product?.price || 0;
+//     const originalPrice = activeVariant?.original_price || product?.original_price || null;
+
+//     if (originalPrice && originalPrice > mainPrice) {
+//       const discount = Math.round(((originalPrice - mainPrice) / originalPrice) * 100);
+//       return (
+//         <div className="price-section">
+//           <span className="current-price">₹{mainPrice.toLocaleString('en-IN')}</span>
+//           <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
+//           <span className="discount">{discount}% off</span>
+//         </div>
+//       );
+//     }
+//     return (
+//       <div className="price-section">
+//         <span className="current-price">₹{mainPrice.toLocaleString('en-IN')}</span>
+//       </div>
+//     );
+//   };
+
+//   // Render logic
+//   if (loading) return (
+//     <div className="loading">
+//       <svg className="spinner" viewBox="0 0 50 50">
+//         <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   if (error) return (
+//     <div className="error">
+//       {error}
+//       <div className="error-actions">
+//         <button onClick={fetchProductAndVariants} className="retry-btn">Retry</button>
+//         <button onClick={() => navigate('/products')} className="back-btn">Back to Products</button>
+//       </div>
+//     </div>
+//   );
+
+//   if (!product) return (
+//     <div className="error">
+//       Product not found
+//       <button onClick={() => navigate('/products')} className="back-btn">Back to Products</button>
+//     </div>
+//   );
+
+//   const displayedImages = getDisplayedImages();
+//   const activeVariant = getActiveVariant();
+
+//   // Unified variant selection with specific attributes
+//   const variantAttributes = variants.map(v => ({
+//     id: v.id,
+//     index: variants.indexOf(v),
+//     color: v.attributes?.color || '',
+//     model: v.attributes?.model || '',
+//     attributes: Object.entries(v.attributes || {})
+//       .filter(([key, val]) => val) // Filter out empty values
+//       .map(([key, val]) => `${key}: ${val}`)
+//       .join(', '),
+//   }));
+
+//   // Check if there are any variants with valid attributes to display
+//   const hasValidVariants = variantAttributes.some(v => v.attributes);
+
+//   return (
+//     <div className="product-page-container">
+//       <button
+//         onClick={() => navigate('/products')}
+//         className="enhanced-back-btn"
+//       >
+//         ← Back to Products
+//       </button>
+
+//       {/* Main Content */}
+//       <div className="main-content">
+//         {/* LEFT SECTION: Images */}
+//         <div className="product-image-section">
+//           <div className="image-slider-container">
+//             {displayedImages.length > 1 ? (
+//               <Slider {...sliderSettings}>
+//                 {displayedImages.map((imgUrl, i) => (
+//                   <div key={i} className="slider-image-wrapper">
+//                     <img
+//                       src={imgUrl}
+//                       alt={`Slide ${i}`}
+//                       onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                     />
+//                   </div>
+//                 ))}
+//               </Slider>
+//             ) : (
+//               <div className="single-image-wrapper">
+//                 <img
+//                   src={displayedImages[0]}
+//                   alt="Product"
+//                   onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                 />
+//               </div>
+//             )}
+//           </div>
+
+//           <div className="view-360">
+//             <button disabled>View in 360° (Coming Soon)</button>
+//           </div>
+//         </div>
+
+//         {/* RIGHT SECTION: Details */}
+//         <div className="product-details-section">
+//           <h1 className="product-title">{product.title || product.name}</h1>
+
+//           {/* Price & discount */}
+//           {renderPriceSection()}
+
+//           {/* Product highlights */}
+//           <ul className="product-highlights">
+//             {product.description?.split(';').filter(point => point.trim()).map((point, idx) => (
+//               <li key={idx}>{point.trim()}</li>
+//             )) || <li>No description available</li>}
+//           </ul>
+
+//           {/* Variant Selection */}
+//           {hasValidVariants && (
+//             <div className="variant-section">
+//               <h4>Variants:</h4>
+//               <div className="variant-options">
+//                 {variantAttributes.map((v) => (
+//                   v.attributes && (
+//                     <button
+//                       key={v.id}
+//                       className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
+//                       onClick={() => setSelectedVariantIndex(v.index)}
+//                     >
+//                       {v.attributes || `Variant #${v.index + 1}`}
+//                     </button>
+//                   )
+//                 ))}
+//               </div>
+//             </div>
+//           )}
+
+//           {/* Action buttons */}
+//           <div className="action-buttons">
+//             <button onClick={addToCart} className="add-to-cart-button">
+//               Add to Cart
+//             </button>
+//             <button className="buy-now-button" onClick={() => navigate('/checkout')}>
+//               Buy Now
+//             </button>
+//             <button onClick={addToWishlist} className="wishlist-button">
+//               Add to Wishlist
+//             </button>
+//           </div>
+
+//           {/* Seller info */}
+//           <div className="seller-info">
+//             <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+//             <Link to={`/seller/${product.seller_id}`} className="seller-link">
+//               View Seller Profile
+//             </Link>
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* RATINGS & REVIEWS */}
+//       <div className="ratings-reviews-section">
+//         <h3>Ratings & Reviews</h3>
+//         <p className="by-verified">By verified customers</p>
+//         <div className="rating-score">
+//           <StarRatingDisplay rating={averageRating} />
+//           <span className="rating-count">
+//             ({totalReviewsCount} {totalReviewsCount === 1 ? 'review' : 'reviews'})
+//           </span>
+//         </div>
+
+//         {reviews.length > 0 ? (
+//           reviews.map((review, index) => (
+//             <div key={index} className="review-item">
+//               <div className="review-header">
+//                 <strong className="review-author">{review.reviewer_name}</strong>
+//                 <StarRatingDisplay rating={review.rating} />
+//               </div>
+//               <p className="review-text">{review.review_text}</p>
+//               {review.reply_text && (
+//                 <div className="review-reply">
+//                   <strong>Seller Reply:</strong> {review.reply_text}
+//                 </div>
+//               )}
+//               <small className="review-date">
+//                 {new Date(review.created_at).toLocaleDateString('en-IN', {
+//                   year: 'numeric',
+//                   month: 'long',
+//                   day: 'numeric',
+//                 })}
+//               </small>
+//             </div>
+//           ))
+//         ) : (
+//           <p className="no-reviews">No reviews yet.</p>
+//         )}
+//       </div>
+
+//       {/* SPECIFICATIONS SECTION */}
+//       <div className="specifications-section">
+//         <h3>Specifications</h3>
+//         {product.specifications && Object.keys(product.specifications).length > 0 ? (
+//           <div className="specifications-list">
+//             {Object.entries(product.specifications).map(([key, value], idx) => (
+//               <div key={idx} className="spec-item">
+//                 <span className="spec-key">{key}</span>
+//                 <span className="spec-value">{value}</span>
+//               </div>
+//             ))}
+//           </div>
+//         ) : (
+//           <p className="no-specs">No specifications available.</p>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default ProductPage;
+
+
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Slider from 'react-slick';
@@ -2931,6 +4817,27 @@ import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import { supabase } from '../supabaseClient';
 import '../style/ProductPage.css';
+
+// Toast Notification Library (e.g., react-toastify)
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+// Star Rating Component (Read-Only for Display)
+const StarRatingDisplay = ({ rating }) => {
+  const stars = [1, 2, 3, 4, 5];
+  return (
+    <div className="star-rating-display">
+      {stars.map((star) => (
+        <span
+          key={star}
+          className={`star ${star <= Math.round(rating) ? 'filled' : ''}`}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+};
 
 function ProductPage() {
   const { id } = useParams();
@@ -2951,14 +4858,11 @@ function ProductPage() {
     fetchProductAndVariants();
   }, [id]);
 
-  // -------------------------
   // Fetch product & variants
-  // -------------------------
   const fetchProductAndVariants = async () => {
     setLoading(true);
     setError(null);
     try {
-      // 1) Fetch product
       const { data: productData, error: productError } = await supabase
         .from('products')
         .select('*, sellers(latitude, longitude, store_name)')
@@ -2968,48 +4872,41 @@ function ProductPage() {
       if (productError) throw productError;
       if (!productData) {
         setError('Product not found.');
+        setLoading(false);
         return;
       }
       setProduct(productData);
 
-      // 2) Fetch variants
       const { data: variantData, error: variantError } = await supabase
         .from('product_variants')
         .select('*')
         .eq('product_id', parseInt(id, 10));
       if (variantError) throw variantError;
-      setVariants(variantData || []);
-
-      // 3) Fetch reviews
-      const reviewsData = await fetchProductReviews(parseInt(id, 10));
-      setReviews(reviewsData);
+      const validVariants = variantData?.filter(variant => {
+        const attributes = variant.attributes || {};
+        const hasValidAttributes = Object.entries(attributes).some(([key, value]) => key !== 'attribute1' || (key === 'attribute1' && value));
+        return hasValidAttributes;
+      }) || [];
+      setVariants(validVariants);
     } catch (err) {
-      console.error('Error fetching product or variants:', err);
       setError(`Error: ${err.message || 'Failed to load product.'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // -------------------------
   // Fetch reviews from DB
-  // -------------------------
   const fetchProductReviews = async (productId) => {
     try {
-      // 1) Get order_items for this product
       const { data: orderItemsData, error: orderItemsError } = await supabase
         .from('order_items')
         .select('order_id, product_id')
         .eq('product_id', productId);
       if (orderItemsError) throw orderItemsError;
-      if (!orderItemsData || orderItemsData.length === 0) {
-        return [];
-      }
+      if (!orderItemsData || orderItemsData.length === 0) return [];
 
-      // 2) Unique order IDs
       const orderIds = [...new Set(orderItemsData.map(item => item.order_id))];
 
-      // 3) Fetch reviews for those orders
       const { data: reviewsData, error: reviewsError } = await supabase
         .from('reviews')
         .select(`
@@ -3025,11 +4922,8 @@ function ProductPage() {
         `)
         .in('order_id', orderIds);
       if (reviewsError) throw reviewsError;
-      if (!reviewsData || reviewsData.length === 0) {
-        return [];
-      }
+      if (!reviewsData || reviewsData.length === 0) return [];
 
-      // 4) Fetch reviewer/reviewed names
       const reviewerIds = [...new Set(reviewsData.map(r => r.reviewer_id))];
       const reviewedIds = [...new Set(reviewsData.map(r => r.reviewed_id))];
       const { data: profilesData, error: profilesError } = await supabase
@@ -3038,30 +4932,20 @@ function ProductPage() {
         .in('id', [...reviewerIds, ...reviewedIds]);
       if (profilesError) throw profilesError;
 
-      // 5) Map user names
-      const mappedReviews = reviewsData.map(review => ({
+      return reviewsData.map(review => ({
         ...review,
-        reviewer_name:
-          profilesData.find(p => p.id === review.reviewer_id)?.name || 'Unknown User',
-        reviewed_name:
-          profilesData.find(p => p.id === review.reviewed_id)?.name || 'Unknown User',
+        reviewer_name: profilesData.find(p => p.id === review.reviewer_id)?.name || 'Unknown User',
+        reviewed_name: profilesData.find(p => p.id === review.reviewed_id)?.name || 'Unknown User',
       }));
-
-      return mappedReviews;
     } catch (error) {
-      console.error('Error fetching reviews:', error);
       return [];
     }
   };
 
-  // -------------------------
   // Calculate rating summary
-  // -------------------------
-  const averageRating =
-    reviews.length > 0
-      ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
-      : 0;
-
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+    : 0;
   const totalReviewsCount = reviews.length;
 
   // Which variant is selected
@@ -3078,9 +4962,15 @@ function ProductPage() {
     const activeVariant = getActiveVariant();
     const productImages = product?.images || [];
     const variantImages = activeVariant?.images || [];
-
     const mergedImages = [...new Set([...productImages, ...variantImages])];
     return mergedImages.length > 0 ? mergedImages : ['https://dummyimage.com/300'];
+  };
+
+  // Check stock availability
+  const isOutOfStock = () => {
+    const activeVariant = getActiveVariant();
+    const stock = activeVariant?.stock !== undefined ? activeVariant.stock : product?.stock;
+    return stock === 0 || stock === undefined;
   };
 
   // react-slick settings
@@ -3094,26 +4984,27 @@ function ProductPage() {
     autoplay: false,
   };
 
-  // -------------------------
   // Add item to cart
-  // -------------------------
   const addToCart = async () => {
     if (!product) return;
+    if (isOutOfStock()) {
+      toast.error('This item is out of stock.');
+      return;
+    }
+
     const activeVariant = getActiveVariant();
     const cartItem = {
       ...product,
       selectedVariant: activeVariant || null,
       price: activeVariant?.price || product.price,
-      images:
-        activeVariant?.images && activeVariant.images.length > 0
-          ? activeVariant.images
-          : product.images,
+      images: activeVariant?.images && activeVariant.images.length > 0
+        ? activeVariant.images
+        : product.images,
     };
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Add to Supabase cart table
         const { error } = await supabase
           .from('cart')
           .insert({
@@ -3124,27 +5015,23 @@ function ProductPage() {
           });
         if (error) throw error;
       } else {
-        // Fallback to local storage
         const updatedCart = [...cart, cartItem];
         setCart(updatedCart);
         localStorage.setItem('cart', JSON.stringify(updatedCart));
       }
-      alert(`${product.title || product.name} added to cart!`);
+      toast.success(`${product.title || product.name} added to cart!`);
     } catch (err) {
-      console.error('Error adding to cart:', err);
-      setError('Failed to add to cart.');
+      setError(`Failed to add to cart: ${err.message}`);
+      toast.error(`Failed to add to cart: ${err.message}`);
     }
   };
 
-  // -------------------------
   // Add item to wishlist
-  // -------------------------
   const addToWishlist = async () => {
     if (!product) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        // Add to Supabase wishlist table (assuming it exists)
         const { error } = await supabase
           .from('wishlist')
           .insert({
@@ -3152,243 +5039,246 @@ function ProductPage() {
             product_id: product.id,
           });
         if (error) throw error;
-        alert(`${product.title || product.name} added to wishlist!`);
+        toast.success(`${product.title || product.name} added to wishlist!`);
       } else {
-        // Fallback to local storage
         if (!wishlist.some(item => item.id === product.id)) {
           const updatedWishlist = [...wishlist, product];
           setWishlist(updatedWishlist);
           localStorage.setItem('wishlist', JSON.stringify(updatedWishlist));
-          alert(`${product.title || product.name} added to wishlist!`);
+          toast.success(`${product.title || product.name} added to wishlist!`);
         } else {
-          alert(`${product.title || product.name} is already in your wishlist!`);
+          toast.info(`${product.title || product.name} is already in your wishlist!`);
         }
       }
     } catch (err) {
-      console.error('Error adding to wishlist:', err);
-      setError('Failed to add to wishlist.');
+      setError(`Failed to add to wishlist: ${err.message}`);
+      toast.error(`Failed to add to wishlist: ${err.message}`);
     }
   };
 
-  // -------------------------
   // Render price & discount
-  // -------------------------
   const renderPriceSection = () => {
     const activeVariant = getActiveVariant();
     const variantPrice = activeVariant?.price;
     const mainPrice = variantPrice || product?.price || 0;
+    const originalPrice = activeVariant?.original_price || product?.original_price || null;
 
-    const originalPrice =
-      activeVariant?.original_price || product?.original_price || null;
     if (originalPrice && originalPrice > mainPrice) {
       const discount = Math.round(((originalPrice - mainPrice) / originalPrice) * 100);
       return (
         <div className="price-section">
-          <span className="current-price">₹{mainPrice}</span>
-          <span className="original-price">₹{originalPrice}</span>
+          <span className="current-price">₹{mainPrice.toLocaleString('en-IN')}</span>
+          <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
           <span className="discount">{discount}% off</span>
         </div>
       );
     }
     return (
       <div className="price-section">
-        <span className="current-price">₹{mainPrice}</span>
+        <span className="current-price">₹{mainPrice.toLocaleString('en-IN')}</span>
       </div>
     );
   };
 
-  // -------------------------
   // Render logic
-  // -------------------------
-  if (loading) return <div className="loading">Loading...</div>;
-  if (error) return <div className="error">{error} <button onClick={() => navigate('/products')}>Back to Products</button></div>;
-  if (!product) return <div className="error">Product not found <button onClick={() => navigate('/products')}>Back to Products</button></div>;
+  if (loading) return (
+    <div className="loading">
+      <svg className="spinner" viewBox="0 0 50 50">
+        <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+      </svg>
+      Loading...
+    </div>
+  );
+
+  if (error) return (
+    <div className="error">
+      {error}
+      <div className="error-actions">
+        <button onClick={fetchProductAndVariants} className="retry-btn">Retry</button>
+        <button onClick={() => navigate('/products')} className="back-btn">Back to Products</button>
+      </div>
+    </div>
+  );
+
+  if (!product) return (
+    <div className="error">
+      Product not found
+      <button onClick={() => navigate('/products')} className="back-btn">Back to Products</button>
+    </div>
+  );
 
   const displayedImages = getDisplayedImages();
   const activeVariant = getActiveVariant();
 
-  // Filter variants by color or capacity
-  const colorVariants = variants.filter(v => v.attributes?.color);
-  const capacityVariants = variants.filter(v => v.attributes?.capacity);
+  // Unified variant selection with specific attributes
+  const variantAttributes = variants.map(v => ({
+    id: v.id,
+    index: variants.indexOf(v),
+    color: v.attributes?.color || '',
+    model: v.attributes?.model || '',
+    attributes: Object.entries(v.attributes || {})
+      .filter(([key, val]) => val)
+      .map(([key, val]) => `${key}: ${val}`)
+      .join(', '),
+  }));
+
+  const hasValidVariants = variantAttributes.some(v => v.attributes);
 
   return (
     <div className="product-page-container">
-      {/* LEFT SECTION: Images */}
-      <div className="product-image-section">
-        <div className="image-slider-container">
-          {displayedImages.length > 1 ? (
-            <Slider {...sliderSettings}>
-              {displayedImages.map((imgUrl, i) => (
-                <div key={i} className="slider-image-wrapper">
-                  <img
-                    src={imgUrl}
-                    alt={`Slide ${i}`}
-                    onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
-                  />
-                </div>
-              ))}
-            </Slider>
-          ) : (
-            <div className="single-image-wrapper">
-              <img
-                src={displayedImages[0]}
-                alt="Product"
-                onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
-              />
+      <button
+        onClick={() => navigate('/products')}
+        className="enhanced-back-btn"
+      >
+        ← Back to Products
+      </button>
+
+      {/* Main Content */}
+      <div className="main-content">
+        {/* LEFT SECTION: Images */}
+        <div className="product-image-section">
+          <div className="image-slider-container">
+            {displayedImages.length > 1 ? (
+              <Slider {...sliderSettings}>
+                {displayedImages.map((imgUrl, i) => (
+                  <div key={i} className="slider-image-wrapper">
+                    <img
+                      src={imgUrl}
+                      alt={`Slide ${i}`}
+                      onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+                    />
+                  </div>
+                ))}
+              </Slider>
+            ) : (
+              <div className="single-image-wrapper">
+                <img
+                  src={displayedImages[0]}
+                  alt="Product"
+                  onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="view-360">
+            <button disabled>View in 360° (Coming Soon)</button>
+          </div>
+        </div>
+
+        {/* RIGHT SECTION: Details */}
+        <div className="product-details-section">
+          <h1 className="product-title">{product.title || product.name}</h1>
+
+          {/* Price & discount */}
+          {renderPriceSection()}
+
+          {/* Product highlights */}
+          <ul className="product-highlights">
+            {product.description?.split(';').filter(point => point.trim()).map((point, idx) => (
+              <li key={idx}>{point.trim()}</li>
+            )) || <li>No description available</li>}
+          </ul>
+
+          {/* Variant Selection */}
+          {hasValidVariants && (
+            <div className="variant-section">
+              <h4>Variants:</h4>
+              <div className="variant-options">
+                {variantAttributes.map((v) => (
+                  v.attributes && (
+                    <button
+                      key={v.id}
+                      className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
+                      onClick={() => setSelectedVariantIndex(v.index)}
+                    >
+                      {v.attributes || `Variant #${v.index + 1}`}
+                    </button>
+                  )
+                ))}
+              </div>
             </div>
           )}
-        </div>
 
-        <div className="view-360">
-          <button disabled>View in 360° (Coming Soon)</button>
-        </div>
-      </div>
-
-      {/* RIGHT SECTION: Details */}
-      <div className="product-details-section">
-        <h1 className="product-title">{product.title || product.name}</h1>
-
-        {/* Price & discount */}
-        {renderPriceSection()}
-
-        {/* Product highlights */}
-        <ul className="product-highlights">
-          {product.description?.split(';').map((point, idx) => (
-            <li key={idx}>{point.trim()}</li>
-          )) || <li>No description available</li>}
-        </ul>
-
-        {/* Color selection */}
-        {colorVariants.length > 0 && (
-          <div className="variant-color-section">
-            <h4>Color:</h4>
-            <div className="color-options">
-              {colorVariants.map((v) => {
-                const idx = variants.indexOf(v);
-                return (
-                  <button
-                    key={v.id}
-                    className={`color-button ${idx === selectedVariantIndex ? 'active' : ''}`}
-                    onClick={() => setSelectedVariantIndex(idx)}
-                  >
-                    {v.attributes.color}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Action buttons */}
+          <div className="action-buttons">
+            <button
+              onClick={addToCart}
+              className="add-to-cart-button"
+              disabled={isOutOfStock()}
+            >
+              {isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}
+            </button>
+            <button className="buy-now-button" onClick={() => navigate('/checkout')}>
+              Buy Now
+            </button>
+            <button onClick={addToWishlist} className="wishlist-button">
+              Add to Wishlist
+            </button>
           </div>
-        )}
 
-        {/* Storage selection */}
-        {capacityVariants.length > 0 && (
-          <div className="variant-capacity-section">
-            <h4>Storage (RAM + ROM):</h4>
-            <div className="capacity-options">
-              {capacityVariants.map((v) => {
-                const idx = variants.indexOf(v);
-                return (
-                  <button
-                    key={v.id}
-                    className={`capacity-button ${idx === selectedVariantIndex ? 'active' : ''}`}
-                    onClick={() => setSelectedVariantIndex(idx)}
-                  >
-                    {v.attributes.capacity}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Seller info */}
+          <div className="seller-info">
+            <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+            <Link to={`/seller/${product.seller_id}`} className="seller-link">
+              View Seller Profile
+            </Link>
           </div>
-        )}
-
-        {/* All variant buttons */}
-        {variants.length > 0 && (
-          <div className="variant-raw-section">
-            <h4>Other Variants:</h4>
-            {variants.map((v, idx) => {
-              const attrText = Object.entries(v.attributes || {})
-                .map(([key, val]) => `${key}: ${val}`)
-                .join(', ');
-              return (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVariantIndex(idx)}
-                  className={`variant-button ${idx === selectedVariantIndex ? 'active' : ''}`}
-                >
-                  {attrText || `Variant #${idx + 1}`}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Stock info */}
-        <p className="stock-info">
-          <strong>Stock:</strong>{' '}
-          {activeVariant && activeVariant.stock
-            ? activeVariant.stock
-            : product.stock || 'N/A'}
-        </p>
-
-        {/* Action buttons */}
-        <div className="action-buttons">
-          <button onClick={addToCart} className="add-to-cart-button">
-            Add to Cart
-          </button>
-          <button className="buy-now-button" onClick={() => navigate('/checkout')}>
-            Buy Now
-          </button>
-          <button onClick={addToWishlist} className="wishlist-button">
-            Add to Wishlist
-          </button>
-        </div>
-
-        {/* Seller info */}
-        <div className="seller-info">
-          <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
-          <Link to={`/seller/${product.seller_id}`} className="seller-link">
-            View Seller Profile
-          </Link>
         </div>
       </div>
 
       {/* RATINGS & REVIEWS */}
-      <div className="ratings-summary">
+      <div className="ratings-reviews-section">
         <h3>Ratings & Reviews</h3>
-        <p className="by-verified">by verified customers</p>
-
+        <p className="by-verified">By verified customers</p>
         <div className="rating-score">
-          <span className="rating-value">{averageRating.toFixed(1)}/5</span>
+          <StarRatingDisplay rating={averageRating} />
           <span className="rating-count">
             ({totalReviewsCount} {totalReviewsCount === 1 ? 'review' : 'reviews'})
           </span>
         </div>
-      </div>
 
-      {/* DETAILED REVIEWS LIST */}
-      <div className="reviews-section">
-        <h3>Customer Reviews</h3>
         {reviews.length > 0 ? (
           reviews.map((review, index) => (
             <div key={index} className="review-item">
               <div className="review-header">
                 <strong className="review-author">{review.reviewer_name}</strong>
-                <span className="review-rating">{review.rating}/5</span>
+                <StarRatingDisplay rating={review.rating} />
               </div>
               <p className="review-text">{review.review_text}</p>
-
               {review.reply_text && (
                 <div className="review-reply">
                   <strong>Seller Reply:</strong> {review.reply_text}
                 </div>
               )}
-
               <small className="review-date">
-                {new Date(review.created_at).toLocaleDateString()}
+                {new Date(review.created_at).toLocaleDateString('en-IN', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
               </small>
             </div>
           ))
         ) : (
           <p className="no-reviews">No reviews yet.</p>
+        )}
+      </div>
+
+      {/* SPECIFICATIONS SECTION */}
+      <div className="specifications-section">
+        <h3>Specifications</h3>
+        {product.specifications && Object.keys(product.specifications).length > 0 ? (
+          <div className="specifications-list">
+            {Object.entries(product.specifications).map(([key, value], idx) => (
+              <div key={idx} className="spec-item">
+                <span className="spec-key">{key}</span>
+                <span className="spec-value">{value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="no-specs">No specifications available.</p>
         )}
       </div>
     </div>
