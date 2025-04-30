@@ -7057,6 +7057,1447 @@
 
 
 
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaSearch, FaHome, FaList, FaUser } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+// import Footer from './Footer'; // Import Footer component
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers within 40km.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Invalid product.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Out of stock.');
+//       return;
+//     }
+//     try {
+//       if (!session?.user) {
+//         setError('Please log in.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       // Check if product already exists in cart
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity, product_id')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         console.error('Fetch Error:', fetchError);
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Exceeds stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) {
+//           console.error('Update Error:', updateError);
+//           throw updateError;
+//         }
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) {
+//           console.error('Insert Error:', insertError);
+//           throw insertError;
+//         }
+//       }
+
+//       setError(null);
+//       alert('Added to cart!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError(`Failed to add to cart: ${err.message || 'Unknown error'}`);
+//     }
+//   }, [navigate, session]);
+
+//   // Fetch data on mount
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//   }, [fetchUserRole, fetchBannerImages]);
+
+//   useEffect(() => {
+//     if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+//       fetchNearbyProducts();
+//     }
+//   }, [buyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(() => {
+//     if (!searchTerm) return products;
+//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+//   }, [products, searchTerm]);
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   if (loadingProducts && loadingBanners) return (
+//     <div className="loading">
+//       <svg className="spinner" viewBox="0 0 50 50">
+//         <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   return (
+//     <div className="home">
+//       {/* Sticky Search Bar */}
+//       <div className="search-bar sticky">
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner) => (
+//               <Link key={banner.name} to={`/product/${banner.name}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Error Message */}
+//       {error && (
+//         <div className="home-error" aria-live="polite">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Products Near You (40km)</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products within 40km.'}</p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <p className="product-price">
+//                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                   <p className={`product-stock ${product.stock <= 0 ? 'out-of-stock' : ''}`}>
+//                     In Stock: {product.stock > 0 ? product.stock : 'Out of Stock'}
+//                   </p>
+//                   <div className="product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="add-to-cart-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         navigate('/cart', { state: { product } });
+//                       }}
+//                       className="buy-now-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       <Footer /> {/* Use Footer component instead of inline footer */}
+//     </div>
+//   );
+// }
+
+// // export default React.memo(Home);
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaSearch, FaHome, FaList, FaUser } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import '../style/Home.css';
+// import Footer from './Footer'; // Import Footer component
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, setBuyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       setError('Failed to fetch user role.');
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products (without login dependency)
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setError('No buyer location available. Please allow location access or try again.');
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         setError('No sellers nearby.');
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setError('Failed to fetch products.');
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//       setError('Failed to load banner images.');
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Invalid product.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Out of stock.');
+//       return;
+//     }
+//     if (!session?.user) {
+//       setError('Please log in to add items to cart.');
+//       navigate('/auth');
+//       return;
+//     }
+
+//     try {
+//       // Check if product already exists in cart
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity, product_id')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         console.error('Fetch Error:', fetchError);
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Exceeds stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) {
+//           console.error('Update Error:', updateError);
+//           throw updateError;
+//         }
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) {
+//           console.error('Insert Error:', insertError);
+//           throw insertError;
+//         }
+//       }
+
+//       setError(null);
+//       alert('Added to cart!');
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       setError(`Failed to add to cart: ${err.message || 'Unknown error'}`);
+//     }
+//   }, [navigate, session]);
+
+//   // Buy now (add to cart and navigate to cart page)
+//   const buyNow = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       setError('Invalid product.');
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       setError('Out of stock.');
+//       return;
+//     }
+//     if (!session?.user) {
+//       setError('Please log in to proceed to cart.');
+//       navigate('/auth');
+//       return;
+//     }
+
+//     try {
+//       // Check if product already exists in cart
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity, product_id')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         console.error('Fetch Error:', fetchError);
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           setError('Exceeds stock.');
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) {
+//           console.error('Update Error:', updateError);
+//           throw updateError;
+//         }
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) {
+//           console.error('Insert Error:', insertError);
+//           throw insertError;
+//         }
+//       }
+
+//       setError(null);
+//       // Navigate to cart page after adding to cart
+//       navigate('/cart');
+//     } catch (err) {
+//       console.error('Error in Buy Now:', err);
+//       setError(`Failed to add to cart: ${err.message || 'Unknown error'}`);
+//     }
+//   }, [navigate, session]);
+
+//   // Fetch data on mount and handle location
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+
+//     // Get location if not available from context
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       if (navigator.geolocation) {
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newLocation = {
+//               lat: position.coords.latitude,
+//               lon: position.coords.longitude,
+//             };
+//             setBuyerLocation(newLocation); // Update context
+//             fetchNearbyProducts();
+//           },
+//           (error) => {
+//             console.error('Geolocation error:', error);
+//             setError('Unable to fetch your location. Please enable location services or log in to set your location.');
+//             setLoadingProducts(false);
+//           }
+//         );
+//       } else {
+//         setError('Geolocation is not supported by this browser.');
+//         setLoadingProducts(false);
+//       }
+//     } else {
+//       fetchNearbyProducts();
+//     }
+//   }, [fetchUserRole, fetchBannerImages, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(() => {
+//     if (!searchTerm) return products;
+//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+//   }, [products, searchTerm]);
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   if (loadingProducts && loadingBanners) return (
+//     <div className="loading">
+//       <svg className="spinner" viewBox="0 0 50 50">
+//         <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   return (
+//     <div className="home">
+//       {/* Sticky Search Bar */}
+//       <div className="search-bar sticky">
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner) => (
+//               <Link key={banner.name} to={`/product/${banner.name}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Error Message */}
+//       {error && (
+//         <div className="home-error" aria-live="polite">
+//           <p>{error}</p>
+//           {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images') || error.includes('Unable to fetch your location')) && (
+//             <button
+//               onClick={() => {
+//                 if (error.includes('Failed to fetch products')) fetchNearbyProducts();
+//                 if (error.includes('Failed to load banner images')) fetchBannerImages();
+//                 if (error.includes('Unable to fetch your location') && navigator.geolocation) {
+//                   navigator.geolocation.getCurrentPosition(
+//                     (position) => {
+//                       const newLocation = {
+//                         lat: position.coords.latitude,
+//                         lon: position.coords.longitude,
+//                       };
+//                       setBuyerLocation(newLocation);
+//                       fetchNearbyProducts();
+//                     },
+//                     (geoError) => {
+//                       console.error('Geolocation retry error:', geoError);
+//                       setError('Location access denied. Please enable location services or log in.');
+//                     }
+//                   );
+//                 }
+//               }}
+//               className="retry-btn"
+//             >
+//               Retry
+//             </button>
+//           )}
+//         </div>
+//       )}
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Fast Delivery, Just Order!</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <p className="product-price">
+//                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                   <div className="product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="add-to-cart-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         buyNow(product);
+//                       }}
+//                       className="buy-now-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       <Footer /> {/* Use Footer component instead of inline footer */}
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+// import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaSearch, FaHome, FaList, FaUser } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import { ToastContainer, toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+// import '../style/Home.css';
+// import Footer from './Footer';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, setBuyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Check network connectivity
+//   const checkNetworkStatus = () => {
+//     if (!navigator.onLine) {
+//       toast.error('No internet connection. Please check your network and try again.', {
+//         position: "top-center",
+//         autoClose: 5000,
+//       });
+//       return false;
+//     }
+//     return true;
+//   };
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while fetching user role. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 5000,
+//         });
+//       } else {
+//         toast.error('Failed to fetch user role.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//     }
+//   }, [session]);
+
+//   // Fetch nearby products (without login dependency)
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       toast.warn('No buyer location available. Please allow location access or log in.', {
+//         position: "top-center",
+//         autoClose: 5000,
+//       });
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     if (!checkNetworkStatus()) {
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         toast.info('No sellers nearby.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while fetching products. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 5000,
+//         });
+//       } else {
+//         toast.error('Failed to fetch products.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     if (!checkNetworkStatus()) {
+//       setLoadingBanners(false);
+//       return;
+//     }
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while fetching banner images. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 5000,
+//         });
+//       } else {
+//         toast.error('Failed to load banner images.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       toast.error('Invalid product.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       toast.warn('Out of stock.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.warn('Please log in to add items to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+
+//     try {
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity, product_id')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           toast.warn('Exceeds stock.', {
+//             position: "top-center",
+//             autoClose: 3000,
+//           });
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       toast.success('Added to cart!', {
+//         position: "top-center",
+//         autoClose: 2000,
+//       });
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while adding to cart. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 5000,
+//         });
+//       } else {
+//         toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//     }
+//   }, [navigate, session]);
+
+//   // Buy now (add to cart and navigate to cart page)
+//   const buyNow = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       toast.error('Invalid product.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       toast.warn('Out of stock.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.warn('Please log in to proceed to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+
+//     try {
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity, product_id')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .single();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           toast.warn('Exceeds stock.', {
+//             position: "top-center",
+//             autoClose: 3000,
+//           });
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       toast.success('Added to cart! Redirecting...', {
+//         position: "top-center",
+//         autoClose: 2000,
+//       });
+//       setTimeout(() => navigate('/cart'), 2000);
+//     } catch (err) {
+//       console.error('Error in Buy Now:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while adding to cart. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 5000,
+//         });
+//       } else {
+//         toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//     }
+//   }, [navigate, session]);
+
+//   // Fetch data on mount and handle location
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       if (navigator.geolocation) {
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newLocation = {
+//               lat: position.coords.latitude,
+//               lon: position.coords.longitude,
+//             };
+//             setBuyerLocation(newLocation);
+//             fetchNearbyProducts();
+//           },
+//           (error) => {
+//             console.error('Geolocation error:', error);
+//             let errorMessage = 'Unable to fetch your location.';
+//             if (error.code === error.PERMISSION_DENIED) {
+//               errorMessage = 'Location access denied. Please enable location services.';
+//             } else if (error.code === error.POSITION_UNAVAILABLE) {
+//               errorMessage = 'Location information is unavailable. Please try again.';
+//             } else if (error.code === error.TIMEOUT) {
+//               errorMessage = 'Location request timed out. Please try again.';
+//             }
+//             toast.warn(errorMessage, {
+//               position: "top-center",
+//               autoClose: 5000,
+//             });
+//             setLoadingProducts(false);
+//           },
+//           { timeout: 10000 }
+//         );
+//       } else {
+//         toast.error('Geolocation is not supported by this browser.', {
+//           position: "top-center",
+//           autoClose: 5000,
+//         });
+//         setLoadingProducts(false);
+//       }
+//     } else {
+//       fetchNearbyProducts();
+//     }
+//   }, [fetchUserRole, fetchBannerImages, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(() => {
+//     if (!searchTerm) return products;
+//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+//   }, [products, searchTerm]);
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   if (loadingProducts && loadingBanners) return (
+//     <div className="loading-container">
+//       <div className="loading-animation">
+//         <div className="loading-box">
+//           <FaShoppingCart className="loading-icon" />
+//           <span>Finding the best deals for you...</span>
+//         </div>
+//         <div className="loading-dots">
+//           <span>.</span><span>.</span><span>.</span>
+//         </div>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="home">
+//       <ToastContainer />
+      
+//       {/* Sticky Search Bar */}
+//       <div className="search-bar sticky">
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           aria-label="Search products"
+//         />
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner) => (
+//               <Link key={banner.name} to={`/product/${banner.name}`} aria-label={`Banner ${banner.name}`}>
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} />
+//               </Link>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Fast Delivery, Just Order!</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
+//         ) : (
+//           <div className="product-grid">
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <p className="product-price">
+//                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                   <div className="product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="add-to-cart-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         buyNow(product);
+//                       }}
+//                       className="buy-now-btn"
+//                       disabled={product.stock <= 0}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -7065,8 +8506,10 @@ import { FaShoppingCart, FaSearch, FaHome, FaList, FaUser } from 'react-icons/fa
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick-theme.css';
 import 'slick-carousel/slick/slick.css';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import '../style/Home.css';
-import Footer from './Footer'; // Import Footer component
+import Footer from './Footer';
 
 // Utility to debounce a function
 const debounce = (func, delay) => {
@@ -7089,7 +8532,7 @@ function calculateDistance(userLoc, sellerLoc) {
 }
 
 function Home() {
-  const { buyerLocation, session } = useContext(LocationContext);
+  const { buyerLocation, setBuyerLocation, session } = useContext(LocationContext);
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [bannerImages, setBannerImages] = useState([]);
@@ -7107,12 +8550,25 @@ function Home() {
     []
   );
 
+  // Check network connectivity
+  const checkNetworkStatus = () => {
+    if (!navigator.onLine) {
+      toast.error('No internet connection. Please check your network and try again.', {
+        position: "top-center",
+        autoClose: 5000,
+      });
+      return false;
+    }
+    return true;
+  };
+
   // Fetch user role
   const fetchUserRole = useCallback(async () => {
     if (!session?.user) {
       setIsSeller(false);
       return;
     }
+    if (!checkNetworkStatus()) return;
     try {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -7123,14 +8579,31 @@ function Home() {
       setIsSeller(profileData?.is_seller || false);
     } catch (err) {
       console.error('Error fetching user role:', err);
-      setError('Failed to fetch user role.');
+      if (err.message.includes('Network')) {
+        toast.error('Network error while fetching user role. Please check your connection.', {
+          position: "top-center",
+          autoClose: 5000,
+        });
+      } else {
+        toast.error('Failed to fetch user role.', {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      }
     }
   }, [session]);
 
-  // Fetch nearby products
+  // Fetch nearby products (without login dependency)
   const fetchNearbyProducts = useCallback(async () => {
     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
-      setError('No buyer location available.');
+      toast.warn('No buyer location available. Please allow location access or log in.', {
+        position: "top-center",
+        autoClose: 5000,
+      });
+      setLoadingProducts(false);
+      return;
+    }
+    if (!checkNetworkStatus()) {
       setLoadingProducts(false);
       return;
     }
@@ -7152,7 +8625,10 @@ function Home() {
 
       if (nearbySellerIds.length === 0) {
         setProducts([]);
-        setError('No sellers within 40km.');
+        toast.info('No sellers nearby.', {
+          position: "top-center",
+          autoClose: 3000,
+        });
         return;
       }
 
@@ -7174,7 +8650,17 @@ function Home() {
       setError(null);
     } catch (err) {
       console.error('Error fetching products:', err);
-      setError('Failed to fetch products.');
+      if (err.message.includes('Network')) {
+        toast.error('Network error while fetching products. Please check your connection.', {
+          position: "top-center",
+          autoClose: 5000,
+        });
+      } else {
+        toast.error('Failed to fetch products.', {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      }
       setProducts([]);
     } finally {
       setLoadingProducts(false);
@@ -7183,6 +8669,10 @@ function Home() {
 
   // Fetch banner images
   const fetchBannerImages = useCallback(async () => {
+    if (!checkNetworkStatus()) {
+      setLoadingBanners(false);
+      return;
+    }
     setLoadingBanners(true);
     try {
       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
@@ -7197,8 +8687,18 @@ function Home() {
       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
     } catch (err) {
       console.error('Error fetching banner images:', err);
+      if (err.message.includes('Network')) {
+        toast.error('Network error while fetching banner images. Please check your connection.', {
+          position: "top-center",
+          autoClose: 5000,
+        });
+      } else {
+        toast.error('Failed to load banner images.', {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      }
       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-      setError('Failed to load banner images.');
     } finally {
       setLoadingBanners(false);
     }
@@ -7207,47 +8707,64 @@ function Home() {
   // Add to cart
   const addToCart = useCallback(async (product) => {
     if (!product || !product.id || !product.name || product.price === undefined) {
-      setError('Invalid product.');
+      toast.error('Invalid product.', {
+        position: "top-center",
+        autoClose: 3000,
+      });
       return;
     }
     if (product.stock <= 0) {
-      setError('Out of stock.');
+      toast.warn('Out of stock.', {
+        position: "top-center",
+        autoClose: 3000,
+      });
       return;
     }
-    try {
-      if (!session?.user) {
-        setError('Please log in.');
-        navigate('/auth');
-        return;
-      }
+    if (!session?.user) {
+      toast.warn('Please log in to add items to cart.', {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      navigate('/auth');
+      return;
+    }
+    if (!checkNetworkStatus()) return;
 
-      // Check if product already exists in cart
+    try {
+      // Simplified SELECT query to avoid potential issues
       const { data: existingCartItem, error: fetchError } = await supabase
         .from('cart')
-        .select('id, quantity, product_id')
+        .select('id, quantity')
         .eq('user_id', session.user.id)
         .eq('product_id', product.id)
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Fetch Error:', fetchError);
-        throw fetchError;
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          // No rows found, proceed with insert
+        } else {
+          throw fetchError;
+        }
       }
 
       if (existingCartItem) {
-        const newQuantity = existingCartItem.quantity + 1;
+        const newQuantity = (existingCartItem.quantity || 0) + 1;
         if (newQuantity > product.stock) {
-          setError('Exceeds stock.');
+          toast.warn('Exceeds stock.', {
+            position: "top-center",
+            autoClose: 3000,
+          });
           return;
         }
         const { error: updateError } = await supabase
           .from('cart')
           .update({ quantity: newQuantity })
           .eq('id', existingCartItem.id);
-        if (updateError) {
-          console.error('Update Error:', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
+        toast.success(`${product.name} quantity updated in cart!`, {
+          position: "top-center",
+          autoClose: 2000,
+        });
       } else {
         const { error: insertError } = await supabase
           .from('cart')
@@ -7258,31 +8775,168 @@ function Home() {
             price: product.price,
             title: product.name,
           });
-        if (insertError) {
-          console.error('Insert Error:', insertError);
-          throw insertError;
-        }
+        if (insertError) throw insertError;
+        toast.success(`${product.name} added to cart!`, {
+          position: "top-center",
+          autoClose: 2000,
+        });
       }
-
-      setError(null);
-      alert('Added to cart!');
     } catch (err) {
       console.error('Error adding to cart:', err);
-      setError(`Failed to add to cart: ${err.message || 'Unknown error'}`);
+      if (err.message.includes('Network')) {
+        toast.error('Network error while adding to cart. Please check your connection.', {
+          position: "top-center",
+          autoClose: 5000,
+        });
+      } else if (err.code === '406') {
+        toast.error('Unable to check cart due to a server error. Please try again.', {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      } else {
+        toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      }
     }
   }, [navigate, session]);
 
-  // Fetch data on mount
+  // Buy now (add to cart and navigate to cart page)
+  const buyNow = useCallback(async (product) => {
+    if (!product || !product.id || !product.name || product.price === undefined) {
+      toast.error('Invalid product.', {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      return;
+    }
+    if (product.stock <= 0) {
+      toast.warn('Out of stock.', {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      return;
+    }
+    if (!session?.user) {
+      toast.warn('Please log in to proceed to cart.', {
+        position: "top-center",
+        autoClose: 3000,
+      });
+      navigate('/auth');
+      return;
+    }
+    if (!checkNetworkStatus()) return;
+
+    try {
+      const { data: existingCartItem, error: fetchError } = await supabase
+        .from('cart')
+        .select('id, quantity')
+        .eq('user_id', session.user.id)
+        .eq('product_id', product.id)
+        .maybeSingle();
+
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          // No rows found, proceed with insert
+        } else {
+          throw fetchError;
+        }
+      }
+
+      if (existingCartItem) {
+        const newQuantity = (existingCartItem.quantity || 0) + 1;
+        if (newQuantity > product.stock) {
+          toast.warn('Exceeds stock.', {
+            position: "top-center",
+            autoClose: 3000,
+          });
+          return;
+        }
+        const { error: updateError } = await supabase
+          .from('cart')
+          .update({ quantity: newQuantity })
+          .eq('id', existingCartItem.id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('cart')
+          .insert({
+            user_id: session.user.id,
+            product_id: product.id,
+            quantity: 1,
+            price: product.price,
+            title: product.name,
+          });
+        if (insertError) throw insertError;
+      }
+
+      toast.success('Added to cart! Redirecting...', {
+        position: "top-center",
+        autoClose: 2000,
+      });
+      setTimeout(() => navigate('/cart'), 2000);
+    } catch (err) {
+      console.error('Error in Buy Now:', err);
+      if (err.message.includes('Network')) {
+        toast.error('Network error while adding to cart. Please check your connection.', {
+          position: "top-center",
+          autoClose: 5000,
+        });
+      } else {
+        toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+          position: "top-center",
+          autoClose: 3000,
+        });
+      }
+    }
+  }, [navigate, session]);
+
+  // Fetch data on mount and handle location
   useEffect(() => {
     fetchUserRole();
     fetchBannerImages();
-  }, [fetchUserRole, fetchBannerImages]);
 
-  useEffect(() => {
-    if (buyerLocation && buyerLocation.lat && buyerLocation.lon) {
+    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const newLocation = {
+              lat: position.coords.latitude,
+              lon: position.coords.longitude,
+            };
+            setBuyerLocation(newLocation);
+            fetchNearbyProducts();
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            let errorMessage = 'Unable to fetch your location.';
+            if (error.code === error.PERMISSION_DENIED) {
+              errorMessage = 'Location access denied. Please enable location services.';
+            } else if (error.code === error.POSITION_UNAVAILABLE) {
+              errorMessage = 'Location information is unavailable. Please try again.';
+            } else if (error.code === error.TIMEOUT) {
+              errorMessage = 'Location request timed out. Please try again.';
+            }
+            toast.warn(errorMessage, {
+              position: "top-center",
+              autoClose: 5000,
+            });
+            setLoadingProducts(false);
+          },
+          { timeout: 10000 }
+        );
+      } else {
+        toast.error('Geolocation is not supported by this browser.', {
+          position: "top-center",
+          autoClose: 5000,
+        });
+        setLoadingProducts(false);
+      }
+    } else {
       fetchNearbyProducts();
     }
-  }, [buyerLocation, fetchNearbyProducts]);
+  }, [fetchUserRole, fetchBannerImages, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -7303,16 +8957,23 @@ function Home() {
   };
 
   if (loadingProducts && loadingBanners) return (
-    <div className="loading">
-      <svg className="spinner" viewBox="0 0 50 50">
-        <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
-      </svg>
-      Loading...
+    <div className="loading-container">
+      <div className="loading-animation">
+        <div className="loading-box">
+          <FaShoppingCart className="loading-icon" />
+          <span>Finding the best deals for you...</span>
+        </div>
+        <div className="loading-dots">
+          <span>.</span><span>.</span><span>.</span>
+        </div>
+      </div>
     </div>
   );
 
   return (
     <div className="home">
+      <ToastContainer />
+      
       {/* Sticky Search Bar */}
       <div className="search-bar sticky">
         <FaSearch className="search-icon" />
@@ -7339,27 +9000,9 @@ function Home() {
         )}
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="home-error" aria-live="polite">
-          <p>{error}</p>
-          {(error.includes('Failed to fetch products') || error.includes('Failed to load banner images')) && (
-            <button
-              onClick={() => {
-                if (error.includes('Failed to fetch products')) fetchNearbyProducts();
-                if (error.includes('Failed to load banner images')) fetchBannerImages();
-              }}
-              className="retry-btn"
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Products Section */}
       <section className="products-section">
-        <h2 className="section-title">Products Near You (40km)</h2>
+        <h2 className="section-title">Fast Delivery, Just Order!</h2>
         {loadingProducts ? (
           <div className="product-grid">
             {[...Array(4)].map((_, i) => (
@@ -7375,7 +9018,7 @@ function Home() {
             ))}
           </div>
         ) : filteredProducts.length === 0 ? (
-          <p className="no-products">{searchTerm ? 'No products found.' : 'No products within 40km.'}</p>
+          <p className="no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
         ) : (
           <div className="product-grid">
             {filteredProducts.map((product) => (
@@ -7401,9 +9044,6 @@ function Home() {
                   <p className="product-price">
                     ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
-                  <p className={`product-stock ${product.stock <= 0 ? 'out-of-stock' : ''}`}>
-                    In Stock: {product.stock > 0 ? product.stock : 'Out of Stock'}
-                  </p>
                   <div className="product-buttons">
                     <button
                       onClick={(e) => {
@@ -7419,7 +9059,7 @@ function Home() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate('/cart', { state: { product } });
+                        buyNow(product);
                       }}
                       className="buy-now-btn"
                       disabled={product.stock <= 0}
@@ -7435,7 +9075,7 @@ function Home() {
         )}
       </section>
 
-      <Footer /> {/* Use Footer component instead of inline footer */}
+      <Footer />
     </div>
   );
 }
