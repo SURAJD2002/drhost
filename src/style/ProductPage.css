@@ -10,6 +10,20 @@
   margin: 0 auto;
 }
 
+@media (min-width: 640px) {
+  .product-page-container {
+    padding: 20px;
+    max-width: 800px;
+  }
+}
+
+@media (min-width: 768px) {
+  .product-page-container {
+    padding: 25px;
+    max-width: 1200px;
+  }
+}
+
 /* Enhanced Back to Products Button */
 .enhanced-back-btn {
   display: flex;
@@ -40,6 +54,7 @@
   display: flex;
   flex-direction: column;
   gap: 15px;
+  margin-bottom: 40px;
 }
 
 @media (min-width: 768px) {
@@ -115,9 +130,34 @@
 
 .price-section {
   display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+.price-section.offer-highlight {
+  background: linear-gradient(135deg, #fef3c7 0%, #fee2e2 100%);
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.deal-label {
+  display: inline-block;
+  background-color: #ef4444;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  animation: pulse 2s infinite;
+}
+
+.price-details {
+  display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 15px;
 }
 
 .current-price {
@@ -139,11 +179,23 @@
 }
 
 .discount {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ef4444;
+  background-color: #fee2e2;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.low-stock-warning {
   font-size: 12px;
-  color: #10b981;
-  background-color: #d1fae5;
-  padding: 2px 6px;
-  border-radius: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  background-color: #fee2e2;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  display: inline-block;
 }
 
 .product-highlights {
@@ -151,11 +203,13 @@
   padding-left: 20px;
   font-size: 13px;
   color: #4b5563;
+  list-style: none;
   line-height: 1.6;
 }
 
 .product-highlights li {
   margin-bottom: 6px;
+  padding: 5px 0;
 }
 
 .variant-section {
@@ -240,6 +294,11 @@
   background-color: #4338ca;
 }
 
+.buy-now-button:disabled {
+  background-color: #a3bffa;
+  cursor: not-allowed;
+}
+
 .seller-info {
   margin-top: 20px;
   font-size: 13px;
@@ -263,6 +322,16 @@
   margin-top: 20px;
   padding: 20px;
   border-top: 1px solid #e5e7eb;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+@media (min-width: 768px) {
+  .ratings-reviews-section {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 .ratings-reviews-section h3 {
@@ -320,6 +389,8 @@
   margin-top: 5px;
   color: #6b7280;
   font-style: italic;
+  padding-left: 20px;
+  border-left: 2px solid #4f46e5;
 }
 
 .review-date {
@@ -339,6 +410,18 @@
   margin-top: 20px;
   padding: 20px;
   border-top: 1px solid #e5e7eb;
+  background: #f9f9f9;
+  border-radius: 8px;
+  min-height: 200px; /* Ensure enough space for content */
+  overflow: visible; /* Prevent clipping */
+}
+
+@media (min-width: 768px) {
+  .specifications-section {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 .specifications-section h3 {
@@ -351,11 +434,13 @@
 .specifications-list {
   border: 1px solid #e5e7eb;
   border-radius: 6px;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
 }
 
 .spec-item {
-  display: flex;
-  justify-content: space-between;
+  display: contents;
   padding: 10px;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -455,38 +540,6 @@
   background-color: #d1d5db;
 }
 
-/* Responsive Design */
-@media (min-width: 640px) {
-  .product-page-container {
-    padding: 20px;
-    max-width: 800px;
-  }
-
-  .slider-image-wrapper img,
-  .single-image-wrapper img {
-    height: 250px;
-  }
-}
-
-@media (min-width: 768px) {
-  .product-page-container {
-    padding: 25px;
-    max-width: 1200px;
-  }
-
-  .slider-image-wrapper img,
-  .single-image-wrapper img {
-    height: 300px;
-  }
-
-  .ratings-reviews-section,
-  .specifications-section {
-    max-width: 1200px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
 /* Star Rating Styling */
 .star-rating-display {
   display: inline-flex;
@@ -501,4 +554,54 @@
 
 .star.filled {
   color: #f59e0b; /* Yellow for filled stars */
+}
+
+/* Additional Spinner Animation for Consistency */
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+/* Pulsating Animation for Offer Label */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+.specifications-section {
+  margin-top: 20px;
+  padding: 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9f9f9;
+  border-radius: 8px;
+  max-height: 300px; /* Restrict height for scroll */
+  overflow-y: auto;  /* Enable vertical scroll */
+  scroll-behavior: smooth;
+}
+
+@media (min-width: 768px) {
+  .specifications-section {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }

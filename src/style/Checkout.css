@@ -1,4 +1,3 @@
-/* Checkout.css */
 * {
   box-sizing: border-box;
 }
@@ -51,6 +50,9 @@
 
 .checkout-item-details {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .checkout-item-details h3 {
@@ -65,9 +67,16 @@
   margin: 2px 0;
 }
 
+.variant-details {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+}
+
 .checkout-details {
   background-color: white;
   padding: 15px;
+  padding-bottom: 89px; /* Add space for sticky button */
   border-radius: 8px 8px 0 0; /* Rounded top corners, flat bottom */
   position: fixed;
   bottom: 0;
@@ -75,7 +84,7 @@
   right: 0;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Elevation shadow */
   z-index: 1000; /* Above footer */
-  max-height: 50vh; /* Limit height to avoid covering too much content */
+  max-height: 60vh; /* Increased to give more space */
   overflow-y: auto; /* Scrollable if content overflows */
 }
 
@@ -108,6 +117,14 @@ select {
   margin-bottom: 10px;
 }
 
+.checkout-action {
+  position: sticky;
+  bottom: 0;
+  background-color: white;
+  padding: 10px 0;
+  z-index: 1001; /* Ensure it stays above other content in checkout-details */
+}
+
 button {
   padding: 10px 20px;
   background-color: #007bff; /* Trust-building blue */
@@ -118,6 +135,8 @@ button {
   transition: background-color 0.3s ease;
   width: 100%; /* Full width for better visibility on mobile */
   font-size: 16px;
+  margin-top: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for prominence */
 }
 
 button:hover:not(:disabled) {
@@ -186,6 +205,12 @@ button:disabled {
     box-shadow: none; /* Remove shadow on larger screens */
     max-height: none; /* No height limit on larger screens */
     overflow-y: visible; /* No scrolling needed */
+    padding-bottom: 20px; /* Adjusted padding */
+  }
+
+  .checkout-action {
+    position: static; /* No need for sticky on larger screens */
+    padding: 0;
   }
 
   .checkout-details h2,
@@ -199,6 +224,7 @@ button:disabled {
 
   button {
     width: auto; /* On larger screens, button doesn't need to be full-width */
+    margin-top: 15px;
   }
 }
 
@@ -216,15 +242,4 @@ button:disabled {
   .checkout-details {
     max-width: 910px; /* Match checkout container width */
   }
-}
-.checkout-item-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.variant-details {
-  font-size: 0.9rem;
-  color: #555;
-  margin: 0;
 }

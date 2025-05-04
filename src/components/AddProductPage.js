@@ -1721,6 +1721,1239 @@
 // export default AddProductPage;
 
 
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { useForm, useFieldArray } from 'react-hook-form';
+// import { LocationContext } from '../App';
+// import '../style/AddProductPage.css';
+// import { toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+
+// function AddProductPage() {
+//   const navigate = useNavigate();
+//   const { sellerLocation } = useContext(LocationContext);
+
+//   const [categories, setCategories] = useState([]);
+//   const [selectedCategory, setSelectedCategory] = useState(null);
+//   const [previewImages, setPreviewImages] = useState([]);
+//   const [variantPreviews, setVariantPreviews] = useState({});
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState(null);
+//   const [message, setMessage] = useState('');
+//   const [enableVariants, setEnableVariants] = useState(false);
+
+//   const {
+//     register,
+//     handleSubmit,
+//     reset,
+//     setValue,
+//     watch,
+//     formState: { errors },
+//     control,
+//   } = useForm({
+//     defaultValues: {
+//       title: '',
+//       description: '',
+//       price: '',
+//       stock: '',
+//       category_id: '',
+//       images: [],
+//       variants: [],
+//       specifications: [],
+//     },
+//   });
+
+//   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
+//     control,
+//     name: 'variants',
+//   });
+
+//   const { fields: specFields, append: appendSpec, remove: removeSpec, replace: replaceSpecs } = useFieldArray({
+//     control,
+//     name: 'specifications',
+//   });
+
+//   const watchCategoryId = watch('category_id');
+//   useEffect(() => {
+//     if (watchCategoryId) {
+//       const categoryId = parseInt(watchCategoryId, 10);
+//       setSelectedCategory(categoryId);
+//       const selectedCategoryData = categories.find((c) => c.id === categoryId) || {};
+//       const specFieldsFromBackend = selectedCategoryData.specifications_fields || [];
+//       let initialSpecs = [...specFieldsFromBackend];
+
+//       if (selectedCategoryData.name === 'Mobile Phones' || categoryId === 1) {
+//         const mobileSpecs = [
+//           { key: 'RAM', value: '' },
+//           { key: 'Storage', value: '' },
+//           { key: 'Battery Capacity', value: '' },
+//         ];
+//         initialSpecs = mobileSpecs.map(spec => ({ ...spec, value: '' }));
+//       }
+
+//       replaceSpecs(initialSpecs.map((field) => ({ key: field.key || '', value: '' })));
+//     } else {
+//       setSelectedCategory(null);
+//       replaceSpecs([]);
+//     }
+//   }, [watchCategoryId, categories, replaceSpecs]);
+
+//   const fetchCategories = useCallback(async () => {
+//     try {
+//       const { data, error } = await supabase
+//         .from('categories')
+//         .select('id, name, variant_attributes, specifications_fields')
+//         .order('id', { ascending: true });
+//       if (error) {
+//         if (error.code === '42703') {
+//           setError('The categories table is missing specifications_fields. Please update the schema.');
+//         } else {
+//           setError('Failed to load categories.');
+//         }
+//         toast.error('Failed to load categories.');
+//         setCategories([]);
+//       } else {
+//         setCategories(data || []);
+//       }
+//     } catch (err) {
+//       setError('Failed to load categories.');
+//       toast.error('Failed to load categories.');
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     fetchCategories();
+//   }, [fetchCategories]);
+
+//   const uploadImage = async (file) => {
+//     setLoading(true);
+//     try {
+//       if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+//         throw new Error('Invalid image file (must be an image, max 5MB).');
+//       }
+//       const fileExt = file.name.split('.').pop();
+//       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+//       const { error } = await supabase.storage
+//         .from('product-images')
+//         .upload(fileName, file);
+//       if (error) throw error;
+//       const { data: { publicUrl } } = supabase.storage
+//         .from('product-images')
+//         .getPublicUrl(fileName);
+//       return publicUrl;
+//     } catch (err) {
+//       setError(`Failed to upload image: ${err.message}`);
+//       toast.error(`Failed to upload image: ${err.message}`);
+//       return null;
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleImageChange = (e) => {
+//     const files = Array.from(e.target.files);
+//     if (!files.length) return;
+//     setValue('images', files);
+//     setPreviewImages(files.map((f) => URL.createObjectURL(f)));
+//   };
+
+//   const handleVariantImageChange = (e, index) => {
+//     const files = Array.from(e.target.files);
+//     if (!files.length) return;
+//     setValue(`variants.${index}.images`, files);
+//     setVariantPreviews((prev) => ({
+//       ...prev,
+//       [index]: files.map((f) => URL.createObjectURL(f)),
+//     }));
+//   };
+
+//   const onSubmitProduct = async (formData) => {
+//     setLoading(true);
+//     setMessage('');
+//     setError(null);
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (!session?.user) {
+//         setError('You must be logged in.');
+//         toast.error('You must be logged in.');
+//         setLoading(false);
+//         return;
+//       }
+//       const sellerId = session.user.id;
+
+//       if (!sellerLocation || !sellerLocation.lat || !sellerLocation.lon) {
+//         setError('Please set your store location in the Account page before adding a product.');
+//         toast.error('Please set your store location in the Account page.');
+//         setLoading(false);
+//         navigate('/account');
+//         return;
+//       }
+
+//       let imageUrls = [];
+//       if (formData.images && formData.images.length > 0) {
+//         const uploadPromises = formData.images.map((file) => uploadImage(file));
+//         const results = await Promise.all(uploadPromises);
+//         imageUrls = results.filter(Boolean);
+//       }
+
+//       const specifications = formData.specifications.reduce((obj, spec) => {
+//         if (spec.key && spec.value) {
+//           obj[spec.key] = spec.value;
+//         }
+//         return obj;
+//       }, {});
+
+//       const { data: insertedProduct, error: productError } = await supabase
+//         .from('products')
+//         .insert({
+//           seller_id: sellerId,
+//           category_id: parseInt(formData.category_id, 10),
+//           title: formData.title.trim(),
+//           description: formData.description,
+//           price: parseFloat(formData.price),
+//           stock: parseInt(formData.stock, 10),
+//           images: imageUrls,
+//           latitude: sellerLocation.lat,
+//           longitude: sellerLocation.lon,
+//           is_approved: false,
+//           status: 'active',
+//           specifications,
+//         })
+//         .select('id')
+//         .single();
+//       if (productError) throw productError;
+//       const newProductId = insertedProduct.id;
+
+//       if (enableVariants && formData.variants && formData.variants.length > 0) {
+//         const selectedCategoryData = categories.find((c) => c.id === parseInt(formData.category_id, 10));
+//         const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes) 
+//           ? selectedCategoryData.variant_attributes 
+//           : [];
+
+//         const variantPromises = formData.variants.map(async (variant, index) => {
+//           if (!variant.price || parseFloat(variant.price) < 0) {
+//             throw new Error(`Variant ${index + 1}: Price must be a non-negative number.`);
+//           }
+//           if (!variant.stock || parseInt(variant.stock, 10) < 0) {
+//             throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
+//           }
+
+//           let hasAttribute = false;
+//           const attributes = {};
+//           if (variantAttributes.length > 0) {
+//             variantAttributes.forEach((attr) => {
+//               if (variant[attr]) {
+//                 attributes[attr] = variant[attr];
+//                 hasAttribute = true;
+//               } else {
+//                 attributes[attr] = '';
+//               }
+//             });
+//             if (!hasAttribute) {
+//               throw new Error(`Variant ${index + 1}: At least one attribute must be filled.`);
+//             }
+//           } else {
+//             attributes.attribute1 = variant.attribute1 || '';
+//             if (variant.attribute1) hasAttribute = true;
+//             if (!hasAttribute) {
+//               throw new Error(`Variant ${index + 1}: Attribute is required if variants are added.`);
+//             }
+//           }
+
+//           let variantImageUrls = [];
+//           if (variant.images && variant.images.length > 0) {
+//             const variantUploads = variant.images.map((file) => uploadImage(file));
+//             const results = await Promise.all(variantUploads);
+//             variantImageUrls = results.filter(Boolean);
+//           }
+
+//           const { error: variantError } = await supabase
+//             .from('product_variants')
+//             .insert({
+//               product_id: newProductId,
+//               attributes,
+//               price: parseFloat(variant.price),
+//               stock: parseInt(variant.stock, 10),
+//               images: variantImageUrls,
+//               status: 'active',
+//             });
+//           if (variantError) throw variantError;
+//         });
+//         await Promise.all(variantPromises);
+//       }
+
+//       setMessage('Product added successfully!');
+//       toast.success('Product added successfully!');
+//       reset();
+//       setPreviewImages([]);
+//       setVariantPreviews({});
+//       setEnableVariants(false);
+//       replaceSpecs([]);
+//       navigate('/seller');
+//     } catch (err) {
+//       setError(`Error: ${err.message}`);
+//       toast.error(`Error: ${err.message}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const isMobileCategory = selectedCategory && categories.find((c) => c.id === selectedCategory)?.name === 'Mobile Phones';
+
+//   return (
+//     <div className="add-product-container">
+//       <h2 className="add-product-title">Add New Product</h2>
+//       {message && <p className="success-message">{message}</p>}
+//       {error && <p className="error-message">{error}</p>}
+
+//       <form onSubmit={handleSubmit(onSubmitProduct)} className="add-product-form">
+//         <div className="form-group">
+//           <label htmlFor="title" className="form-label">Product Name</label>
+//           <input
+//             id="title"
+//             {...register('title', { required: 'Product name is required' })}
+//             placeholder="Enter product name"
+//             className="form-input"
+//           />
+//           {errors.title && <p className="error-text">{errors.title.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="description" className="form-label">Description</label>
+//           <textarea
+//             id="description"
+//             {...register('description', { required: 'Description is required' })}
+//             placeholder="Enter product description (use semicolons to separate points)"
+//             className="form-textarea"
+//           />
+//           {errors.description && <p className="error-text">{errors.description.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="price" className="form-label">Price (₹)</label>
+//           <input
+//             id="price"
+//             type="number"
+//             {...register('price', { required: 'Price is required', min: { value: 0, message: 'Price must be non-negative' } })}
+//             placeholder="Enter price"
+//             className="form-input"
+//           />
+//           {errors.price && <p className="error-text">{errors.price.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="stock" className="form-label">Stock</label>
+//           <input
+//             id="stock"
+//             type="number"
+//             {...register('stock', { required: 'Stock is required', min: { value: 0, message: 'Stock must be non-negative' } })}
+//             placeholder="Enter stock quantity"
+//             className="form-input"
+//           />
+//           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="category_id" className="form-label">Category</label>
+//           <select
+//             id="category_id"
+//             {...register('category_id', { required: 'Category is required' })}
+//             className="form-select"
+//           >
+//             <option value="">Select Category</option>
+//             {categories.map((category) => (
+//               <option key={category.id} value={category.id}>
+//                 {category.name.trim()}
+//               </option>
+//             ))}
+//           </select>
+//           {errors.category_id && <p className="error-text">{errors.category_id.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="images" className="form-label">Product Images</label>
+//           <input
+//             id="images"
+//             type="file"
+//             multiple
+//             accept="image/*"
+//             onChange={handleImageChange}
+//             className="form-input"
+//           />
+//           {previewImages.length > 0 && (
+//             <div className="image-preview">
+//               {previewImages.map((src, idx) => (
+//                 <img
+//                   key={idx}
+//                   src={src}
+//                   alt={`Preview ${idx}`}
+//                   className="preview-image"
+//                 />
+//               ))}
+//             </div>
+//           )}
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">Specifications</h3>
+//           {specFields.map((field, index) => (
+//             <div key={field.id} className="spec-field">
+//               <input
+//                 {...register(`specifications.${index}.key`, { required: 'Specification key is required' })}
+//                 placeholder="Specification Key (e.g., Material)"
+//                 className="form-input spec-input"
+//                 defaultValue={field.key}
+//                 disabled={!!field.key}
+//               />
+//               <input
+//                 {...register(`specifications.${index}.value`, { required: 'Specification value is required' })}
+//                 placeholder="Specification Value (e.g., Cotton)"
+//                 className="form-input spec-input"
+//               />
+//               <button
+//                 type="button"
+//                 onClick={() => removeSpec(index)}
+//                 className="remove-spec-btn"
+//                 disabled={!!field.key && isMobileCategory}
+//               >
+//                 Remove
+//               </button>
+//             </div>
+//           ))}
+//           <button
+//             type="button"
+//             onClick={() => appendSpec({ key: '', value: '' })}
+//             className="add-spec-btn"
+//           >
+//             Add Custom Specification
+//           </button>
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">
+//             Variants
+//             <label className="variant-toggle">
+//               <input
+//                 type="checkbox"
+//                 checked={enableVariants}
+//                 onChange={() => setEnableVariants(!enableVariants)}
+//               />
+//               Enable Variants
+//             </label>
+//           </h3>
+//           {enableVariants ? (
+//             <>
+//               {variantFields.length === 0 ? (
+//                 <p className="no-variants">No variants added. Click below to add a variant.</p>
+//               ) : (
+//                 variantFields.map((field, index) => {
+//                   const selectedCategoryData = categories.find((c) => c.id === selectedCategory);
+//                   const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes) 
+//                     ? selectedCategoryData.variant_attributes 
+//                     : [];
+
+//                   let variantInputs = variantAttributes.length > 0 ? (
+//                     variantAttributes.map((attr) => (
+//                       <div key={attr} className="variant-input">
+//                         <label className="form-label">{`Variant ${attr}`}</label>
+//                         <input
+//                           {...register(`variants.${index}.${attr}`, {
+//                             required: variantAttributes.length > 0 ? `${attr} is required` : false,
+//                           })}
+//                           placeholder={`Enter ${attr}`}
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.[attr] && (
+//                           <p className="error-text">{errors.variants[index][attr].message}</p>
+//                         )}
+//                       </div>
+//                     ))
+//                   ) : (
+//                     <div className="variant-input">
+//                       <label className="form-label">Attribute 1</label>
+//                       <input
+//                         {...register(`variants.${index}.attribute1`, { required: 'Attribute is required' })}
+//                         placeholder="Enter attribute"
+//                         className="form-input"
+//                       />
+//                       {errors.variants?.[index]?.attribute1 && (
+//                         <p className="error-text">{errors.variants[index].attribute1.message}</p>
+//                       )}
+//                     </div>
+//                   );
+
+//                   return (
+//                     <div key={field.id} className="variant-field">
+//                       {variantInputs}
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Price</label>
+//                         <input
+//                           {...register(`variants.${index}.price`, {
+//                             required: 'Variant price is required',
+//                             min: { value: 0, message: 'Price must be non-negative' },
+//                           })}
+//                           type="number"
+//                           placeholder="Enter variant price"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.price && (
+//                           <p className="error-text">{errors.variants[index].price.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Stock</label>
+//                         <input
+//                           {...register(`variants.${index}.stock`, {
+//                             required: 'Variant stock is required',
+//                             min: { value: 0, message: 'Stock must be non-negative' },
+//                           })}
+//                           type="number"
+//                           placeholder="Enter variant stock"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.stock && (
+//                           <p className="error-text">{errors.variants[index].stock.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Images</label>
+//                         <input
+//                           type="file"
+//                           multiple
+//                           accept="image/*"
+//                           onChange={(e) => handleVariantImageChange(e, index)}
+//                           className="form-input"
+//                         />
+//                         {variantPreviews[index] && variantPreviews[index].length > 0 && (
+//                           <div className="image-preview">
+//                             {variantPreviews[index].map((src, idx) => (
+//                               <img
+//                                 key={idx}
+//                                 src={src}
+//                                 alt={`Variant Preview ${idx}`}
+//                                 className="preview-image"
+//                               />
+//                             ))}
+//                           </div>
+//                         )}
+//                       </div>
+//                       <button
+//                         type="button"
+//                         onClick={() => removeVariant(index)}
+//                         className="remove-variant-btn"
+//                       >
+//                         Remove Variant
+//                       </button>
+//                     </div>
+//                   );
+//                 })
+//               )}
+//               <button
+//                 type="button"
+//                 onClick={() => appendVariant({ attributes: {}, price: '', stock: '' })}
+//                 className="add-variant-btn"
+//               >
+//                 Add Variant
+//               </button>
+//             </>
+//           ) : (
+//             <p className="no-variants">Variants are disabled. Enable to add variants.</p>
+//           )}
+//         </div>
+
+//         <div className="form-actions">
+//           <button
+//             type="submit"
+//             disabled={loading}
+//             className="submit-btn"
+//           >
+//             {loading ? 'Saving...' : 'Save'}
+//           </button>
+//           <button
+//             type="button"
+//             onClick={() => navigate('/seller')}
+//             disabled={loading}
+//             className="cancel-btn"
+//           >
+//             Cancel
+//           </button>
+//         </div>
+//       </form>
+//     </div>
+//   );
+// }
+
+// export default AddProductPage;
+
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { useForm, useFieldArray } from 'react-hook-form';
+// import { LocationContext } from '../App';
+// import '../style/AddProductPage.css';
+// import { toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+
+// function AddProductPage() {
+//   const navigate = useNavigate();
+//   const { sellerLocation } = useContext(LocationContext);
+
+//   const [categories, setCategories] = useState([]);
+//   const [selectedCategory, setSelectedCategory] = useState(null);
+//   const [previewImages, setPreviewImages] = useState([]);
+//   const [primaryImageIndex, setPrimaryImageIndex] = useState(null);
+//   const [variantPreviews, setVariantPreviews] = useState({});
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState(null);
+//   const [message, setMessage] = useState('');
+//   const [enableVariants, setEnableVariants] = useState(false);
+//   const [calculatedPrice, setCalculatedPrice] = useState(null);
+
+//   const {
+//     register,
+//     handleSubmit,
+//     reset,
+//     setValue,
+//     watch,
+//     formState: { errors },
+//     control,
+//   } = useForm({
+//     defaultValues: {
+//       title: '',
+//       description: '',
+//       price: '',
+//       commission: '',
+//       discount: '', // Now a fixed amount in ₹
+//       stock: '',
+//       category_id: '',
+//       images: [],
+//       variants: [],
+//       specifications: [],
+//     },
+//   });
+
+//   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
+//     control,
+//     name: 'variants',
+//   });
+
+//   const { fields: specFields, append: appendSpec, remove: removeSpec, replace: replaceSpecs } = useFieldArray({
+//     control,
+//     name: 'specifications',
+//   });
+
+//   const watchCategoryId = watch('category_id');
+//   const watchPrice = watch('price');
+//   const watchCommission = watch('commission');
+//   const watchDiscount = watch('discount');
+
+//   // Calculate price after commission (fixed amount) and discount (fixed amount)
+//   useEffect(() => {
+//     if (watchPrice && watchCommission >= 0 && watchDiscount >= 0) {
+//       const price = parseFloat(watchPrice) || 0;
+//       const commissionAmount = parseFloat(watchCommission) || 0;
+//       const discountAmount = parseFloat(watchDiscount) || 0;
+
+//       // Subtract fixed commission amount
+//       const priceAfterCommission = price - commissionAmount;
+
+//       // Subtract fixed discount amount
+//       const finalPrice = priceAfterCommission - discountAmount;
+
+//       setCalculatedPrice(finalPrice.toFixed(2));
+//     } else {
+//       setCalculatedPrice(null);
+//     }
+//   }, [watchPrice, watchCommission, watchDiscount]);
+
+//   useEffect(() => {
+//     if (watchCategoryId) {
+//       const categoryId = parseInt(watchCategoryId, 10);
+//       setSelectedCategory(categoryId);
+//       const selectedCategoryData = categories.find((c) => c.id === categoryId) || {};
+//       const specFieldsFromBackend = selectedCategoryData.specifications_fields || [];
+//       let initialSpecs = [...specFieldsFromBackend];
+
+//       if (selectedCategoryData.name === 'Mobile Phones' || categoryId === 1) {
+//         const mobileSpecs = [
+//           { key: 'RAM', value: '' },
+//           { key: 'Storage', value: '' },
+//           { key: 'Battery Capacity', value: '' },
+//         ];
+//         initialSpecs = mobileSpecs.map(spec => ({ ...spec, value: '' }));
+//       }
+
+//       replaceSpecs(initialSpecs.map((field) => ({ key: field.key || '', value: '' })));
+//     } else {
+//       setSelectedCategory(null);
+//       replaceSpecs([]);
+//     }
+//   }, [watchCategoryId, categories, replaceSpecs]);
+
+//   const fetchCategories = useCallback(async () => {
+//     try {
+//       const { data, error } = await supabase
+//         .from('categories')
+//         .select('id, name, variant_attributes, specifications_fields')
+//         .order('id', { ascending: true });
+//       if (error) {
+//         if (error.code === '42703') {
+//           setError('The categories table is missing specifications_fields. Please update the schema.');
+//         } else {
+//           setError('Failed to load categories.');
+//         }
+//         toast.error('Failed to load categories.');
+//         setCategories([]);
+//       } else {
+//         setCategories(data || []);
+//       }
+//     } catch (err) {
+//       setError('Failed to load categories.');
+//       toast.error('Failed to load categories.');
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     fetchCategories();
+//   }, [fetchCategories]);
+
+//   const uploadImage = async (file) => {
+//     setLoading(true);
+//     try {
+//       if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+//         throw new Error('Invalid image file (must be an image, max 5MB).');
+//       }
+//       const fileExt = file.name.split('.').pop();
+//       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+//       const { error } = await supabase.storage
+//         .from('product-images')
+//         .upload(fileName, file);
+//       if (error) throw error;
+//       const { data: { publicUrl } } = supabase.storage
+//         .from('product-images')
+//         .getPublicUrl(fileName);
+//       return publicUrl;
+//     } catch (err) {
+//       setError(`Failed to upload image: ${err.message}`);
+//       toast.error(`Failed to upload image: ${err.message}`);
+//       return null;
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleImageChange = (e) => {
+//     const files = Array.from(e.target.files);
+//     if (!files.length) return;
+//     setValue('images', files);
+//     setPreviewImages(files.map((f) => URL.createObjectURL(f)));
+//     setPrimaryImageIndex(null);
+//   };
+
+//   const setPrimaryImage = (index) => {
+//     setPrimaryImageIndex(index);
+//   };
+
+//   const handleVariantImageChange = (e, index) => {
+//     const files = Array.from(e.target.files);
+//     if (!files.length) return;
+//     setValue(`variants.${index}.images`, files);
+//     setVariantPreviews((prev) => ({
+//       ...prev,
+//       [index]: files.map((f) => URL.createObjectURL(f)),
+//     }));
+//   };
+
+//   const onSubmitProduct = async (formData) => {
+//     setLoading(true);
+//     setMessage('');
+//     setError(null);
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (!session?.user) {
+//         setError('You must be logged in.');
+//         toast.error('You must be logged in.');
+//         setLoading(false);
+//         return;
+//       }
+//       const sellerId = session.user.id;
+
+//       if (!sellerLocation || !sellerLocation.lat || !sellerLocation.lon) {
+//         setError('Please set your store location in the Account page before adding a product.');
+//         toast.error('Please set your store location in the Account page.');
+//         setLoading(false);
+//         navigate('/account');
+//         return;
+//       }
+
+//       let imageUrls = [];
+//       if (formData.images && formData.images.length > 0) {
+//         const uploadPromises = formData.images.map((file) => uploadImage(file));
+//         const results = await Promise.all(uploadPromises);
+//         imageUrls = results.filter(Boolean);
+
+//         // Ensure primary image is the first in the array
+//         if (primaryImageIndex !== null && primaryImageIndex >= 0 && primaryImageIndex < imageUrls.length) {
+//           const primaryImage = imageUrls[primaryImageIndex];
+//           imageUrls.splice(primaryImageIndex, 1);
+//           imageUrls.unshift(primaryImage);
+//         }
+//       }
+
+//       const specifications = formData.specifications.reduce((obj, spec) => {
+//         if (spec.key && spec.value) {
+//           obj[spec.key] = spec.value;
+//         }
+//         return obj;
+//       }, {});
+
+//       const price = parseFloat(formData.price);
+//       const commissionAmount = parseFloat(formData.commission) || 0;
+//       const discountAmount = parseFloat(formData.discount) || 0;
+
+//       // Calculate price after commission (fixed amount) and discount (fixed amount)
+//       const priceAfterCommission = price - commissionAmount;
+//       const finalPrice = priceAfterCommission - discountAmount;
+
+//       const { data: insertedProduct, error: productError } = await supabase
+//         .from('products')
+//         .insert({
+//           seller_id: sellerId,
+//           category_id: parseInt(formData.category_id, 10),
+//           title: formData.title.trim(),
+//           description: formData.description,
+//           price: finalPrice, // Store the final price after commission and discount
+//           original_price: price, // Store the original price before commission and discount
+//           commission_amount: commissionAmount, // Store fixed commission amount
+//           discount_amount: discountAmount, // Store fixed discount amount
+//           stock: parseInt(formData.stock, 10),
+//           images: imageUrls,
+//           latitude: sellerLocation.lat,
+//           longitude: sellerLocation.lon,
+//           is_approved: false,
+//           status: 'active',
+//           specifications,
+//         })
+//         .select('id')
+//         .single();
+//       if (productError) throw productError;
+//       const newProductId = insertedProduct.id;
+
+//       if (enableVariants && formData.variants && formData.variants.length > 0) {
+//         const selectedCategoryData = categories.find((c) => c.id === parseInt(formData.category_id, 10));
+//         const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes) 
+//           ? selectedCategoryData.variant_attributes 
+//           : [];
+
+//         const variantPromises = formData.variants.map(async (variant, index) => {
+//           if (!variant.price || parseFloat(variant.price) < 0) {
+//             throw new Error(`Variant ${index + 1}: Price must be a non-negative number.`);
+//           }
+//           if (!variant.stock || parseInt(variant.stock, 10) < 0) {
+//             throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
+//           }
+
+//           // Apply commission (fixed amount) and discount (fixed amount) to variant price
+//           const variantPrice = parseFloat(variant.price);
+//           const variantPriceAfterCommission = variantPrice - commissionAmount;
+//           const variantFinalPrice = variantPriceAfterCommission - discountAmount;
+
+//           let hasAttribute = false;
+//           const attributes = {};
+//           if (variantAttributes.length > 0) {
+//             variantAttributes.forEach((attr) => {
+//               if (variant[attr]) {
+//                 attributes[attr] = variant[attr];
+//                 hasAttribute = true;
+//               } else {
+//                 attributes[attr] = '';
+//               }
+//             });
+//             if (!hasAttribute) {
+//               throw new Error(`Variant ${index + 1}: At least one attribute must be filled.`);
+//             }
+//           } else {
+//             attributes.attribute1 = variant.attribute1 || '';
+//             if (variant.attribute1) hasAttribute = true;
+//             if (!hasAttribute) {
+//               throw new Error(`Variant ${index + 1}: Attribute is required if variants are added.`);
+//             }
+//           }
+
+//           let variantImageUrls = [];
+//           if (variant.images && variant.images.length > 0) {
+//             const variantUploads = variant.images.map((file) => uploadImage(file));
+//             const results = await Promise.all(variantUploads);
+//             variantImageUrls = results.filter(Boolean);
+//           }
+
+//           const { error: variantError } = await supabase
+//             .from('product_variants')
+//             .insert({
+//               product_id: newProductId,
+//               attributes,
+//               price: variantFinalPrice, // Store final price after commission and discount
+//               original_price: variantPrice, // Store original price
+//               stock: parseInt(variant.stock, 10),
+//               images: variantImageUrls,
+//               status: 'active',
+//             });
+//           if (variantError) throw variantError;
+//         });
+//         await Promise.all(variantPromises);
+//       }
+
+//       setMessage('Product added successfully!');
+//       toast.success('Product added successfully!');
+//       reset();
+//       setPreviewImages([]);
+//       setPrimaryImageIndex(null);
+//       setVariantPreviews({});
+//       setEnableVariants(false);
+//       replaceSpecs([]);
+//       navigate('/seller');
+//     } catch (err) {
+//       setError(`Error: ${err.message}`);
+//       toast.error(`Error: ${err.message}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const isMobileCategory = selectedCategory && categories.find((c) => c.id === selectedCategory)?.name === 'Mobile Phones';
+
+//   return (
+//     <div className="add-product-container">
+//       <h2 className="add-product-title">Add New Product</h2>
+//       {message && <p className="success-message">{message}</p>}
+//       {error && <p className="error-message">{error}</p>}
+
+//       <form onSubmit={handleSubmit(onSubmitProduct)} className="add-product-form">
+//         <div className="form-group">
+//           <label htmlFor="title" className="form-label">Product Name</label>
+//           <input
+//             id="title"
+//             {...register('title', { required: 'Product name is required' })}
+//             placeholder="Enter product name"
+//             className="form-input"
+//           />
+//           {errors.title && <p className="error-text">{errors.title.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="description" className="form-label">Description</label>
+//           <textarea
+//             id="description"
+//             {...register('description', { required: 'Description is required' })}
+//             placeholder="Enter product description (use semicolons to separate points)"
+//             className="form-textarea"
+//           />
+//           {errors.description && <p className="error-text">{errors.description.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="price" className="form-label">Price (₹)</label>
+//           <input
+//             id="price"
+//             type="number"
+//             {...register('price', { required: 'Price is required', min: { value: 0, message: 'Price must be non-negative' } })}
+//             placeholder="Enter price"
+//             className="form-input"
+//           />
+//           {errors.price && <p className="error-text">{errors.price.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="commission" className="form-label">Commission (₹)</label>
+//           <input
+//             id="commission"
+//             type="number"
+//             {...register('commission', { 
+//               required: 'Commission amount is required', 
+//               min: { value: 0, message: 'Commission must be non-negative' }
+//             })}
+//             placeholder="Enter commission amount (e.g., 50 for ₹50)"
+//             className="form-input"
+//           />
+//           {errors.commission && <p className="error-text">{errors.commission.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="discount" className="form-label">Discount (₹)</label>
+//           <input
+//             id="discount"
+//             type="number"
+//             {...register('discount', { 
+//               required: 'Discount amount is required', 
+//               min: { value: 0, message: 'Discount must be non-negative' }
+//             })}
+//             placeholder="Enter discount amount (e.g., 100 for ₹100)"
+//             className="form-input"
+//           />
+//           {errors.discount && <p className="error-text">{errors.discount.message}</p>}
+//         </div>
+
+//         {calculatedPrice && (
+//           <div className="form-group">
+//             <label className="form-label">Final Price After Commission and Discount (₹)</label>
+//             <p className="calculated-price">{calculatedPrice}</p>
+//           </div>
+//         )}
+
+//         <div className="form-group">
+//           <label htmlFor="stock" className="form-label">Stock</label>
+//           <input
+//             id="stock"
+//             type="number"
+//             {...register('stock', { required: 'Stock is required', min: { value: 0, message: 'Stock must be non-negative' } })}
+//             placeholder="Enter stock quantity"
+//             className="form-input"
+//           />
+//           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="category_id" className="form-label">Category</label>
+//           <select
+//             id="category_id"
+//             {...register('category_id', { required: 'Category is required' })}
+//             className="form-select"
+//           >
+//             <option value="">Select Category</option>
+//             {categories.map((category) => (
+//               <option key={category.id} value={category.id}>
+//                 {category.name.trim()}
+//               </option>
+//             ))}
+//           </select>
+//           {errors.category_id && <p className="error-text">{errors.category_id.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="images" className="form-label">Product Images</label>
+//           <input
+//             id="images"
+//             type="file"
+//             multiple
+//             accept="image/*"
+//             onChange={handleImageChange}
+//             className="form-input"
+//           />
+//           {previewImages.length > 0 && (
+//             <div className="image-preview">
+//               {previewImages.map((src, idx) => (
+//                 <div key={idx} className="image-preview-item">
+//                   <img
+//                     src={src}
+//                     alt={`Preview ${idx}`}
+//                     className={`preview-image ${primaryImageIndex === idx ? 'primary-image' : ''}`}
+//                     onClick={() => setPrimaryImage(idx)}
+//                   />
+//                   {primaryImageIndex === idx && <span className="primary-label">Primary</span>}
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">Specifications</h3>
+//           {specFields.map((field, index) => (
+//             <div key={field.id} className="spec-field">
+//               <input
+//                 {...register(`specifications.${index}.key`, { required: 'Specification key is required' })}
+//                 placeholder="Specification Key (e.g., Material)"
+//                 className="form-input spec-input"
+//                 defaultValue={field.key}
+//                 disabled={!!field.key}
+//               />
+//               <input
+//                 {...register(`specifications.${index}.value`, { required: 'Specification value is required' })}
+//                 placeholder="Specification Value (e.g., Cotton)"
+//                 className="form-input spec-input"
+//               />
+//               <button
+//                 type="button"
+//                 onClick={() => removeSpec(index)}
+//                 className="remove-spec-btn"
+//                 disabled={!!field.key && isMobileCategory}
+//               >
+//                 Remove
+//               </button>
+//             </div>
+//           ))}
+//           <button
+//             type="button"
+//             onClick={() => appendSpec({ key: '', value: '' })}
+//             className="add-spec-btn"
+//           >
+//             Add Custom Specification
+//           </button>
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">
+//             Variants
+//             <label className="variant-toggle">
+//               <input
+//                 type="checkbox"
+//                 checked={enableVariants}
+//                 onChange={() => setEnableVariants(!enableVariants)}
+//               />
+//               Enable Variants
+//             </label>
+//           </h3>
+//           {enableVariants ? (
+//             <>
+//               {variantFields.length === 0 ? (
+//                 <p className="no-variants">No variants added. Click below to add a variant.</p>
+//               ) : (
+//                 variantFields.map((field, index) => {
+//                   const selectedCategoryData = categories.find((c) => c.id === selectedCategory);
+//                   const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes) 
+//                     ? selectedCategoryData.variant_attributes 
+//                     : [];
+
+//                   let variantInputs = variantAttributes.length > 0 ? (
+//                     variantAttributes.map((attr) => (
+//                       <div key={attr} className="variant-input">
+//                         <label className="form-label">{`Variant ${attr}`}</label>
+//                         <input
+//                           {...register(`variants.${index}.${attr}`, {
+//                             required: variantAttributes.length > 0 ? `${attr} is required` : false,
+//                           })}
+//                           placeholder={`Enter ${attr}`}
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.[attr] && (
+//                           <p className="error-text">{errors.variants[index][attr].message}</p>
+//                         )}
+//                       </div>
+//                     ))
+//                   ) : (
+//                     <div className="variant-input">
+//                       <label className="form-label">Attribute 1</label>
+//                       <input
+//                         {...register(`variants.${index}.attribute1`, { required: 'Attribute is required' })}
+//                         placeholder="Enter attribute"
+//                         className="form-input"
+//                       />
+//                       {errors.variants?.[index]?.attribute1 && (
+//                         <p className="error-text">{errors.variants[index].attribute1.message}</p>
+//                       )}
+//                     </div>
+//                   );
+
+//                   return (
+//                     <div key={field.id} className="variant-field">
+//                       {variantInputs}
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Price</label>
+//                         <input
+//                           {...register(`variants.${index}.price`, {
+//                             required: 'Variant price is required',
+//                             min: { value: 0, message: 'Price must be non-negative' },
+//                           })}
+//                           type="number"
+//                           placeholder="Enter variant price"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.price && (
+//                           <p className="error-text">{errors.variants[index].price.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Stock</label>
+//                         <input
+//                           {...register(`variants.${index}.stock`, {
+//                             required: 'Variant stock is required',
+//                             min: { value: 0, message: 'Stock must be non-negative' },
+//                           })}
+//                           type="number"
+//                           placeholder="Enter variant stock"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.stock && (
+//                           <p className="error-text">{errors.variants[index].stock.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Images</label>
+//                         <input
+//                           type="file"
+//                           multiple
+//                           accept="image/*"
+//                           onChange={(e) => handleVariantImageChange(e, index)}
+//                           className="form-input"
+//                         />
+//                         {variantPreviews[index] && variantPreviews[index].length > 0 && (
+//                           <div className="image-preview">
+//                             {variantPreviews[index].map((src, idx) => (
+//                               <img
+//                                 key={idx}
+//                                 src={src}
+//                                 alt={`Variant Preview ${idx}`}
+//                                 className="preview-image"
+//                               />
+//                             ))}
+//                           </div>
+//                         )}
+//                       </div>
+//                       <button
+//                         type="button"
+//                         onClick={() => removeVariant(index)}
+//                         className="remove-variant-btn"
+//                       >
+//                         Remove Variant
+//                       </button>
+//                     </div>
+//                   );
+//                 })
+//               )}
+//               <button
+//                 type="button"
+//                 onClick={() => appendVariant({ attributes: {}, price: '', stock: '' })}
+//                 className="add-variant-btn"
+//               >
+//                 Add Variant
+//               </button>
+//             </>
+//           ) : (
+//             <p className="no-variants">Variants are disabled. Enable to add variants.</p>
+//           )}
+//         </div>
+
+//         <div className="form-actions">
+//           <button
+//             type="submit"
+//             disabled={loading}
+//             className="submit-btn"
+//           >
+//             {loading ? 'Saving...' : 'Save'}
+//           </button>
+//           <button
+//             type="button"
+//             onClick={() => navigate('/seller')}
+//             disabled={loading}
+//             className="cancel-btn"
+//           >
+//             Cancel
+//           </button>
+//         </div>
+//       </form>
+//     </div>
+//   );
+// }
+
+// export default AddProductPage;
+
+
+
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -1737,11 +2970,13 @@ function AddProductPage() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [previewImages, setPreviewImages] = useState([]);
+  const [primaryImageIndex, setPrimaryImageIndex] = useState(null);
   const [variantPreviews, setVariantPreviews] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
   const [enableVariants, setEnableVariants] = useState(false);
+  const [calculatedPrice, setCalculatedPrice] = useState(null);
 
   const {
     register,
@@ -1756,6 +2991,8 @@ function AddProductPage() {
       title: '',
       description: '',
       price: '',
+      commission: '',
+      discount: '', // Fixed amount in ₹
       stock: '',
       category_id: '',
       images: [],
@@ -1775,6 +3012,25 @@ function AddProductPage() {
   });
 
   const watchCategoryId = watch('category_id');
+  const watchPrice = watch('price');
+  const watchCommission = watch('commission');
+  const watchDiscount = watch('discount');
+
+  // Calculate price after discount (fixed amount) only; commission is not deducted
+  useEffect(() => {
+    if (watchPrice && watchDiscount >= 0) {
+      const price = parseFloat(watchPrice) || 0;
+      const discountAmount = parseFloat(watchDiscount) || 0;
+
+      // Subtract fixed discount amount only
+      const finalPrice = price - discountAmount;
+
+      setCalculatedPrice(finalPrice.toFixed(2));
+    } else {
+      setCalculatedPrice(null);
+    }
+  }, [watchPrice, watchDiscount]);
+
   useEffect(() => {
     if (watchCategoryId) {
       const categoryId = parseInt(watchCategoryId, 10);
@@ -1856,6 +3112,11 @@ function AddProductPage() {
     if (!files.length) return;
     setValue('images', files);
     setPreviewImages(files.map((f) => URL.createObjectURL(f)));
+    setPrimaryImageIndex(null);
+  };
+
+  const setPrimaryImage = (index) => {
+    setPrimaryImageIndex(index);
   };
 
   const handleVariantImageChange = (e, index) => {
@@ -1896,6 +3157,13 @@ function AddProductPage() {
         const uploadPromises = formData.images.map((file) => uploadImage(file));
         const results = await Promise.all(uploadPromises);
         imageUrls = results.filter(Boolean);
+
+        // Ensure primary image is the first in the array
+        if (primaryImageIndex !== null && primaryImageIndex >= 0 && primaryImageIndex < imageUrls.length) {
+          const primaryImage = imageUrls[primaryImageIndex];
+          imageUrls.splice(primaryImageIndex, 1);
+          imageUrls.unshift(primaryImage);
+        }
       }
 
       const specifications = formData.specifications.reduce((obj, spec) => {
@@ -1905,6 +3173,13 @@ function AddProductPage() {
         return obj;
       }, {});
 
+      const price = parseFloat(formData.price);
+      const commissionAmount = parseFloat(formData.commission) || 0;
+      const discountAmount = parseFloat(formData.discount) || 0;
+
+      // Calculate final price by subtracting discount only
+      const finalPrice = price - discountAmount;
+
       const { data: insertedProduct, error: productError } = await supabase
         .from('products')
         .insert({
@@ -1912,7 +3187,10 @@ function AddProductPage() {
           category_id: parseInt(formData.category_id, 10),
           title: formData.title.trim(),
           description: formData.description,
-          price: parseFloat(formData.price),
+          price: finalPrice, // Store the final price after discount only
+          original_price: price, // Store the original price
+          commission_amount: commissionAmount, // Store commission amount for record-keeping
+          discount_amount: discountAmount, // Store discount amount
           stock: parseInt(formData.stock, 10),
           images: imageUrls,
           latitude: sellerLocation.lat,
@@ -1939,6 +3217,10 @@ function AddProductPage() {
           if (!variant.stock || parseInt(variant.stock, 10) < 0) {
             throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
           }
+
+          // Apply discount (fixed amount) to variant price; commission is not deducted
+          const variantPrice = parseFloat(variant.price);
+          const variantFinalPrice = variantPrice - discountAmount;
 
           let hasAttribute = false;
           const attributes = {};
@@ -1974,7 +3256,8 @@ function AddProductPage() {
             .insert({
               product_id: newProductId,
               attributes,
-              price: parseFloat(variant.price),
+              price: variantFinalPrice, // Store final price after discount only
+              original_price: variantPrice, // Store original price
               stock: parseInt(variant.stock, 10),
               images: variantImageUrls,
               status: 'active',
@@ -1988,6 +3271,7 @@ function AddProductPage() {
       toast.success('Product added successfully!');
       reset();
       setPreviewImages([]);
+      setPrimaryImageIndex(null);
       setVariantPreviews({});
       setEnableVariants(false);
       replaceSpecs([]);
@@ -2044,6 +3328,43 @@ function AddProductPage() {
         </div>
 
         <div className="form-group">
+          <label htmlFor="commission" className="form-label">Commission (₹)</label>
+          <input
+            id="commission"
+            type="number"
+            {...register('commission', { 
+              required: 'Commission amount is required', 
+              min: { value: 0, message: 'Commission must be non-negative' }
+            })}
+            placeholder="Enter commission amount (e.g., 50 for ₹50)"
+            className="form-input"
+          />
+          {errors.commission && <p className="error-text">{errors.commission.message}</p>}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="discount" className="form-label">Discount (₹)</label>
+          <input
+            id="discount"
+            type="number"
+            {...register('discount', { 
+              required: 'Discount amount is required', 
+              min: { value: 0, message: 'Discount must be non-negative' }
+            })}
+            placeholder="Enter discount amount (e.g., 100 for ₹100)"
+            className="form-input"
+          />
+          {errors.discount && <p className="error-text">{errors.discount.message}</p>}
+        </div>
+
+        {calculatedPrice && (
+          <div className="form-group">
+            <label className="form-label">Final Price After Discount (₹)</label>
+            <p className="calculated-price">{calculatedPrice}</p>
+          </div>
+        )}
+
+        <div className="form-group">
           <label htmlFor="stock" className="form-label">Stock</label>
           <input
             id="stock"
@@ -2085,12 +3406,15 @@ function AddProductPage() {
           {previewImages.length > 0 && (
             <div className="image-preview">
               {previewImages.map((src, idx) => (
-                <img
-                  key={idx}
-                  src={src}
-                  alt={`Preview ${idx}`}
-                  className="preview-image"
-                />
+                <div key={idx} className="image-preview-item">
+                  <img
+                    src={src}
+                    alt={`Preview ${idx}`}
+                    className={`preview-image ${primaryImageIndex === idx ? 'primary-image' : ''}`}
+                    onClick={() => setPrimaryImage(idx)}
+                  />
+                  {primaryImageIndex === idx && <span className="primary-label">Primary</span>}
+                </div>
               ))}
             </div>
           )}

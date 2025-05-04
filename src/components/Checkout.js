@@ -1834,6 +1834,333 @@
 
 
 
+// import React, { useState, useEffect, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { LocationContext } from '../App';
+// import { useFetchCartProducts } from '../hooks/useFetchCartProducts';
+// import '../style/Checkout.css';
+// import Footer from './Footer';
+
+// // Default location (Bengaluru) - Consistent with App.js
+// const DEFAULT_LOCATION = { lat: 12.9753, lon: 77.591 };
+
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error);
+//       await new Promise((resolve) => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// function Checkout() {
+//   const { buyerLocation } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [userLocation, setUserLocation] = useState(null);
+//   const [address, setAddress] = useState('');
+//   const [manualAddress, setManualAddress] = useState('');
+//   const [paymentMethod, setPaymentMethod] = useState('credit_card');
+//   const [orderConfirmed, setOrderConfirmed] = useState(false);
+//   const { fetchCartProducts, products, loading, error, setLoading, setError, setProducts } =
+//     useFetchCartProducts(userLocation);
+//   const navigate = useNavigate();
+
+//   useEffect(() => {
+//     const initializeCart = async () => {
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+//       setCartItems(storedCart);
+
+//       if (storedCart.length === 0 || !userLocation) {
+//         return;
+//       }
+//       fetchCartProducts(storedCart);
+//     };
+
+//     if (buyerLocation) {
+//       setUserLocation(buyerLocation);
+//       reverseGeocode(buyerLocation.lat, buyerLocation.lon).then((detectedAddress) => {
+//         setAddress(detectedAddress || 'Address not found. Please enter manually.');
+//       });
+//     } else {
+//       setUserLocation(DEFAULT_LOCATION);
+//       setAddress('Bangalore, Karnataka, India');
+//       setError('Unable to detect location from context; using default Bengaluru location.');
+//     }
+
+//     initializeCart();
+//   }, [buyerLocation, setError, userLocation, fetchCartProducts]);
+
+//   const reverseGeocode = async (lat, lon) => {
+//     try {
+//       const response = await fetch(
+//         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+//         { headers: { 'User-Agent': 'FreshCart/1.0' } }
+//       );
+//       if (!response.ok) throw new Error('Reverse geocoding failed');
+//       const data = await response.json();
+//       return data?.display_name || null;
+//     } catch (error) {
+//       console.error('Error reverse geocoding:', error);
+//       return null;
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find((item) => item.id === product.id);
+//     const quantity = cartItem?.quantity || 1;
+//     const variant = product.selectedVariant;
+//     const price = variant?.price || product.price || 0;
+//     return sum + price * quantity;
+//   }, 0);
+
+//   function groupCartItemsBySeller() {
+//     const itemsBySeller = {};
+//     for (let item of cartItems) {
+//       const prod = products.find((p) => p.id === item.id);
+//       if (!prod) continue;
+
+//       const variantId = item.selectedVariant?.id;
+//       const variant = prod.selectedVariant || prod.product_variants?.find(v => v.id === variantId);
+//       const price = variant?.price || prod.price || 0;
+
+//       const sid = prod.seller_id;
+//       if (!itemsBySeller[sid]) {
+//         itemsBySeller[sid] = [];
+//       }
+//       itemsBySeller[sid].push({
+//         product_id: item.id,
+//         variant_id: variantId || null,
+//         quantity: item.quantity || 1,
+//         price: price,
+//       });
+//     }
+//     return itemsBySeller;
+//   }
+
+//   async function placeOrdersForAllSellers(sessionUserId, shippingLoc, finalAddress) {
+//     const itemsBySeller = groupCartItemsBySeller();
+
+//     for (let sellerId of Object.keys(itemsBySeller)) {
+//       const sellerItems = itemsBySeller[sellerId];
+//       const subTotal = sellerItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+//       // Calculate estimated delivery (3 to 24 hours from now)
+//       const minDeliveryHours = 3;
+//       const maxDeliveryHours = 24;
+//       const deliveryOffset = Math.floor(Math.random() * (maxDeliveryHours - minDeliveryHours + 1)) + minDeliveryHours;
+//       const estimatedDelivery = new Date();
+//       estimatedDelivery.setHours(estimatedDelivery.getHours() + deliveryOffset);
+
+//       const { data: orderData, error: orderError } = await retryRequest(() =>
+//         supabase
+//           .from('orders')
+//           .insert({
+//             user_id: sessionUserId,
+//             seller_id: sellerId,
+//             total: subTotal,
+//             order_status: 'pending',
+//             payment_method: paymentMethod,
+//             shipping_location: `POINT(${shippingLoc.lon} ${shippingLoc.lat})`,
+//             shipping_address: finalAddress,
+//             estimated_delivery: estimatedDelivery.toISOString(), // Store estimated delivery time
+//           })
+//           .select()
+//       );
+
+//       if (orderError) throw orderError;
+//       const insertedOrder = orderData[0];
+
+//       const { error: itemsError } = await retryRequest(() =>
+//         supabase
+//           .from('order_items')
+//           .insert(
+//             sellerItems.map((item) => ({
+//               order_id: insertedOrder.id,
+//               product_id: item.product_id,
+//               variant_id: item.variant_id,
+//               quantity: item.quantity,
+//               price: item.price,
+//             }))
+//           )
+//       );
+//       if (itemsError) throw itemsError;
+
+//       console.log(
+//         `Created Order #${insertedOrder.id} for Seller #${sellerId}, sub-total: ₹${subTotal}, Estimated Delivery: ${estimatedDelivery.toLocaleString()}`
+//       );
+//     }
+//   }
+
+//   const simulatePayment = () => {
+//     return true; // For testing, always succeed
+//   };
+
+//   const handleCheckout = async (e) => {
+//     e.preventDefault();
+//     setLoading(true);
+//     try {
+//       const {
+//         data: { session },
+//         error: sessionError,
+//       } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         navigate('/auth');
+//         return;
+//       }
+
+//       if (!simulatePayment()) {
+//         throw new Error('Payment failed. Please try again.');
+//       }
+
+//       const shippingLocation = userLocation || DEFAULT_LOCATION;
+//       const finalAddress = manualAddress || address || 'Bangalore, Karnataka, India';
+
+//       await placeOrdersForAllSellers(session.user.id, shippingLocation, finalAddress);
+
+//       setCartItems([]);
+//       setProducts([]);
+//       localStorage.setItem('cart', JSON.stringify([]));
+//       if (session?.user) {
+//         await supabase
+//           .from('cart')
+//           .delete()
+//           .eq('user_id', session.user.id);
+//       }
+
+//       setOrderConfirmed(true);
+//       setError(null);
+
+//       navigate('/account');
+//     } catch (error) {
+//       console.error('Error during checkout:', error);
+//       setError(`Error: ${error.message || 'Failed to place order. Please try again.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   if (loading) return <div className="checkout-loading">Processing...</div>;
+//   if (error) return <div className="checkout-error">{error}</div>;
+
+//   if (orderConfirmed) {
+//     return (
+//       <div className="checkout-success">
+//         <h1>Order Confirmed!</h1>
+//         <p>Your orders have been placed successfully. Redirecting to your account...</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="checkout">
+//       <h1>FreshCart Checkout</h1>
+//       {cartItems.length === 0 ? (
+//         <p>Your cart is empty</p>
+//       ) : (
+//         <>
+//           <div className="checkout-items">
+//             {products.map((product, index) => {
+//               const cartItem = cartItems.find((item) => item.id === product.id);
+//               const quantity = cartItem?.quantity || 1;
+//               const variant = product.selectedVariant;
+//               const variantAttributes = variant?.attributes
+//                 ? Object.entries(variant.attributes)
+//                     .filter(([key, val]) => val)
+//                     .map(([key, val]) => `${key}: ${val}`)
+//                     .join(', ')
+//                 : null;
+
+//               return (
+//                 <div key={`${product.id}-${index}`} className="checkout-item">
+//                   <img
+//                     src={
+//                       (variant?.images?.[0] || product.images?.[0]) ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={product.title || product.name || 'Product'}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                   />
+//                   <div className="checkout-item-details">
+//                     <h3>{product.title || product.name || 'Unnamed Product'}</h3>
+//                     {variantAttributes && (
+//                       <p className="variant-details">Variant: {variantAttributes}</p>
+//                     )}
+//                     <p>
+//                       ₹
+//                       {(variant?.price || product.price).toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                     <p>Quantity: {quantity}</p>
+//                     <p>
+//                       Seller ID: <strong>{product.seller_id}</strong>
+//                     </p>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+
+//           <div className="checkout-details">
+//             <h2>Order Summary (All Sellers)</h2>
+//             <p>
+//               Total: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </p>
+
+//             <h3>Shipping Address</h3>
+//             {userLocation && address ? (
+//               <p>
+//                 Detected Address: {address} (Lat {userLocation.lat.toFixed(4)}, Lon{' '}
+//                 {userLocation.lon.toFixed(4)})
+//               </p>
+//             ) : (
+//               <p>Address not detected. Please enter manually.</p>
+//             )}
+//             <textarea
+//               value={manualAddress}
+//               onChange={(e) => setManualAddress(e.target.value)}
+//               placeholder="Enter your shipping address..."
+//               rows="3"
+//             />
+
+//             <h3>Payment Method</h3>
+//             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+//               <option value="credit_card">Credit Card</option>
+//               <option value="debit_card">Debit Card</option>
+//               <option value="upi">UPI</option>
+//               <option value="cash_on_delivery">Cash on Delivery</option>
+//             </select>
+
+//             <button onClick={handleCheckout} disabled={loading}>
+//               {loading ? 'Processing...' : 'Place Orders'}
+//             </button>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Checkout;
+
+
+
 import React, { useState, useEffect, useContext } from 'react';
 import { supabase } from '../supabaseClient';
 import { Link, useNavigate } from 'react-router-dom';
@@ -1893,7 +2220,7 @@ function Checkout() {
     }
 
     initializeCart();
-  }, [buyerLocation, setError, userLocation, fetchCartProducts]);
+  }, [buyerLocation, setError, fetchCartProducts]); // Removed userLocation from dependencies
 
   const reverseGeocode = async (lat, lon) => {
     try {
@@ -1925,7 +2252,12 @@ function Checkout() {
       if (!prod) continue;
 
       const variantId = item.selectedVariant?.id;
-      const variant = prod.selectedVariant || prod.product_variants?.find(v => v.id === variantId);
+      let variant;
+      if (variantId && prod.product_variants) {
+        variant = prod.selectedVariant || prod.product_variants.find(v => v.id === variantId);
+      } else {
+        variant = prod.selectedVariant || (prod.product_variants?.[0] || null);
+      }
       const price = variant?.price || prod.price || 0;
 
       const sid = prod.seller_id;
@@ -1934,7 +2266,7 @@ function Checkout() {
       }
       itemsBySeller[sid].push({
         product_id: item.id,
-        variant_id: variantId || null,
+        variant_id: variant?.id || null,
         quantity: item.quantity || 1,
         price: price,
       });
@@ -1944,55 +2276,63 @@ function Checkout() {
 
   async function placeOrdersForAllSellers(sessionUserId, shippingLoc, finalAddress) {
     const itemsBySeller = groupCartItemsBySeller();
+    const errors = [];
 
     for (let sellerId of Object.keys(itemsBySeller)) {
-      const sellerItems = itemsBySeller[sellerId];
-      const subTotal = sellerItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
+      try {
+        const sellerItems = itemsBySeller[sellerId];
+        const subTotal = sellerItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-      // Calculate estimated delivery (3 to 24 hours from now)
-      const minDeliveryHours = 3;
-      const maxDeliveryHours = 24;
-      const deliveryOffset = Math.floor(Math.random() * (maxDeliveryHours - minDeliveryHours + 1)) + minDeliveryHours;
-      const estimatedDelivery = new Date();
-      estimatedDelivery.setHours(estimatedDelivery.getHours() + deliveryOffset);
+        const minDeliveryHours = 3;
+        const maxDeliveryHours = 24;
+        const deliveryOffset = Math.floor(Math.random() * (maxDeliveryHours - minDeliveryHours + 1)) + minDeliveryHours;
+        const estimatedDelivery = new Date();
+        estimatedDelivery.setHours(estimatedDelivery.getHours() + deliveryOffset);
 
-      const { data: orderData, error: orderError } = await retryRequest(() =>
-        supabase
-          .from('orders')
-          .insert({
-            user_id: sessionUserId,
-            seller_id: sellerId,
-            total: subTotal,
-            order_status: 'pending',
-            payment_method: paymentMethod,
-            shipping_location: `POINT(${shippingLoc.lon} ${shippingLoc.lat})`,
-            shipping_address: finalAddress,
-            estimated_delivery: estimatedDelivery.toISOString(), // Store estimated delivery time
-          })
-          .select()
-      );
+        const { data: orderData, error: orderError } = await retryRequest(() =>
+          supabase
+            .from('orders')
+            .insert({
+              user_id: sessionUserId,
+              seller_id: sellerId,
+              total: subTotal,
+              order_status: 'pending',
+              payment_method: paymentMethod,
+              shipping_location: `POINT(${shippingLoc.lon} ${shippingLoc.lat})`,
+              shipping_address: finalAddress,
+              estimated_delivery: estimatedDelivery.toISOString(),
+            })
+            .select()
+        );
 
-      if (orderError) throw orderError;
-      const insertedOrder = orderData[0];
+        if (orderError) throw orderError;
+        const insertedOrder = orderData[0];
 
-      const { error: itemsError } = await retryRequest(() =>
-        supabase
-          .from('order_items')
-          .insert(
-            sellerItems.map((item) => ({
-              order_id: insertedOrder.id,
-              product_id: item.product_id,
-              variant_id: item.variant_id,
-              quantity: item.quantity,
-              price: item.price,
-            }))
-          )
-      );
-      if (itemsError) throw itemsError;
+        const { error: itemsError } = await retryRequest(() =>
+          supabase
+            .from('order_items')
+            .insert(
+              sellerItems.map((item) => ({
+                order_id: insertedOrder.id,
+                product_id: item.product_id,
+                variant_id: item.variant_id,
+                quantity: item.quantity,
+                price: item.price,
+              }))
+            )
+        );
+        if (itemsError) throw itemsError;
 
-      console.log(
-        `Created Order #${insertedOrder.id} for Seller #${sellerId}, sub-total: ₹${subTotal}, Estimated Delivery: ${estimatedDelivery.toLocaleString()}`
-      );
+        console.log(
+          `Created Order #${insertedOrder.id} for Seller #${sellerId}, sub-total: ₹${subTotal}, Estimated Delivery: ${estimatedDelivery.toLocaleString()}`
+        );
+      } catch (error) {
+        errors.push(`Failed to place order for seller ${sellerId}: ${error.message}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new Error(errors.join('; '));
     }
   }
 
@@ -2024,6 +2364,7 @@ function Checkout() {
 
       await placeOrdersForAllSellers(session.user.id, shippingLocation, finalAddress);
 
+      // Clear cart only after orders are successfully placed
       setCartItems([]);
       setProducts([]);
       localStorage.setItem('cart', JSON.stringify([]));
@@ -2103,9 +2444,6 @@ function Checkout() {
                       })}
                     </p>
                     <p>Quantity: {quantity}</p>
-                    <p>
-                      Seller ID: <strong>{product.seller_id}</strong>
-                    </p>
                   </div>
                 </div>
               );
@@ -2146,9 +2484,11 @@ function Checkout() {
               <option value="cash_on_delivery">Cash on Delivery</option>
             </select>
 
-            <button onClick={handleCheckout} disabled={loading}>
-              {loading ? 'Processing...' : 'Place Orders'}
-            </button>
+            <div className="checkout-action">
+              <button onClick={handleCheckout} disabled={loading}>
+                {loading ? 'Processing...' : 'Place Orders'}
+              </button>
+            </div>
           </div>
         </>
       )}

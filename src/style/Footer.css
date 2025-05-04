@@ -1,15 +1,16 @@
-/* Footer.css */
-
 /* General Footer Styles */
 .footer {
-  background-color: #007bff; /* Primary blue color */
+  background-color: #1e40af; /* Darker blue for better contrast */
   color: #fff;
-  padding: 10px 0;
-  position: fixed;
-  bottom: 0;
+  padding: 12px 0;
   width: 100%;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
   z-index: 1000;
+}
+
+/* Ensure content is not hidden behind footer */
+body {
+  padding-bottom: 60px; /* Adjust based on footer height */
 }
 
 .nav-container {
@@ -32,29 +33,30 @@
 }
 
 .nav-item:hover {
-  color: #ffcc00; /* Highlight color on hover */
+  color: #facc15; /* Brighter yellow for hover */
 }
 
 .nav-item.active {
-  color: #ffcc00; /* Highlight active link */
+  color: #facc15; /* Brighter yellow for active link */
 }
 
 .nav-item svg {
-  font-size: 1.5rem;
-  margin-bottom: 5px;
+  font-size: 1.6rem;
+  margin-bottom: 6px;
 }
 
 /* Cart Badge */
 .cart-badge {
-  background-color: #ff4d4d; /* Red color for cart badge */
+  background-color: #ef4444; /* Vibrant red for cart badge */
   color: #fff;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: bold;
   border-radius: 50%;
-  padding: 2px 6px;
+  padding: 3px 7px;
   position: absolute;
-  top: 5px;
-  right: 10px;
+  top: -5px;
+  right: -10px;
+  transform: translate(50%, -50%);
 }
 
 /* Responsive Design */
@@ -62,6 +64,7 @@
   .nav-container {
     flex-direction: row;
     justify-content: space-between;
+    padding: 0 10px;
   }
 
   .nav-item {
@@ -69,6 +72,32 @@
   }
 
   .nav-item svg {
+    font-size: 1.3rem;
+  }
+
+  .cart-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    top: -4px;
+    right: -8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer {
+    padding: 10px 0;
+  }
+
+  .nav-item {
+    font-size: 0.75rem;
+  }
+
+  .nav-item svg {
     font-size: 1.2rem;
+    margin-bottom: 4px;
+  }
+
+  body {
+    padding-bottom: 50px; /* Adjust for smaller screens */
   }
 }
