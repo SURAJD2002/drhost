@@ -3296,7 +3296,7 @@ import { supabase } from '../supabaseClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { LocationContext } from '../App';
 import { useFetchCartProducts } from '../hooks/useFetchCartProducts';
-import ApplyEMI from './ApplyEMI';
+import ApplyEMI from '../components/ApplyEMI';
 import '../style/Checkout.css';
 import Footer from './Footer';
 
