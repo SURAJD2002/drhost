@@ -1,49 +1,35 @@
-* {
-  box-sizing: border-box;
-}
-
 .checkout {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  padding: 10px;
+  padding: 20px;
   background-color: #f9fafb;
   min-height: 100vh;
-  max-width: 100%;
-  width: 100%;
+  max-width: 960px;
   margin: 0 auto;
-  overflow-x: hidden; /* Prevent horizontal scrolling */
-  padding-bottom: 180px; /* Increased padding to account for checkout-details height */
 }
 
 .checkout h1 {
-  font-size: 20px;
-  color: #007bff; /* Trust-building blue */
-  text-align: center;
-  margin-bottom: 10px;
+  font-size: 28px;
+  color: #007bff;
+  margin-bottom: 20px;
 }
 
 .checkout-items {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex-grow: 1; /* Allow items to take up available space */
+  gap: 15px;
 }
 
 .checkout-item {
   display: flex;
-  align-items: center;
-  background-color: white;
-  border-radius: 8px;
-  padding: 10px;
   gap: 15px;
-  width: 100%;
-  max-width: 100%;
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .checkout-item img {
-  width: 80px;
-  height: 80px;
+  width: 100px;
+  height: 100px;
   object-fit: cover;
   border-radius: 6px;
 }
@@ -52,186 +38,179 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .checkout-item-details h3 {
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 600;
   color: #1f2937;
-  margin-bottom: 5px;
-}
-
-.checkout-item-details p {
-  font-size: 12px;
-  color: #6b7280;
-  margin: 2px 0;
-}
-
-.variant-details {
-  font-size: 0.9rem;
-  color: #555;
   margin: 0;
 }
 
-.checkout-details {
-  background-color: white;
-  padding: 15px;
-  padding-bottom: 89px; /* Add space for sticky button */
-  border-radius: 8px 8px 0 0; /* Rounded top corners, flat bottom */
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* Elevation shadow */
-  z-index: 1000; /* Above footer */
-  max-height: 60vh; /* Increased to give more space */
-  overflow-y: auto; /* Scrollable if content overflows */
+.checkout-item-details p {
+  font-size: 14px;
+  color: #1f2937;
+  margin: 0;
 }
 
-.checkout-details h2,
-.checkout-details h3 {
-  font-size: 16px;
+.variant-details {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.checkout-details {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.checkout-details h2 {
+  font-size: 20px;
+  font-weight: 600;
   color: #1f2937;
-  margin-bottom: 10px;
+  margin-bottom: 15px;
 }
 
 .checkout-details p {
+  font-size: 16px;
+  color: #1f2937;
+  margin-bottom: 15px;
+}
+
+.checkout-details h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 15px 0 10px;
+}
+
+.checkout-details textarea {
+  width: 100%;
+  padding: 10px;
   font-size: 14px;
-  color: #6b7280;
-  margin: 5px 0;
-}
-
-textarea {
-  width: 100%;
-  padding: 8px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  margin-bottom: 10px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.3s ease;
 }
 
-select {
+.checkout-details textarea:focus {
+  border-color: #007bff;
+}
+
+.checkout-details select {
   width: 100%;
-  padding: 8px;
+  padding: 10px;
+  font-size: 14px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  margin-bottom: 10px;
+  outline: none;
+  transition: border-color 0.3s ease;
 }
 
-.checkout-action {
-  position: sticky;
-  bottom: 0;
-  background-color: white;
-  padding: 10px 0;
-  z-index: 1001; /* Ensure it stays above other content in checkout-details */
+.checkout-details select:focus {
+  border-color: #007bff;
 }
 
-button {
-  padding: 10px 20px;
-  background-color: #007bff; /* Trust-building blue */
+.emi-option {
+  margin: 15px 0;
+}
+
+.emi-option button {
+  width: 100%;
+  padding: 12px;
+  background-color: #007bff;
   color: white;
   border: none;
   border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   transition: background-color 0.3s ease;
-  width: 100%; /* Full width for better visibility on mobile */
+}
+
+.emi-option button:hover {
+  background-color: #0056b3;
+}
+
+.checkout-action {
+  margin-top: 20px;
+}
+
+.checkout-action button {
+  width: 100%;
+  padding: 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
   font-size: 16px;
-  margin-top: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for prominence */
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-button:hover:not(:disabled) {
-  background-color: #0056b3; /* Darker blue for hover */
+.checkout-action button:hover {
+  background-color: #0056b3;
 }
 
-button:disabled {
-  background-color: #a3bffa;
+.checkout-action button:disabled {
+  background-color: #93c5fd;
   cursor: not-allowed;
+}
+
+.checkout-loading {
+  text-align: center;
+  padding: 20px;
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.checkout-error {
+  padding: 15px;
+  background-color: #fee2e2;
+  border-radius: 6px;
+  text-align: center;
+  color: #6b7280;
+  width: 100%;
+  max-width: 100%;
 }
 
 .checkout-success {
   text-align: center;
   padding: 20px;
-  background-color: #e0f7fa;
+  background-color: white;
   border-radius: 8px;
-  color: #007bff; /* Trust-building blue */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .checkout-success h1 {
-  font-size: 18px;
-  margin-bottom: 10px;
+  font-size: 24px;
+  color: #10b981;
+  margin-bottom: 15px;
 }
 
-.checkout-loading,
-.checkout-error {
-  padding: 15px;
-  text-align: center;
-  color: #6b7280;
-}
-
-.checkout-error {
-  background-color: #fee2e2;
-  border-radius: 6px;
+.checkout-success p {
+  font-size: 16px;
+  color: #1f2937;
 }
 
 /* Responsive Design */
 @media (min-width: 640px) {
   .checkout {
-    padding: 20px;
-    max-width: 800px;
-    padding-bottom: 160px; /* Adjusted for larger screens */
+    padding: 25px;
+  }
+
+  .checkout h1 {
+    font-size: 32px;
   }
 
   .checkout-item {
-    padding: 15px;
-  }
-
-  .checkout-item img {
-    width: 100px;
-    height: 100px;
-  }
-
-  .checkout-item-details h3 {
-    font-size: 16px;
-  }
-
-  .checkout-details {
     padding: 20px;
-    position: sticky; /* On larger screens, sticky instead of fixed */
-    bottom: 0;
-    left: auto;
-    right: auto;
-    max-width: 760px; /* Match checkout container width */
-    margin: 0 auto;
-    box-shadow: none; /* Remove shadow on larger screens */
-    max-height: none; /* No height limit on larger screens */
-    overflow-y: visible; /* No scrolling needed */
-    padding-bottom: 20px; /* Adjusted padding */
-  }
-
-  .checkout-action {
-    position: static; /* No need for sticky on larger screens */
-    padding: 0;
-  }
-
-  .checkout-details h2,
-  .checkout-details h3 {
-    font-size: 18px;
-  }
-
-  .checkout-details p {
-    font-size: 14px;
-  }
-
-  button {
-    width: auto; /* On larger screens, button doesn't need to be full-width */
-    margin-top: 15px;
-  }
-}
-
-@media (min-width: 768px) {
-  .checkout {
-    padding: 25px;
-    max-width: 960px;
   }
 
   .checkout-item img {
@@ -239,7 +218,87 @@ button:disabled {
     height: 120px;
   }
 
-  .checkout-details {
-    max-width: 910px; /* Match checkout container width */
+  .checkout-item-details h3 {
+    font-size: 18px;
   }
+
+  .checkout-item-details p {
+    font-size: 16px;
+  }
+
+  .variant-details {
+    font-size: 14px;
+  }
+
+  .checkout-details {
+    padding: 25px;
+  }
+
+  .checkout-details h2 {
+    font-size: 22px;
+  }
+
+  .checkout-details p {
+    font-size: 18px;
+  }
+
+  .checkout-details h3 {
+    font-size: 20px;
+  }
+
+  .checkout-details textarea,
+  .checkout-details select {
+    font-size: 16px;
+    padding: 12px;
+  }
+
+  .emi-option button,
+  .checkout-action button {
+    padding: 14px;
+    font-size: 18px;
+  }
+}
+
+@media (min-width: 768px) {
+  .checkout {
+    padding: 30px;
+  }
+
+  .checkout h1 {
+    font-size: 36px;
+  }
+
+  .checkout-item img {
+    width: 140px;
+    height: 140px;
+  }
+
+  .checkout-item-details h3 {
+    font-size: 20px;
+  }
+
+  .checkout-item-details p {
+    font-size: 18px;
+  }
+
+  .variant-details {
+    font-size: 15px;
+  }
+
+  .checkout-details h2 {
+    font-size: 24px;
+  }
+
+  .checkout-details p {
+    font-size: 20px;
+  }
+
+  .checkout-details h3 {
+    font-size: 22px;
+  }
+}
+.address-error {
+  color: red;
+  font-size: 0.9em;
+  margin-top: 5px;
 }

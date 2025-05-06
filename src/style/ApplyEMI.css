@@ -1,0 +1,291 @@
+.emi-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .emi-modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .emi-modal-content h2 {
+    font-size: 20px;
+    color: #1f2937;
+    margin-bottom: 15px;
+    text-align: center;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f2937;
+    margin-bottom: 5px;
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.3s ease;
+  }
+  
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: #007bff;
+  }
+  
+  .form-group input[readonly] {
+    background-color: #f3f4f6;
+    color: #6b7280;
+  }
+  
+  .form-group .error {
+    color: #ef4444;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+  }
+  
+  .emi-modal-content button[type="submit"] {
+    width: 100%;
+    padding: 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 10px;
+  }
+  
+  .emi-modal-content button[type="submit"]:hover {
+    background-color: #0056b3;
+  }
+  
+  .emi-modal-content button[type="submit"]:disabled {
+    background-color: #93c5fd;
+    cursor: not-allowed;
+  }
+  
+  .close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .close-btn:hover {
+    background-color: #dc2626;
+  }
+  
+  .emi-error {
+    padding: 15px;
+    background-color: #fee2e2;
+    border-radius: 6px;
+    text-align: center;
+    color: #6b7280;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  /* Responsive Design */
+  @media (min-width: 640px) {
+    .emi-modal-content {
+      padding: 25px;
+      width: 80%;
+    }
+  
+    .emi-modal-content h2 {
+      font-size: 24px;
+    }
+  
+    .form-group label {
+      font-size: 16px;
+    }
+  
+    .form-group input,
+    .form-group select {
+      font-size: 16px;
+      padding: 12px;
+    }
+  
+    .form-group .error {
+      font-size: 14px;
+    }
+  
+    .emi-modal-content button[type="submit"] {
+      padding: 14px;
+      font-size: 18px;
+    }
+  
+    .close-btn {
+      padding: 10px 14px;
+      font-size: 16px;
+    }
+  }
+  /* ApplyEMI.css */
+.emi-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  
+  .emi-modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+  }
+  
+  .emi-modal-content.success {
+    text-align: center;
+  }
+  
+  .success-icon {
+    font-size: 48px;
+    color: #28a745;
+    margin-bottom: 20px;
+  }
+  
+  .emi-success-details {
+    margin: 20px 0;
+    text-align: left;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+  }
+  
+  .emi-success-details p {
+    margin: 5px 0;
+  }
+  
+  .view-orders-btn {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    margin-right: 10px;
+  }
+  
+  .view-orders-btn:hover {
+    background-color: #0056b3;
+  }
+  
+  .close-btn {
+    background-color: #dc3545;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  .close-btn:hover {
+    background-color: #c82333;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  
+  .form-group input[readonly] {
+    background-color: #f0f0f0;
+  }
+  
+  .error {
+    color: red;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+  }
+  
+  button[type="submit"] {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    width: 100%;
+  }
+  
+  button[type="submit"]:hover {
+    background-color: #218838;
+  }
+  
+  button[type="submit"][disabled] {
+    background-color: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .emi-error {
+    color: red;
+    text-align: center;
+    padding: 20px;
+  }
+  .emi-success-details p {
+    margin: 5px 0;
+  }
