@@ -1,12 +1,13 @@
 /* Use the same color palette as Home.css */
 :root {
   --primary-dark: #007bff;
+  --primary-dark-hover: #0056b3; /* Added for consistency with other components */
   --accent-gold: #FFD700;
   --luxury-gold: #D4AF37;
   --luxury-dark: #1A1A1A;
   --luxury-gradient-start: #2C2C2C;
   --luxury-gradient-end: #4A4A4A;
-  --light-blue: #66b0ff; /* Complementary lighter blue for logo gradient */
+  --light-blue: #66b0ff;
 }
 
 /* Navbar */
@@ -39,10 +40,8 @@
 .logo-container {
   display: flex;
   align-items: center;
-  gap: 10px;
   text-decoration: none;
   transition: all 0.3s ease;
-  margin-left: -34px; /* Removed negative margin for better alignment */
 }
 
 .logo-container:hover {
@@ -50,43 +49,19 @@
   filter: drop-shadow(0 0 8px rgba(0, 123, 255, 0.3));
 }
 
-/* Logo Icon */
-.logo-icon {
-  font-size: 34px; /* Increased size */
-  color: var(--primary-dark);
-  animation: gentleBounce 2s ease infinite;
-}
-
-/* Logo Text */
-.logo-text {
-  font-size: 28px;
-  font-weight: 700;
-  font-family: 'Poppins', sans-serif;
-  background: linear-gradient(90deg, var(--primary-dark), var(--light-blue), var(--primary-dark));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  position: relative;
-  letter-spacing: 1.5px;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.logo-text::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--primary-dark);
-  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-  animation: glowUnderline 2s ease infinite;
+/* Logo Image */
+.logo-image {
+  height: 40px; /* Base height for the logo */
+  width: auto; /* Maintain aspect ratio */
+  object-fit: contain;
+  animation: logoFadeIn 0.5s ease forwards;
 }
 
 /* Auth Buttons */
 .auth-buttons {
   display: flex;
   align-items: center;
-  gap: 30px; /* Increased gap for better spacing */
+  gap: 30px;
 }
 
 /* Auth Link */
@@ -134,7 +109,7 @@
   align-items: center;
   color: var(--primary-dark);
   text-decoration: none;
-  font-size: 2.2rem; /* Increased size */
+  font-size: 2.2rem;
   transition: all 0.3s ease;
 }
 
@@ -173,24 +148,14 @@
   }
 }
 
-@keyframes gentleBounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
-@keyframes glowUnderline {
+@keyframes logoFadeIn {
   0% {
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 10px rgba(0, 123, 255, 0.8);
+    opacity: 0;
+    transform: scale(0.9);
   }
   100% {
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -232,13 +197,9 @@
     gap: 20px;
   }
 
-  .logo-icon {
-    font-size: 30px; /* Adjusted for smaller screens */
-  }
-
-  .logo-text {
-    font-size: 24px;
-    letter-spacing: 1px;
+  .logo-image {
+    height: 139px;
+    margin-right: 188px; /* Adjusted for smaller screens */
   }
 
   .auth-link {
@@ -247,7 +208,7 @@
   }
 
   .cart-icon {
-    font-size: 2rem; /* Adjusted for smaller screens */
+    font-size: 2rem;
   }
 
   .cart-badge {
@@ -263,12 +224,8 @@
     flex-direction: row;
   }
 
-  .logo-icon {
-    font-size: 34px;
-  }
-
-  .logo-text {
-    font-size: 28px;
+  .logo-image {
+    height: 122px;
   }
 
   .cart-icon {

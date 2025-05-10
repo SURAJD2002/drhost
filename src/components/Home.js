@@ -15354,6 +15354,661 @@
 // export default React.memo(Home);
 
 
+// import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
+// import { useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { FaShoppingCart, FaSearch } from 'react-icons/fa';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick-theme.css';
+// import 'slick-carousel/slick/slick.css';
+// import { ToastContainer, toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+// import '../style/Home.css';
+// import Footer from './Footer';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Home() {
+//   const { buyerLocation, setBuyerLocation, session } = useContext(LocationContext);
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState([]);
+//   const [bannerImages, setBannerImages] = useState([]);
+//   const [categories, setCategories] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loadingProducts, setLoadingProducts] = useState(true);
+//   const [loadingBanners, setLoadingBanners] = useState(true);
+//   const [loadingCategories, setLoadingCategories] = useState(true);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+//   const [isSearchFocused, setIsSearchFocused] = useState(false);
+//   const [suggestions, setSuggestions] = useState([]);
+//   const searchRef = useRef(null);
+
+//   // Debounced search handler
+//   const debouncedSetSearchTerm = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   // Check network connectivity
+//   const checkNetworkStatus = () => {
+//     if (!navigator.onLine) {
+//       toast.error('No internet connection. Please check your network and try again.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return false;
+//     }
+//     return true;
+//   };
+
+//   // Fetch user role
+//   const fetchUserRole = useCallback(async () => {
+//     if (!session?.user) {
+//       setIsSeller(false);
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+//     try {
+//       const { data: profileData, error: profileError } = await supabase
+//         .from('profiles')
+//         .select('is_seller')
+//         .eq('id', session.user.id)
+//         .single();
+//       if (profileError) throw profileError;
+//       setIsSeller(profileData?.is_seller || false);
+//     } catch (err) {
+//       console.error('Error fetching user role:', err);
+//       toast.error('Failed to fetch user role.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//     }
+//   }, [session]);
+
+//   // Fetch categories
+//   const fetchCategories = useCallback(async () => {
+//     if (!checkNetworkStatus()) {
+//       setLoadingCategories(false);
+//       return;
+//     }
+//     setLoadingCategories(true);
+//     try {
+//       const { data, error } = await supabase
+//         .from('categories')
+//         .select('*')
+//         .order('name')
+//         .limit(6);
+//       if (error) throw error;
+//       setCategories(data || []);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching categories:', err);
+//       setError('Failed to load categories. Please try again.');
+//       setCategories([]);
+//     } finally {
+//       setLoadingCategories(false);
+//     }
+//   }, []);
+
+//   // Fetch nearby products
+//   const fetchNearbyProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     if (!checkNetworkStatus()) {
+//       setLoadingProducts(false);
+//       return;
+//     }
+//     setLoadingProducts(true);
+//     try {
+//       const { data: allSellers, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = allSellers
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, title, price, original_price, discount_amount, images, seller_id, stock')
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+//         discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+//         stock: product.stock || 0,
+//       }));
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       setProducts([]);
+//     } finally {
+//       setLoadingProducts(false);
+//     }
+//   }, [buyerLocation]);
+
+//   // Fetch banner images
+//   const fetchBannerImages = useCallback(async () => {
+//     if (!checkNetworkStatus()) {
+//       setLoadingBanners(false);
+//       return;
+//     }
+//     setLoadingBanners(true);
+//     try {
+//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+//       const banners = await Promise.all(
+//         data
+//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+//           .map(async (file) => {
+//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+//             return { url: publicUrl, name: file.name };
+//           })
+//       );
+//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } catch (err) {
+//       console.error('Error fetching banner images:', err);
+//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+//     } finally {
+//       setLoadingBanners(false);
+//     }
+//   }, []);
+
+//   // Add to cart
+//   const addToCart = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       toast.error('Invalid product.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       toast.warn('Out of stock.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.warn('Please log in to add items to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+
+//     try {
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .maybeSingle();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           toast.warn('Exceeds stock.', {
+//             position: "top-center",
+//             autoClose: 3000,
+//           });
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//         toast.success(`${product.name} quantity updated in cart!`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//         toast.success(`${product.name} added to cart!`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       toast.error('Failed to add to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//     }
+//   }, [navigate, session]);
+
+//   // Buy now
+//   const buyNow = useCallback(async (product) => {
+//     if (!product || !product.id || !product.name || product.price === undefined) {
+//       toast.error('Invalid product.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (product.stock <= 0) {
+//       toast.warn('Out of stock.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.warn('Please log in to proceed to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+
+//     try {
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .maybeSingle();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+//       if (existingCartItem) {
+//         const newQuantity = existingCartItem.quantity + 1;
+//         if (newQuantity > product.stock) {
+//           toast.warn('Exceeds stock.', {
+//             position: "top-center",
+//             autoClose: 3000,
+//           });
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//       }
+
+//       toast.success('Added to cart! Redirecting...', {
+//         position: "top-center",
+//         autoClose: 2000,
+//       });
+//       setTimeout(() => navigate('/cart'), 2000);
+//     } catch (err) {
+//       console.error('Error in Buy Now:', err);
+//       toast.error('Failed to add to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//     }
+//   }, [navigate, session]);
+
+//   // Compute search suggestions
+//   useEffect(() => {
+//     if (!searchTerm || !isSearchFocused) {
+//       setSuggestions([]);
+//       return;
+//     }
+
+//     const filteredSuggestions = products
+//       .filter((product) =>
+//         product.name.toLowerCase().includes(searchTerm.toLowerCase())
+//       )
+//       .slice(0, 5);
+//     setSuggestions(filteredSuggestions);
+//   }, [searchTerm, products, isSearchFocused]);
+
+//   // Handle clicks outside the search bar
+//   useEffect(() => {
+//     const handleClickOutside = (event) => {
+//       if (searchRef.current && !searchRef.current.contains(event.target)) {
+//         setIsSearchFocused(false);
+//         setSuggestions([]);
+//       }
+//     };
+
+//     document.addEventListener('mousedown', handleClickOutside);
+//     return () => {
+//       document.removeEventListener('mousedown', handleClickOutside);
+//     };
+//   }, []);
+
+//   // Fetch data on mount and handle location
+//   useEffect(() => {
+//     fetchUserRole();
+//     fetchBannerImages();
+//     fetchCategories();
+
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       if (navigator.geolocation) {
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newLocation = {
+//               lat: position.coords.latitude,
+//               lon: position.coords.longitude,
+//             };
+//             setBuyerLocation(newLocation);
+//             fetchNearbyProducts();
+//           },
+//           (error) => {
+//             console.error('Geolocation error:', error);
+//             fetchNearbyProducts(); // Still attempt to fetch products if location fails
+//           },
+//           { timeout: 10000 }
+//         );
+//       } else {
+//         fetchNearbyProducts(); // Fallback if geolocation is not supported
+//       }
+//     } else {
+//       fetchNearbyProducts();
+//     }
+//   }, [fetchUserRole, fetchBannerImages, fetchCategories, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
+
+//   // Filter products
+//   const filteredProducts = useMemo(() => {
+//     if (!searchTerm) return products;
+//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+//   }, [products, searchTerm]);
+
+//   // Slider settings
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     autoplay: true,
+//     autoplaySpeed: 3000,
+//     arrows: true,
+//   };
+
+//   if (loadingProducts && loadingBanners && loadingCategories) return (
+//     <div className="loading-container">
+//       <div className="loading-animation">
+//         <div className="loading-box">
+//           <FaShoppingCart className="loading-icon" />
+//           <span>Finding the best deals for you...</span>
+//         </div>
+//         <div className="loading-dots">
+//           <span>.</span><span>.</span><span>.</span>
+//         </div>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="home">
+//       <ToastContainer position="top-center" autoClose={3000} />
+
+//       {/* Sticky Search Bar with Suggestions */}
+//       <div className="search-bar sticky" ref={searchRef}>
+//         <FaSearch className="search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search products..."
+//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+//           onFocus={() => setIsSearchFocused(true)}
+//           aria-label="Search products"
+//         />
+//         {suggestions.length > 0 && isSearchFocused && (
+//           <ul className="search-suggestions">
+//             {suggestions.map((suggestion) => (
+//               <li
+//                 key={suggestion.id}
+//                 className="suggestion-item"
+//                 onClick={() => {
+//                   setSearchTerm(suggestion.name);
+//                   setIsSearchFocused(false);
+//                   setSuggestions([]);
+//                 }}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && setSearchTerm(suggestion.name) && setIsSearchFocused(false) && setSuggestions([])}
+//                 aria-label={`Select ${suggestion.name}`}
+//               >
+//                 {suggestion.name}
+//               </li>
+//             ))}
+//           </ul>
+//         )}
+//       </div>
+
+//       {/* Banner Slider */}
+//       <div className="banner-slider">
+//         {loadingBanners ? (
+//           <div className="banner-skeleton" />
+//         ) : (
+//           <Slider {...sliderSettings}>
+//             {bannerImages.map((banner) => (
+//               <div key={banner.name} className="banner-wrapper">
+//                 <img src={banner.url} alt={`Banner ${banner.name}`} loading="lazy" />
+//                 <button
+//                   className="view-offers-btn"
+//                   onClick={() => navigate('/categories')}
+//                   aria-label="View Offers"
+//                 >
+//                   View Offers
+//                 </button>
+//               </div>
+//             ))}
+//           </Slider>
+//         )}
+//       </div>
+
+//       {/* Featured Categories Section */}
+//       <section className="home-categories-section">
+//         <header className="home-cat-header">
+//           <h2 className="home-cat-title">Explore Categories</h2>
+//           <Link to="/categories" className="home-cat-view-all" aria-label="View All Categories">
+//             View All
+//           </Link>
+//         </header>
+//         {error && <p className="home-cat-error">{error}</p>}
+//         {loadingCategories ? (
+//           <div className="home-cat-grid-wrapper">
+//             <div className="home-cat-grid">
+//               {[...Array(4)].map((_, i) => (
+//                 <div key={i} className="home-cat-card-skeleton">
+//                   <div className="home-cat-skeleton-image" />
+//                   <div className="home-cat-skeleton-text" />
+//                 </div>
+//               ))}
+//             </div>
+//           </div>
+//         ) : categories.length === 0 ? (
+//           <p className="home-cat-no-categories">No categories available.</p>
+//         ) : (
+//           <div className="home-cat-grid-wrapper">
+//             <div className="home-cat-grid">
+//               {categories.map((category) => (
+//                 <Link
+//                   to={`/products?category=${category.id}`}
+//                   key={category.id}
+//                   className="home-cat-card"
+//                   aria-label={`View products in ${category.name} category`}
+//                 >
+//                   <img
+//                     src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
+//                     alt={category.name}
+//                     className="home-cat-image"
+//                     onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
+//                     loading="lazy"
+//                   />
+//                   <h3 className="home-cat-name">{category.name.trim()}</h3>
+//                 </Link>
+//               ))}
+//             </div>
+//           </div>
+//         )}
+//       </section>
+
+//       {/* Products Section */}
+//       <section className="products-section">
+//         <h2 className="section-title">Fast Delivery, Just Order!</h2>
+//         {loadingProducts ? (
+//           <div className="product-grid">
+//             {[...Array(4)].map((_, i) => (
+//               <div key={i} className="product-card-skeleton">
+//                 <div className="skeleton-image" />
+//                 <div className="skeleton-text" />
+//                 <div className="skeleton-text short" />
+//                 <div className="skeleton-buttons">
+//                   <div className="skeleton-btn" />
+//                   <div className="skeleton-btn" />
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         ) : filteredProducts.length === 0 ? (
+//           <p className="no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
+//         ) : (
+//           <div className={`product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
+//               >
+//                 <div className="product-image-wrapper">
+//                   {product.discountAmount > 0 && (
+//                     <span className="offer-badge">
+//                       <span className="offer-label">Offer!</span>
+//                       Save ₹{product.discountAmount.toFixed(2)}
+//                     </span>
+//                   )}
+//                   <img
+//                     src={product.images[0]}
+//                     alt={product.name}
+//                     onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//                 <div className="product-info">
+//                   <h3 className="product-name">{product.name}</h3>
+//                   <div className="price-section">
+//                     <p className="product-price">
+//                       ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                     </p>
+//                     {product.originalPrice && product.originalPrice > product.price && (
+//                       <p className="original-price">
+//                         ₹{product.originalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                       </p>
+//                     )}
+//                   </div>
+//                   <div className="product-buttons">
+//   <button
+//     onClick={(e) => {
+//       e.stopPropagation();
+//       addToCart(product);
+//     }}
+//     className="cart-action-btn"
+//     disabled={product.stock <= 0}
+//     aria-label={`Add ${product.name} to cart`}
+//   >
+//     <FaShoppingCart /> Add to Cart
+//   </button>
+//   <button
+//     onClick={(e) => {
+//       e.stopPropagation();
+//       buyNow(product);
+//     }}
+//     className="buy-action-btn"
+//     disabled={product.stock <= 0}
+//     aria-label={`Buy ${product.name} now`}
+//   >
+//     Buy Now
+//   </button>
+// </div>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         )}
+//       </section>
+
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default React.memo(Home);
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -15791,13 +16446,13 @@ function Home() {
   };
 
   if (loadingProducts && loadingBanners && loadingCategories) return (
-    <div className="loading-container">
-      <div className="loading-animation">
-        <div className="loading-box">
-          <FaShoppingCart className="loading-icon" />
+    <div className="td-loading-container">
+      <div className="td-loading-animation">
+        <div className="td-loading-box">
+          <FaShoppingCart className="td-loading-icon" />
           <span>Finding the best deals for you...</span>
         </div>
-        <div className="loading-dots">
+        <div className="td-loading-dots">
           <span>.</span><span>.</span><span>.</span>
         </div>
       </div>
@@ -15805,12 +16460,12 @@ function Home() {
   );
 
   return (
-    <div className="home">
+    <div className="td-home">
       <ToastContainer position="top-center" autoClose={3000} />
 
       {/* Sticky Search Bar with Suggestions */}
-      <div className="search-bar sticky" ref={searchRef}>
-        <FaSearch className="search-icon" />
+      <div className="td-search-bar sticky" ref={searchRef}>
+        <FaSearch className="td-search-icon" />
         <input
           type="text"
           placeholder="Search products..."
@@ -15819,11 +16474,11 @@ function Home() {
           aria-label="Search products"
         />
         {suggestions.length > 0 && isSearchFocused && (
-          <ul className="search-suggestions">
+          <ul className="td-search-suggestions">
             {suggestions.map((suggestion) => (
               <li
                 key={suggestion.id}
-                className="suggestion-item"
+                className="td-suggestion-item"
                 onClick={() => {
                   setSearchTerm(suggestion.name);
                   setIsSearchFocused(false);
@@ -15842,16 +16497,16 @@ function Home() {
       </div>
 
       {/* Banner Slider */}
-      <div className="banner-slider">
+      <div className="td-banner-slider">
         {loadingBanners ? (
-          <div className="banner-skeleton" />
+          <div className="td-banner-skeleton" />
         ) : (
           <Slider {...sliderSettings}>
             {bannerImages.map((banner) => (
-              <div key={banner.name} className="banner-wrapper">
+              <div key={banner.name} className="td-banner-wrapper">
                 <img src={banner.url} alt={`Banner ${banner.name}`} loading="lazy" />
                 <button
-                  className="view-offers-btn"
+                  className="td-view-offers-btn"
                   onClick={() => navigate('/categories')}
                   aria-label="View Offers"
                 >
@@ -15864,45 +16519,45 @@ function Home() {
       </div>
 
       {/* Featured Categories Section */}
-      <section className="home-categories-section">
-        <header className="home-cat-header">
-          <h2 className="home-cat-title">Explore Categories</h2>
-          <Link to="/categories" className="home-cat-view-all" aria-label="View All Categories">
+      <section className="td-categories-section">
+        <header className="td-cat-header">
+          <h2 className="td-cat-title">Explore Categories</h2>
+          <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
             View All
           </Link>
         </header>
-        {error && <p className="home-cat-error">{error}</p>}
+        {error && <p className="td-cat-error">{error}</p>}
         {loadingCategories ? (
-          <div className="home-cat-grid-wrapper">
-            <div className="home-cat-grid">
+          <div className="td-cat-grid-wrapper">
+            <div className="td-cat-grid">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="home-cat-card-skeleton">
-                  <div className="home-cat-skeleton-image" />
-                  <div className="home-cat-skeleton-text" />
+                <div key={i} className="td-cat-card-skeleton">
+                  <div className="td-cat-skeleton-image" />
+                  <div className="td-cat-skeleton-text" />
                 </div>
               ))}
             </div>
           </div>
         ) : categories.length === 0 ? (
-          <p className="home-cat-no-categories">No categories available.</p>
+          <p className="td-cat-no-categories">No categories available.</p>
         ) : (
-          <div className="home-cat-grid-wrapper">
-            <div className="home-cat-grid">
+          <div className="td-cat-grid-wrapper">
+            <div className="td-cat-grid">
               {categories.map((category) => (
                 <Link
                   to={`/products?category=${category.id}`}
                   key={category.id}
-                  className="home-cat-card"
+                  className="td-cat-card"
                   aria-label={`View products in ${category.name} category`}
                 >
                   <img
                     src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
                     alt={category.name}
-                    className="home-cat-image"
+                    className="td-cat-image"
                     onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
                     loading="lazy"
                   />
-                  <h3 className="home-cat-name">{category.name.trim()}</h3>
+                  <h3 className="td-cat-name">{category.name.trim()}</h3>
                 </Link>
               ))}
             </div>
@@ -15911,40 +16566,40 @@ function Home() {
       </section>
 
       {/* Products Section */}
-      <section className="products-section">
-        <h2 className="section-title">Fast Delivery, Just Order!</h2>
+      <section className="td-products-section">
+        <h2 className="td-section-title">Fast Delivery, Just Order!</h2>
         {loadingProducts ? (
-          <div className="product-grid">
+          <div className="td-product-grid">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="product-card-skeleton">
-                <div className="skeleton-image" />
-                <div className="skeleton-text" />
-                <div className="skeleton-text short" />
-                <div className="skeleton-buttons">
-                  <div className="skeleton-btn" />
-                  <div className="skeleton-btn" />
+              <div key={i} className="td-product-card-skeleton">
+                <div className="td-skeleton-image" />
+                <div className="td-skeleton-text" />
+                <div className="td-skeleton-text short" />
+                <div className="td-skeleton-buttons">
+                  <div className="td-skeleton-btn" />
+                  <div className="td-skeleton-btn" />
                 </div>
               </div>
             ))}
           </div>
         ) : filteredProducts.length === 0 ? (
-          <p className="no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
+          <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
         ) : (
-          <div className={`product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
+          <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="product-card"
+                className="td-product-card"
                 onClick={() => navigate(`/product/${product.id}`)}
                 role="button"
                 tabIndex={0}
                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
                 aria-label={`View ${product.name}`}
               >
-                <div className="product-image-wrapper">
+                <div className="td-product-image-wrapper">
                   {product.discountAmount > 0 && (
-                    <span className="offer-badge">
-                      <span className="offer-label">Offer!</span>
+                    <span className="td-offer-badge">
+                      <span className="td-offer-label">Offer!</span>
                       Save ₹{product.discountAmount.toFixed(2)}
                     </span>
                   )}
@@ -15955,42 +16610,42 @@ function Home() {
                     loading="lazy"
                   />
                 </div>
-                <div className="product-info">
-                  <h3 className="product-name">{product.name}</h3>
-                  <div className="price-section">
-                    <p className="product-price">
+                <div className="td-product-info">
+                  <h3 className="td-product-name">{product.name}</h3>
+                  <div className="td-price-section">
+                    <p className="td-product-price">
                       ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     {product.originalPrice && product.originalPrice > product.price && (
-                      <p className="original-price">
+                      <p className="td-original-price">
                         ₹{product.originalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     )}
                   </div>
-                  <div className="product-buttons">
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      addToCart(product);
-    }}
-    className="cart-action-btn"
-    disabled={product.stock <= 0}
-    aria-label={`Add ${product.name} to cart`}
-  >
-    <FaShoppingCart /> Add to Cart
-  </button>
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      buyNow(product);
-    }}
-    className="buy-action-btn"
-    disabled={product.stock <= 0}
-    aria-label={`Buy ${product.name} now`}
-  >
-    Buy Now
-  </button>
-</div>
+                  <div className="td-product-buttons">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product);
+                      }}
+                      className="td-cart-action-btn"
+                      disabled={product.stock <= 0}
+                      aria-label={`Add ${product.name} to cart`}
+                    >
+                      <FaShoppingCart /> Add to Cart
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        buyNow(product);
+                      }}
+                      className="td-buy-action-btn"
+                      disabled={product.stock <= 0}
+                      aria-label={`Buy ${product.name} now`}
+                    >
+                      Buy Now
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

@@ -1724,3 +1724,196 @@ export default function Auth() {
     </div>
   );
 }
+
+
+
+
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import '../style/Auth.css';
+
+// export default function Auth() {
+//   const navigate = useNavigate();
+//   const [mode, setMode] = useState('login'); // 'login' or 'signup'
+//   const [fullName, setFullName] = useState('');
+//   const [phone, setPhone] = useState('+91');
+//   const [otp, setOtp] = useState('');
+//   const [otpSent, setOtpSent] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [message, setMessage] = useState('');
+//   const [resendCooldown, setResendCooldown] = useState(0);
+
+//   // Redirect if already authenticated and subscribe to auth events
+//   useEffect(() => {
+//     supabase.auth.getSession().then(({ data: { session } }) => {
+//       if (session) navigate('/account', { replace: true });
+//     });
+
+//     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+//       if (event === 'SIGNED_IN') navigate('/account', { replace: true });
+//       if (event === 'SIGNED_OUT') navigate('/auth', { replace: true });
+//     });
+
+//     return () => subscription.unsubscribe();
+//   }, [navigate]);
+
+//   // Handle resend OTP cooldown
+//   useEffect(() => {
+//     if (resendCooldown > 0) {
+//       const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [resendCooldown]);
+
+//   // Send OTP
+//   const sendOtp = useCallback(async () => {
+//     if (!/^\+91[0-9]{10}$/.test(phone)) {
+//       setMessage('Enter a valid 10-digit phone number (e.g., +919876543210)');
+//       return;
+//     }
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.signInWithOtp({ phone });
+//       if (error) throw error;
+//       setOtpSent(true);
+//       setResendCooldown(30); // 30-second cooldown for resend
+//       setMessage('OTP sent to your phone. Please check.');
+//     } catch (err) {
+//       console.error('Send OTP error:', err);
+//       setMessage('Failed to send OTP. Please try again.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [phone]);
+
+//   // Verify OTP
+//   const verifyOtp = async () => {
+//     if (!otp) {
+//       setMessage('Please enter the OTP received on your phone.');
+//       return;
+//     }
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { data: { user }, error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
+//       if (error) throw error;
+//       if (mode === 'signup') {
+//         await supabase.from('profiles').upsert({
+//           id: user.id,
+//           full_name: fullName || phone.split('+91')[1],
+//           phone_number: phone,
+//         });
+//         setMessage('Sign-up successful. Welcome!');
+//       } else {
+//         setMessage('Login successful. Welcome back!');
+//       }
+//     } catch (err) {
+//       console.error('Verify OTP error:', err);
+//       setMessage('Invalid OTP. Please try again or request a new one.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Reset form fields on mode toggle
+//   const handleModeToggle = () => {
+//     setMode(mode === 'signup' ? 'login' : 'signup');
+//     setFullName('');
+//     setPhone('+91');
+//     setOtp('');
+//     setOtpSent(false);
+//     setMessage('');
+//     setResendCooldown(0);
+//   };
+
+//   return (
+//     <div className="auth-container">
+//       <h1 className="auth-title">{mode === 'signup' ? 'Think & Deliver Sign Up' : 'Think & Deliver Login'}</h1>
+//       <div className="auth-form">
+//         {mode === 'signup' && (
+//           <input
+//             type="text"
+//             placeholder="Full Name"
+//             value={fullName}
+//             onChange={(e) => setFullName(e.target.value)}
+//             disabled={loading}
+//             required
+//             className="auth-input"
+//             aria-label="Full Name"
+//           />
+//         )}
+//         <input
+//           type="tel"
+//           placeholder="+91 Phone (e.g., +919876543210)"
+//           value={phone}
+//           onChange={(e) => setPhone(e.target.value.startsWith('+91') ? e.target.value : '+91' + e.target.value.replace(/^\+91/, ''))}
+//           disabled={loading || otpSent}
+//           required
+//           className="auth-input"
+//           aria-label="Phone Number"
+//         />
+//         {!otpSent ? (
+//           <button
+//             onClick={sendOtp}
+//             disabled={loading}
+//             className="auth-button"
+//             aria-label="Send OTP"
+//           >
+//             {loading ? 'Sending...' : 'Send OTP'}
+//           </button>
+//         ) : (
+//           <>
+//             <input
+//               type="text"
+//               placeholder="Enter OTP"
+//               value={otp}
+//               onChange={(e) => setOtp(e.target.value)}
+//               disabled={loading}
+//               required
+//               className="auth-input"
+//               aria-label="OTP Code"
+//             />
+//             <button
+//               onClick={verifyOtp}
+//               disabled={loading}
+//               className="auth-button"
+//               aria-label="Verify OTP"
+//             >
+//               {loading ? 'Verifying...' : 'Verify OTP'}
+//             </button>
+//             <button
+//               onClick={sendOtp}
+//               disabled={loading || resendCooldown > 0}
+//               className="auth-button resend-btn"
+//               aria-label="Resend OTP"
+//             >
+//               {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+//             </button>
+//           </>
+//         )}
+//       </div>
+//       {message && <p className="auth-message">{message}</p>}
+//       <button
+//         onClick={handleModeToggle}
+//         disabled={loading}
+//         className="auth-toggle"
+//         aria-label={mode === 'signup' ? 'Switch to Login' : 'Switch to Sign Up'}
+//       >
+//         {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
+//       </button>
+//       <div className="auth-footer">
+//         <Link to="/policy" className="footer-link" aria-label="View Policies">
+//           Policies
+//         </Link>
+//         <Link to="/privacy" className="footer-link" aria-label="View Privacy Policy">
+//           Privacy Policy
+//         </Link>
+//       </div>
+//       <Link to="/" className="back-link" aria-label="Back to Home">
+//         Back to Home
+//       </Link>
+//     </div>
+//   );
+// }

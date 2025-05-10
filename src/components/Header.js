@@ -368,13 +368,71 @@
 // export default Header;
 
 
+// import React, { useEffect, useContext } from 'react';
+// import { Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { IoCartOutline } from 'react-icons/io5';
+// import { FaShoppingBag } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Header.css';
+
+// function Header() {
+//   const { session, cartCount } = useContext(LocationContext);
+
+//   useEffect(() => {
+//     supabase.auth.getSession().then(({ data: { session } }) => {
+//       // Session is managed in context
+//     });
+
+//     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+//       // Session updates handled in App.js via LocationContext
+//     });
+
+//     return () => subscription.unsubscribe();
+//   }, []);
+
+//   return (
+//     <header className="navbar">
+//       <div className="nav-container">
+//         <Link to="/" className="logo-container" aria-label="JustOrder Home">
+//           <FaShoppingBag className="logo-icon" />
+//           <span className="logo-text">JustOrder</span>
+//         </Link>
+//         <div className="auth-buttons">
+//           {session ? (
+//             <Link to="/cart" className="cart-icon" aria-label={`Cart with ${cartCount} items`}>
+//               <IoCartOutline />
+//               {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+//             </Link>
+//           ) : (
+//             <>
+//               <Link to="/auth" className="auth-link" aria-label="Sign Up">
+//                 Sign Up
+//               </Link>
+//               <Link to="/auth" className="auth-link" aria-label="Login">
+//                 Login
+//               </Link>
+//             </>
+//           )}
+//         </div>
+//       </div>
+//     </header>
+//   );
+// }
+
+// export default Header;
+
+
+
+
+
 import React, { useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { IoCartOutline } from 'react-icons/io5';
-import { FaShoppingBag } from 'react-icons/fa';
 import { LocationContext } from '../App';
 import '../style/Header.css';
+import logo from '../assets/markeet.png'; // Import the logo
 
 function Header() {
   const { session, cartCount } = useContext(LocationContext);
@@ -395,8 +453,7 @@ function Header() {
     <header className="navbar">
       <div className="nav-container">
         <Link to="/" className="logo-container" aria-label="JustOrder Home">
-          <FaShoppingBag className="logo-icon" />
-          <span className="logo-text">JustOrder</span>
+          <img src={logo} alt="JustOrder Logo" className="logo-image" />
         </Link>
         <div className="auth-buttons">
           {session ? (

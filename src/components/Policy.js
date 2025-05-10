@@ -27,7 +27,7 @@ function Policy() {
       <section className="policy-section">
         <h2 className="section-heading">Shipping Policy</h2>
         <p>
-          We aim to deliver your orders within 3-5 business days, depending on your location. Orders are shipped only to locations within a 40km radius of the seller's store. You can track your order status from the "My Orders" section in your account.
+          We aim to deliver your orders within 3Hrs-24Hrs business days, depending on your location. Orders are shipped only to locations within a 40km radius of the seller's store. You can track your order status from the "My Orders" section in your account.
         </p>
         <ul>
           <li>Free shipping on orders above ₹500.</li>

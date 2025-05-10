@@ -1,0 +1,14 @@
+{
+  "emulators": {
+    "auth": {
+      "port": 9099,
+      "users": [
+        {
+          "uid": "test1",
+          "phoneNumber": "+15555550123",
+          "phoneVerificationCodes": ["123456"]
+        }
+      ]
+    }
+  }
+}
