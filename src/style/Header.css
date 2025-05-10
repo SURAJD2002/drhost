@@ -1,13 +1,16 @@
-/* Use the same color palette as Home.css */
+/* Unified color palette (aligned with Home.css) */
 :root {
   --primary-dark: #007bff;
-  --primary-dark-hover: #0056b3; /* Added for consistency with other components */
+  --primary-dark-hover: #0056b3;
   --accent-gold: #FFD700;
   --luxury-gold: #D4AF37;
   --luxury-dark: #1A1A1A;
   --luxury-gradient-start: #2C2C2C;
   --luxury-gradient-end: #4A4A4A;
   --light-blue: #66b0ff;
+  --accent-red: #ef4444; /* Added for cart badge consistency */
+  --accent-orange: #f97316; /* Added for cart badge consistency */
+  --shadow: rgba(0, 0, 0, 0.1); /* Added for consistency */
 }
 
 /* Navbar */
@@ -19,8 +22,8 @@
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(220, 240, 255, 0.8));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  padding: 15px 0;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  padding: 10px 0; /* Reduced padding for tighter look */
+  box-shadow: 0 4px 15px var(--shadow);
   z-index: 1000;
   animation: slideDown 0.5s ease forwards;
 }
@@ -33,7 +36,7 @@
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 15px; /* Reduced padding for better alignment */
 }
 
 /* Logo Container */
@@ -51,8 +54,8 @@
 
 /* Logo Image */
 .logo-image {
-  height: 40px; /* Base height for the logo */
-  width: auto; /* Maintain aspect ratio */
+  height: 40px;
+  width: auto;
   object-fit: contain;
   animation: logoFadeIn 0.5s ease forwards;
 }
@@ -61,45 +64,37 @@
 .auth-buttons {
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 15px; /* Reduced from 30px for tighter spacing */
 }
 
 /* Auth Link */
 .auth-link {
   color: var(--primary-dark);
   text-decoration: none;
-  font-size: 15px;
+  font-size: 14px; /* Slightly smaller for balance */
   font-weight: 600;
-  padding: 8px 20px;
-  border: 2px solid var(--primary-dark);
-  border-radius: 25px;
-  background: rgba(255, 255, 255, 0.2);
+  padding: 8px 16px; /* Adjusted for compact look */
+  border: 1px solid var(--primary-dark); /* Thinner border */
+  border-radius: 6px; /* Rounded but not pill-shaped */
+  background: transparent; /* Removed semi-opaque background */
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px; /* Ensure consistent width */
+  box-shadow: 0 2px 4px var(--shadow); /* Added subtle shadow */
 }
 
 .auth-link:hover {
   background: var(--primary-dark);
-  color: #fff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
-  animation: pulseButton 0.5s ease;
+  color: white;
+  transform: translateY(-1px); /* Subtle lift effect */
+  box-shadow: 0 4px 8px var(--shadow); /* Enhanced shadow on hover */
 }
 
+/* Removed the ::before pseudo-element for simpler hover effect */
 .auth-link::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(0, 123, 255, 0.3), transparent);
-  transition: all 0.5s ease;
-}
-
-.auth-link:hover::before {
-  left: 100%;
+  display: none; /* Removed gradient slide effect */
 }
 
 /* Cart Icon */
@@ -122,8 +117,8 @@
 
 /* Cart Badge */
 .cart-badge {
-  background: linear-gradient(135deg, #ef4444, #f97316);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+  color: white;
   font-size: 0.8rem;
   font-weight: bold;
   border-radius: 50%;
@@ -132,7 +127,7 @@
   top: -8px;
   right: -12px;
   transform: translate(50%, -50%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 6px var(--shadow);
   animation: bounceIn 0.6s ease forwards;
 }
 
@@ -188,23 +183,25 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .nav-container {
-    flex-direction: column;
-    gap: 12px;
-    padding: 0 15px;
+    flex-direction: row; /* Changed to row to keep buttons inline */
+    justify-content: space-between; /* Ensure even spacing */
+    align-items: center;
+    padding: 0 10px;
   }
 
   .auth-buttons {
-    gap: 20px;
+    gap: 10px; /* Tighter gap for mobile */
   }
 
   .logo-image {
-    height: 139px;
-    margin-right: 188px; /* Adjusted for smaller screens */
+    height: 35px; /* Slightly smaller for mobile */
+    margin-right: 0; /* Removed excessive margin */
   }
 
   .auth-link {
     font-size: 13px;
-    padding: 6px 16px;
+    padding: 6px 12px;
+    min-width: 70px; /* Smaller buttons for mobile */
   }
 
   .cart-icon {
@@ -222,13 +219,50 @@
 @media (min-width: 769px) {
   .nav-container {
     flex-direction: row;
+    padding: 0 20px;
   }
 
   .logo-image {
-    height: 122px;
+    height: 40px; /* Restored original height */
+  }
+
+  .auth-link {
+    font-size: 14px;
+    padding: 8px 16px;
   }
 
   .cart-icon {
     font-size: 2.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .nav-container {
+    padding: 0 8px;
+  }
+
+  .auth-buttons {
+    gap: 8px;
+  }
+
+  .logo-image {
+    height: 125px;
+  }
+
+  .auth-link {
+    font-size: 12px;
+    padding: 5px 10px;
+    min-width: 60px;
+  }
+
+  .cart-icon {
+    font-size: 1.8rem;
+  }
+
+  .cart-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    top: -5px;
+    right: -8px;
   }
 }
