@@ -791,15 +791,279 @@
 
 
 
-import React, { useState, useEffect, useCallback } from 'react';
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { useNavigate } from 'react-router-dom';
+// import '../style/Orders.css';
+
+// function Orders() {
+//   const [orders, setOrders] = useState([]);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const navigate = useNavigate();
+
+//   const withRetry = (fn, maxAttempts = 3, delay = 1000) => {
+//     return async () => {
+//       let attempt = 0;
+//       while (attempt < maxAttempts) {
+//         try {
+//           return await fn();
+//         } catch (error) {
+//           attempt++;
+//           if (attempt === maxAttempts) throw error;
+//           await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
+//         }
+//       }
+//     };
+//   };
+
+//   const fetchOrders = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+//         if (refreshError || !refreshData.session?.user) {
+//           setError('You must be logged in to view your orders.');
+//           setLoading(false);
+//           navigate('/auth');
+//           return;
+//         }
+//         session = refreshData.session;
+//       }
+
+//       let query = supabase
+//         .from('orders')
+//         .select(`
+//           id,
+//           user_id,
+//           seller_id,
+//           order_status,
+//           total,
+//           shipping_address,
+//           payment_method,
+//           created_at,
+//           cancellation_reason,
+//           emi_application_uuid,
+//           emi_applications!orders_emi_application_uuid_fkey (
+//             product_name,
+//             product_price,
+//             seller_name
+//           ),
+//           order_items (
+//             quantity,
+//             price,
+//             products (
+//               title,
+//               images
+//             )
+//           ),
+//           sellers (
+//             store_name
+//           )
+//         `);
+
+//       if (session.user.id) {
+//         const { data: profileData, error: profileError } = await supabase
+//           .from('profiles')
+//           .select('is_seller')
+//           .eq('id', session.user.id)
+//           .single();
+
+//         if (profileError) throw profileError;
+
+//         if (profileData.is_seller) {
+//           query = query.eq('seller_id', session.user.id);
+//         } else {
+//           query = query.eq('user_id', session.user.id);
+//         }
+//       }
+
+//       const fetchOrdersQuery = () => query.order('created_at', { ascending: false });
+//       const ordersData = await withRetry(fetchOrdersQuery)();
+
+//       setOrders(ordersData.data || []);
+//       setError(null);
+//     } catch (fetchError) {
+//       console.error('Error fetching orders:', fetchError);
+//       setError(`Error: ${fetchError.message || 'Failed to fetch orders. Please check your permissions or try again later.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [navigate]);
+
+//   useEffect(() => {
+//     fetchOrders();
+//   }, [fetchOrders]);
+
+//   const handleOrderClick = async (orderId) => {
+//     try {
+//       let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+//         if (refreshError || !refreshData.session?.user) {
+//           setError('Authentication required. Please ensure you are logged in.');
+//           navigate('/auth');
+//           return;
+//         }
+//         session = refreshData.session;
+//       }
+
+//       const { data: orderData, error: orderError } = await supabase
+//         .from('orders')
+//         .select(`
+//           *,
+//           emi_applications!orders_emi_application_uuid_fkey (
+//             product_name,
+//             product_price,
+//             seller_name
+//           ),
+//           order_items (
+//             quantity,
+//             price,
+//             products (
+//               title,
+//               images
+//             )
+//           ),
+//           sellers (
+//             store_name
+//           )
+//         `)
+//         .eq('id', orderId)
+//         .single();
+
+//       if (orderError) {
+//         if (orderError.code === 'PGRST116') {
+//           setError('Order not found.');
+//         } else if (orderError.code === '42501') {
+//           setError('You are not authorized to view this order.');
+//         } else {
+//           throw orderError;
+//         }
+//         return;
+//       }
+
+//       const isBuyer = orderData.user_id === session.user.id;
+//       const isSeller = orderData.seller_id === session.user.id;
+
+//       if (!isBuyer && !isSeller) {
+//         setError('You are not authorized to view this order.');
+//         return;
+//       }
+
+//       navigate(`/order-details/${orderId}`, { state: { order: orderData } });
+//     } catch (error) {
+//       console.error('Error navigating to order:', error);
+//       setError(`Error: ${error.message || 'Failed to navigate to order details. Please try again later.'}`);
+//       if (error.message.includes('Authentication required') || error.code === '42501') {
+//         navigate('/auth');
+//       }
+//     }
+//   };
+
+//   if (loading) return <div className="orders-loading">Loading...</div>;
+//   if (error) return <div className="orders-error">{error}</div>;
+//   if (orders.length === 0) return <div className="orders-empty">You have no orders yet.</div>;
+
+//   return (
+//     <div className="orders">
+//       <h1 style={{ color: '#007bff' }}>My Orders</h1>
+//       <div className="orders-list">
+//         {orders.map((order) => (
+//           <div 
+//             key={order.id} 
+//             className="order-item" 
+//             onClick={() => handleOrderClick(order.id)}
+//             style={{ cursor: 'pointer', border: '1px solid #ccc', borderRadius: '8px', padding: '10px', margin: '10px' }}
+//           >
+//             <h3 style={{ color: '#007bff' }}>Order #{order.id}</h3>
+//             <p style={{ color: '#666' }}>
+//               Total: ₹{(order.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//             </p>
+//             <p style={{ color: '#666' }}>Payment Method: {order.payment_method}</p>
+//             <p style={{ color: '#666' }}>
+//               Status: {order.order_status}
+//               {order.payment_method === 'emi' && order.order_status === 'pending' && (
+//                 <span style={{ color: '#ff9800', marginLeft: '5px' }}>(Waiting for Approval)</span>
+//               )}
+//             </p>
+//             {order.order_status === 'cancelled' && order.cancellation_reason && (
+//               <p style={{ color: '#f44336' }}>Reason: {order.cancellation_reason}</p>
+//             )}
+//             <p style={{ color: '#666' }}>Shipping Address: {order.shipping_address || 'Not provided'}</p>
+//             <div className="order-items-list">
+//               <h4 style={{ color: '#007bff' }}>Ordered Products</h4>
+//               {order.payment_method === 'emi' && order.emi_applications ? (
+//                 <div className="order-item-details">
+//                   <img
+//                     src={'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//                     alt={order.emi_applications.product_name || 'Product'}
+//                     onError={(e) => {
+//                       e.target.src = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     style={{ width: '50px', height: '50px', marginRight: '10px' }}
+//                   />
+//                   <p style={{ color: '#666' }}>
+//                     {order.emi_applications.product_name} - Price: ₹{order.emi_applications.product_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                   </p>
+//                 </div>
+//               ) : order.order_items && order.order_items.length > 0 ? (
+//                 order.order_items.map((item, index) => (
+//                   <div key={index} className="order-item-details">
+//                     <img
+//                       src={item.products?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//                       alt={item.products?.title || `Product ${index + 1}`}
+//                       onError={(e) => {
+//                         e.target.src = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                       }}
+//                       style={{ width: '50px', height: '50px', marginRight: '10px' }}
+//                     />
+//                     <p style={{ color: '#666' }}>
+//                       {item.products?.title || 'Unnamed Product'} - Qty: {item.quantity} - Price: ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                     </p>
+//                   </div>
+//                 ))
+//               ) : (
+//                 <p style={{ color: '#666' }}>Product details not available.</p>
+//               )}
+//             </div>
+//             <p style={{ color: '#666' }}>
+//               Seller: {order.emi_applications?.seller_name || order.sellers?.store_name || 'Unknown Seller'}
+//             </p>
+//           </div>
+//         ))}
+//       </div>
+//       <div className="footer" style={{ backgroundColor: '#f8f9fa', padding: '10px', textAlign: 'center', color: '#666', marginTop: '20px' }}>
+//         <div className="footer-icons" style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
+//           <span className="icon-circle" style={{ backgroundColor: '#007bff', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+//             🏠
+//           </span>
+//           <span className="icon-circle" style={{ backgroundColor: '#007bff', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+//             🛒
+//           </span>
+//         </div>
+//         <p style={{ color: '#007bff' }}>Categories</p>
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default Orders;
+
+
+
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import '../style/Orders.css';
 
 function Orders() {
   const [orders, setOrders] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isSeller, setIsSeller] = useState(false);
   const navigate = useNavigate();
 
   const withRetry = (fn, maxAttempts = 3, delay = 1000) => {
@@ -863,20 +1127,19 @@ function Orders() {
           )
         `);
 
-      if (session.user.id) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('is_seller')
-          .eq('id', session.user.id)
-          .single();
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_seller')
+        .eq('id', session.user.id)
+        .single();
 
-        if (profileError) throw profileError;
+      if (profileError) throw profileError;
+      setIsSeller(profileData.is_seller);
 
-        if (profileData.is_seller) {
-          query = query.eq('seller_id', session.user.id);
-        } else {
-          query = query.eq('user_id', session.user.id);
-        }
+      if (profileData.is_seller) {
+        query = query.eq('seller_id', session.user.id);
+      } else {
+        query = query.eq('user_id', session.user.id);
       }
 
       const fetchOrdersQuery = () => query.order('created_at', { ascending: false });
@@ -896,7 +1159,7 @@ function Orders() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleOrderClick = async (orderId) => {
+  const handleOrderClick = useCallback(async (orderId) => {
     try {
       let { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session?.user) {
@@ -960,93 +1223,181 @@ function Orders() {
         navigate('/auth');
       }
     }
-  };
+  }, [navigate]);
 
-  if (loading) return <div className="orders-loading">Loading...</div>;
-  if (error) return <div className="orders-error">{error}</div>;
-  if (orders.length === 0) return <div className="orders-empty">You have no orders yet.</div>;
+  // SEO variables
+  const pageUrl = 'https://www.freshcart.com/orders';
+  const defaultImage = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+  const pageTitle = isSeller ? 'Seller Orders - FreshCart' : 'My Orders - FreshCart';
+  const pageDescription = isSeller
+    ? 'View and manage orders received for your products on FreshCart.'
+    : 'View and track your orders on FreshCart, including order details and status.';
+
+  if (loading) return (
+    <div className="orders-loading">Loading...</div>
+  );
+  if (error) return (
+    <div className="orders-error">
+      <Helmet>
+        <title>Error - FreshCart</title>
+        <meta name="description" content="An error occurred while loading your FreshCart orders. Please try again." />
+        <meta name="robots" content="noindex, nofollow" />
+        <link rel="canonical" href={pageUrl} />
+      </Helmet>
+      {error}
+    </div>
+  );
+  if (orders.length === 0) return (
+    <div className="orders-empty">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta name="keywords" content="orders, ecommerce, FreshCart, order tracking" />
+        <meta name="robots" content="noindex, follow" />
+        <link rel="canonical" href={pageUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={defaultImage} />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={defaultImage} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: pageTitle,
+            description: pageDescription,
+            url: pageUrl,
+            publisher: {
+              '@type': 'Organization',
+              name: 'FreshCart',
+            },
+          })}
+        </script>
+      </Helmet>
+      You have no orders yet.
+    </div>
+  );
 
   return (
     <div className="orders">
-      <h1 style={{ color: '#007bff' }}>My Orders</h1>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <meta name="keywords" content="orders, ecommerce, FreshCart, order tracking" />
+        <meta name="robots" content="noindex, follow" />
+        <link rel="canonical" href={pageUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content={orders[0]?.order_items?.[0]?.products?.images?.[0] || defaultImage} />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content={orders[0]?.order_items?.[0]?.products?.images?.[0] || defaultImage} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: pageTitle,
+            description: pageDescription,
+            url: pageUrl,
+            publisher: {
+              '@type': 'Organization',
+              name: 'FreshCart',
+            },
+          })}
+        </script>
+      </Helmet>
+      <h1 className="orders-title">My Orders</h1>
       <div className="orders-list">
         {orders.map((order) => (
-          <div 
-            key={order.id} 
-            className="order-item" 
-            onClick={() => handleOrderClick(order.id)}
-            style={{ cursor: 'pointer', border: '1px solid #ccc', borderRadius: '8px', padding: '10px', margin: '10px' }}
-          >
-            <h3 style={{ color: '#007bff' }}>Order #{order.id}</h3>
-            <p style={{ color: '#666' }}>
-              Total: ₹{(order.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <p style={{ color: '#666' }}>Payment Method: {order.payment_method}</p>
-            <p style={{ color: '#666' }}>
-              Status: {order.order_status}
-              {order.payment_method === 'emi' && order.order_status === 'pending' && (
-                <span style={{ color: '#ff9800', marginLeft: '5px' }}>(Waiting for Approval)</span>
-              )}
-            </p>
-            {order.order_status === 'cancelled' && order.cancellation_reason && (
-              <p style={{ color: '#f44336' }}>Reason: {order.cancellation_reason}</p>
-            )}
-            <p style={{ color: '#666' }}>Shipping Address: {order.shipping_address || 'Not provided'}</p>
-            <div className="order-items-list">
-              <h4 style={{ color: '#007bff' }}>Ordered Products</h4>
-              {order.payment_method === 'emi' && order.emi_applications ? (
-                <div className="order-item-details">
-                  <img
-                    src={'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
-                    alt={order.emi_applications.product_name || 'Product'}
-                    onError={(e) => {
-                      e.target.src = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
-                    }}
-                    style={{ width: '50px', height: '50px', marginRight: '10px' }}
-                  />
-                  <p style={{ color: '#666' }}>
-                    {order.emi_applications.product_name} - Price: ₹{order.emi_applications.product_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-              ) : order.order_items && order.order_items.length > 0 ? (
-                order.order_items.map((item, index) => (
-                  <div key={index} className="order-item-details">
-                    <img
-                      src={item.products?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
-                      alt={item.products?.title || `Product ${index + 1}`}
-                      onError={(e) => {
-                        e.target.src = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
-                      }}
-                      style={{ width: '50px', height: '50px', marginRight: '10px' }}
-                    />
-                    <p style={{ color: '#666' }}>
-                      {item.products?.title || 'Unnamed Product'} - Qty: {item.quantity} - Price: ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p style={{ color: '#666' }}>Product details not available.</p>
-              )}
-            </div>
-            <p style={{ color: '#666' }}>
-              Seller: {order.emi_applications?.seller_name || order.sellers?.store_name || 'Unknown Seller'}
-            </p>
-          </div>
+          <OrderItem
+            key={order.id}
+            order={order}
+            handleOrderClick={handleOrderClick}
+          />
         ))}
       </div>
-      <div className="footer" style={{ backgroundColor: '#f8f9fa', padding: '10px', textAlign: 'center', color: '#666', marginTop: '20px' }}>
-        <div className="footer-icons" style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
-          <span className="icon-circle" style={{ backgroundColor: '#007bff', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-            🏠
-          </span>
-          <span className="icon-circle" style={{ backgroundColor: '#007bff', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-            🛒
-          </span>
+      <div className="footer">
+        <div className="footer-icons">
+          <span className="icon-circle">🏠</span>
+          <span className="icon-circle">🛒</span>
         </div>
-        <p style={{ color: '#007bff' }}>Categories</p>
+        <p className="footer-categories">Categories</p>
       </div>
     </div>
   );
 }
+
+const OrderItem = memo(({ order, handleOrderClick }) => {
+  const defaultImage = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+  
+  return (
+    <div
+      className="order-item"
+      onClick={() => handleOrderClick(order.id)}
+      aria-label={`View details for order ${order.id}`}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && handleOrderClick(order.id)}
+    >
+      <h3 className="order-item-title">Order #{order.id}</h3>
+      <p className="order-item-text">
+        Total: ₹{(order.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </p>
+      <p className="order-item-text">Payment Method: {order.payment_method}</p>
+      <p className="order-item-text">
+        Status: {order.order_status}
+        {order.payment_method === 'emi' && order.order_status === 'pending' && (
+          <span className="order-item-emi-pending">(Waiting for Approval)</span>
+        )}
+      </p>
+      {order.order_status === 'cancelled' && order.cancellation_reason && (
+        <p className="order-item-cancellation">Reason: {order.cancellation_reason}</p>
+      )}
+      <p className="order-item-text">Shipping Address: {order.shipping_address || 'Not provided'}</p>
+      <div className="order-items-list">
+        <h4 className="order-items-title">Ordered Products</h4>
+        {order.payment_method === 'emi' && order.emi_applications ? (
+          <div className="order-item-details">
+            <img
+              src={defaultImage}
+              alt={order.emi_applications.product_name || 'Product'}
+              onError={(e) => (e.target.src = defaultImage)}
+              className="order-item-image"
+            />
+            <p className="order-item-text">
+              {order.emi_applications.product_name} - Price: ₹{order.emi_applications.product_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        ) : order.order_items && order.order_items.length > 0 ? (
+          order.order_items.map((item, index) => (
+            <div key={index} className="order-item-details">
+              <img
+                src={item.products?.images?.[0] || defaultImage}
+                alt={item.products?.title || `Product ${index + 1}`}
+                onError={(e) => (e.target.src = defaultImage)}
+                className="order-item-image"
+              />
+              <p className="order-item-text">
+                {item.products?.title || 'Unnamed Product'} - Qty: {item.quantity} - Price: ₹{item.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+          ))
+        ) : (
+          <p className="order-item-text">Product details not available.</p>
+        )}
+      </div>
+      <p className="order-item-text">
+        Seller: {order.emi_applications?.seller_name || order.sellers?.store_name || 'Unknown Seller'}
+      </p>
+    </div>
+  );
+});
 
 export default Orders;

@@ -553,11 +553,147 @@
 // export default Categories;
 
 
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import '../style/Categories.css';
+// import Footer from './Footer';
+
+// // Utility to debounce a function
+// const debounce = (func, delay) => {
+//   let timeoutId;
+//   return (...args) => {
+//     clearTimeout(timeoutId);
+//     timeoutId = setTimeout(() => func(...args), delay);
+//   };
+// };
+
+// function Categories() {
+//   const [categories, setCategories] = useState([]);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [selectedCategory, setSelectedCategory] = useState(null);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+
+//   useEffect(() => {
+//     fetchCategories();
+//   }, []);
+
+//   const fetchCategories = async () => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data, error } = await supabase
+//         .from('categories')
+//         .select('*')
+//         .order('name');
+
+//       if (error) throw error;
+//       setCategories(data || []);
+//     } catch (err) {
+//       console.error('Error fetching categories:', err);
+//       setError('Error fetching categories. Please try again.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Debounced search handler
+//   const handleSearch = useCallback(
+//     debounce((value) => {
+//       setSearchTerm(value);
+//     }, 300),
+//     []
+//   );
+
+//   const filteredCategories = categories.filter(category =>
+//     category.name.toLowerCase().includes(searchTerm.toLowerCase())
+//   );
+
+//   const handleCategoryClick = (category) => {
+//     setSelectedCategory(category);
+//     console.log(`Navigating to products for category: ${category.name}`);
+//   };
+
+//   return (
+//     <div className="cat-page">
+//       <header className="cat-header">
+//         <h1 className="cat-title">Shop by Category</h1>
+//       </header>
+//       <div className="cat-search-bar">
+//         <input
+//           type="text"
+//           placeholder="Search categories..."
+//           onChange={(e) => handleSearch(e.target.value)}
+//           className="cat-search-input"
+//           aria-label="Search categories"
+//         />
+//       </div>
+//       {error && <p className="cat-error-message">{error}</p>}
+//       <div className="cat-grid">
+//         {loading ? (
+//           [...Array(6)].map((_, i) => (
+//             <div key={`skeleton-${i}`} className="cat-card-skeleton">
+//               <div className="skeleton-image" />
+//               <div className="skeleton-text" />
+//               <div className="skeleton-text short" />
+//               <div className="skeleton-link" />
+//             </div>
+//           ))
+//         ) : filteredCategories.length === 0 ? (
+//           <p className="cat-no-categories">No categories found.</p>
+//         ) : (
+//           filteredCategories.map((category) => (
+//             <div
+//               key={category.id}
+//               className={`cat-card ${selectedCategory?.id === category.id ? 'cat-selected' : ''}`}
+//               onClick={() => handleCategoryClick(category)}
+//               role="button"
+//               tabIndex={0}
+//               onKeyPress={(e) => e.key === 'Enter' && handleCategoryClick(category)}
+//               aria-label={`Select ${category.name} category`}
+//             >
+//               <div className="cat-image-wrapper">
+//                 <img
+//                   src={category.image_url || 'https://via.placeholder.com/150x150?text=Category'}
+//                   alt={category.name}
+//                   className="cat-image"
+//                   onError={(e) => (e.target.src = 'https://via.placeholder.com/150x150?text=Category')}
+//                 />
+//               </div>
+//               <h3 className="cat-name">{category.name.trim()}</h3>
+//               {category.parent_id && (
+//                 <p className="cat-parent">
+//                   Subcategory of:{' '}
+//                   {categories.find(c => c.id === category.parent_id)?.name || 'N/A'}
+//                 </p>
+//               )}
+//               <Link
+//                 to={`/products?category=${category.id}`}
+//                 className="cat-view-products-link"
+//                 aria-label={`View products in ${category.name} category`}
+//               >
+//                 View Products
+//               </Link>
+//             </div>
+//           ))
+//         )}
+//       </div>
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Categories;
+
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import '../style/Categories.css';
 import Footer from './Footer';
+import { Helmet } from 'react-helmet-async'; // Added
 
 // Utility to debounce a function
 const debounce = (func, delay) => {
@@ -615,8 +751,53 @@ function Categories() {
     console.log(`Navigating to products for category: ${category.name}`);
   };
 
+  // SEO variables
+  const pageUrl = 'https://www.markeet.com/categories';
+  const categoryList = categories.map(category => ({
+    "@type": "ListItem",
+    position: categories.indexOf(category) + 1,
+    name: category.name,
+    item: `https://www.markeet.com/products?category=${category.id}`,
+  }));
+
   return (
     <div className="cat-page">
+      <Helmet>
+        <title>Shop by Category - Markeet</title>
+        <meta
+          name="description"
+          content="Explore electronics, appliances, fashion, jewellery, gifts, and home decoration categories on Markeet. Shop local with fast delivery."
+        />
+        <meta
+          name="keywords"
+          content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, categories, Markeet"
+        />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href={pageUrl} />
+        <meta property="og:title" content="Shop by Category - Markeet" />
+        <meta
+          property="og:description"
+          content="Explore electronics, appliances, fashion, jewellery, gifts, and home decoration categories on Markeet."
+        />
+        <meta property="og:image" content="https://via.placeholder.com/150x150?text=Category" />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Shop by Category - Markeet" />
+        <meta
+          name="twitter:description"
+          content="Explore electronics, appliances, fashion, jewellery, gifts, and home decoration categories on Markeet."
+        />
+        <meta name="twitter:image" content="https://via.placeholder.com/150x150?text=Category" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            itemListElement: categoryList,
+          })}
+        </script>
+      </Helmet>
+
       <header className="cat-header">
         <h1 className="cat-title">Shop by Category</h1>
       </header>
@@ -656,7 +837,7 @@ function Categories() {
               <div className="cat-image-wrapper">
                 <img
                   src={category.image_url || 'https://via.placeholder.com/150x150?text=Category'}
-                  alt={category.name}
+                  alt={`${category.name} category image`}
                   className="cat-image"
                   onError={(e) => (e.target.src = 'https://via.placeholder.com/150x150?text=Category')}
                 />

@@ -302,3 +302,72 @@
   font-size: 0.9em;
   margin-top: 5px;
 }
+.map-container {
+  width: 100%;
+  height: 300px;
+  margin-bottom: 10px;
+}
+.geocoder-container .mapboxgl-ctrl-geocoder {
+  width: 100%;
+  max-width: none;
+  box-shadow: none;
+}
+.geocoder-container .mapboxgl-ctrl-geocoder input {
+  padding: 8px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 100%;
+}
+.address-error {
+  color: red;
+  font-size: 14px;
+  margin-top: 5px;
+}
+/* Location Inputs */
+.detect-location-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #fff;
+  background-color: #007bff;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.detect-location-btn:hover {
+  background-color: #0056b3;
+}
+
+.manual-location {
+  margin: 8px 0;
+}
+
+.manual-location p {
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.manual-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.manual-location-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #fff;
+  background-color: #28a745;
+  font-size: 0.9rem;
+}
+
+.manual-location-btn:hover {
+  background-color: #218838;
+}
