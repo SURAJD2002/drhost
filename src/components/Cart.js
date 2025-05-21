@@ -2674,6 +2674,3555 @@
 
 
 
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link } from 'react-router-dom';
+// import { FaTrash } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Cart.css';
+// import Footer from './Footer';
+// import { ToastContainer, toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+// import { Helmet } from 'react-helmet-async'; // Added
+
+// // Custom retry function for Supabase requests (exponential backoff)
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
+//       await new Promise(resolve => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Distance calculation function
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+//     Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Cart() {
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [products, setProducts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   const fetchCartItems = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       const {
+//         data: { session },
+//         error: sessionError,
+//       } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         return;
+//       }
+
+//       const userId = session.user.id;
+
+//       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
+//         supabase.from('cart').select('product_id, quantity, variant_id').eq('user_id', userId)
+//       );
+//       if (supabaseError) {
+//         throw supabaseError;
+//       }
+
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+
+//       const mergedCart = [];
+//       const productIdsSet = new Set();
+
+//       storedCart.forEach(item => {
+//         if (item.id) {
+//           mergedCart.push({
+//             id: item.id,
+//             quantity: item.quantity || 1,
+//             variantId: item.selectedVariant?.id || null,
+//             selectedVariant: item.selectedVariant || null,
+//           });
+//           productIdsSet.add(item.id);
+//         }
+//       });
+
+//       const variantIds = supabaseCart
+//         .filter(item => item.variant_id)
+//         .map(item => item.variant_id);
+//       let variantDetails = {};
+//       if (variantIds.length > 0) {
+//         const { data: variantData, error: variantError } = await supabase
+//           .from('product_variants')
+//           .select('id, attributes, price, images, stock')
+//           .in('id', variantIds);
+//         if (variantError) throw variantError;
+//         variantDetails = variantData.reduce((acc, variant) => {
+//           acc[variant.id] = variant;
+//           return acc;
+//         }, {});
+//       }
+
+//       supabaseCart.forEach(item => {
+//         if (!productIdsSet.has(item.product_id)) {
+//           mergedCart.push({
+//             id: item.product_id,
+//             quantity: item.quantity || 1,
+//             variantId: item.variant_id || null,
+//             selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//           });
+//           productIdsSet.add(item.product_id);
+//         } else {
+//           const existingItemIndex = mergedCart.findIndex(i => i.id === item.product_id);
+//           if (existingItemIndex !== -1) {
+//             mergedCart[existingItemIndex] = {
+//               ...mergedCart[existingItemIndex],
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : mergedCart[existingItemIndex].selectedVariant,
+//             };
+//           }
+//         }
+//       });
+
+//       setCartItems(mergedCart);
+//       localStorage.setItem('cart', JSON.stringify(mergedCart));
+//       setCartCount(mergedCart.length);
+
+//       if (mergedCart.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const productIds = mergedCart.map((item) => item.id).filter(Boolean);
+//       if (productIds.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const { data: productData, error: fetchError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,
+//             seller_id,
+//             title,
+//             name,
+//             price,
+//             stock,
+//             images,
+//             product_variants!product_variants_product_id_fkey(price, images, stock)
+//           `)
+//           .in('id', productIds)
+//           .eq('is_approved', true)
+//       );
+//       if (fetchError) throw fetchError;
+
+//       const { data: sellersData, error: sellersError } = await retryRequest(() =>
+//         supabase.from('sellers').select('id, latitude, longitude')
+//       );
+//       if (sellersError) throw sellersError;
+
+//       const validProducts = (productData || [])
+//         .filter((product) => product.id && (product.title || product.name))
+//         .map((product) => {
+//           const seller = sellersData.find((s) => s.id === product.seller_id);
+//           if (!seller || calculateDistance(buyerLocation, seller) > 40) {
+//             return null;
+//           }
+
+//           const storedItem = mergedCart.find((item) => item.id === product.id);
+//           if (storedItem?.selectedVariant) {
+//             return {
+//               ...product,
+//               selectedVariant: storedItem.selectedVariant,
+//               price: storedItem.selectedVariant.price || product.price,
+//               stock: storedItem.selectedVariant.stock !== undefined ? storedItem.selectedVariant.stock : product.stock,
+//               images: storedItem.selectedVariant.images?.length
+//                 ? storedItem.selectedVariant.images
+//                 : product.images,
+//             };
+//           }
+
+//           const variantWithImages = product.product_variants?.find(
+//             (v) => Array.isArray(v.images) && v.images.length > 0
+//           );
+//           const finalImages =
+//             product.images?.length
+//               ? product.images
+//               : variantWithImages?.images || [
+//                   'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg',
+//                 ];
+//           const productPrice =
+//             product.price !== null && product.price !== undefined
+//               ? product.price
+//               : variantWithImages?.price || 0;
+//           const productStock =
+//             product.stock !== undefined
+//               ? product.stock
+//               : variantWithImages?.stock !== undefined
+//               ? variantWithImages.stock
+//               : 0;
+//           return {
+//             ...product,
+//             images: finalImages,
+//             price: productPrice,
+//             stock: productStock,
+//           };
+//         })
+//         .filter((p) => p !== null);
+
+//       setProducts(validProducts);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
+//       toast.error(`Failed to load cart: ${err.message}`, {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, setCartCount]);
+
+//   useEffect(() => {
+//     if (!buyerLocation || typeof fetchCartItems !== 'function') return;
+//     fetchCartItems();
+//   }, [buyerLocation, fetchCartItems]);
+
+//   const updateSupabaseCartItem = async (userId, productId, updatedItem) => {
+//     try {
+//       const { error: upsertError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .upsert(
+//             {
+//               user_id: userId,
+//               product_id: productId,
+//               quantity: updatedItem.quantity || 1,
+//               variant_id: updatedItem.variantId || null,
+//             },
+//             { onConflict: ['user_id', 'product_id'] }
+//           )
+//       );
+//       if (upsertError) {
+//         console.error('Upsert error details:', upsertError.message, upsertError.code, upsertError.details);
+//         if (upsertError.code === '42P10') {
+//           setError('Database constraint missing. Please contact support to fix the cart table.');
+//           toast.error('Database issue detected. Changes may not sync.', {
+//             position: "top-center",
+//             autoClose: 3000,
+//           });
+//         }
+//         throw upsertError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromSupabaseCart = async (userId, productId) => {
+//     try {
+//       const { error: deleteError } = await retryRequest(() =>
+//         supabase.from('cart').delete().eq('user_id', userId).eq('product_id', productId)
+//       );
+//       if (deleteError) {
+//         console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
+//         throw deleteError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromCart = async (productId) => {
+//     const updatedCart = cartItems.filter((item) => item.id !== productId);
+//     setCartItems(updatedCart);
+//     setProducts((prev) => prev.filter((product) => product.id !== productId));
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Item removed from cart successfully!', {
+//       position: "top-center",
+//       autoClose: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       await removeFromSupabaseCart(session.user.id, productId);
+//     }
+//   };
+
+//   const increaseQuantity = async (productId) => {
+//     const product = products.find(p => p.id === productId);
+//     const cartItem = cartItems.find(item => item.id === productId);
+//     const currentQuantity = cartItem.quantity || 1;
+//     const stock = product.stock !== undefined ? product.stock : 0;
+
+//     if (currentQuantity >= stock) {
+//       toast.error('Cannot add more items. Stock limit reached.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.id === productId) {
+//         return { ...item, quantity: currentQuantity + 1 };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: "top-center",
+//       autoClose: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find(item => item.id === productId);
+//       await updateSupabaseCartItem(session.user.id, productId, updatedItem);
+//     }
+//   };
+
+//   const decreaseQuantity = async (productId) => {
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.id === productId) {
+//         const newQty = (item.quantity || 1) - 1;
+//         return { ...item, quantity: newQty < 1 ? 1 : newQty };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: "top-center",
+//       autoClose: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find(item => item.id === productId);
+//       await updateSupabaseCartItem(session.user.id, productId, updatedItem);
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const quantity = cartItems.find((item) => item.id === product.id)?.quantity || 1;
+//     return sum + (product.price || 0) * quantity;
+//   }, 0);
+
+//   // SEO variables
+//   const pageUrl = 'https://www.markeet.com/cart';
+
+//   if (loading) return <div className="cart-loading">Loading...</div>;
+//   if (error) return <div className="cart-error">{error}</div>;
+
+//   return (
+//     <div className="cart">
+//       <Helmet>
+//         <title>Shopping Cart - Markeet</title>
+//         <meta
+//           name="description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="keywords"
+//           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
+//         />
+//         <meta name="robots" content="noindex, follow" /> {/* Cart is user-specific, so noindex */}
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           property="og:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           property="og:image"
+//           content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//         />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           name="twitter:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="twitter:image"
+//           content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//         />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             "@context": "https://schema.org",
+//             "@type": "WebPage",
+//             name: "Shopping Cart - Markeet",
+//             description: "View and manage your shopping cart on Markeet.",
+//             url: pageUrl,
+//           })}
+//         </script>
+//       </Helmet>
+//       <ToastContainer position="top-center" autoClose={3000} />
+//       <h1 className="cart-title">FreshCart Cart</h1>
+//       {cartItems.length === 0 ? (
+//         <p className="empty-cart">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           <div className="cart-items">
+//             {products.map((product, index) => {
+//               const quantity = cartItems.find((item) => item.id === product.id)?.quantity || 1;
+//               const selectedVariant = product.selectedVariant;
+//               return (
+//                 <div key={`${product.id}-${index}`} className="cart-item">
+//                   <img
+//                     src={
+//                       selectedVariant?.images?.[0] ||
+//                       product.images?.[0] ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={`${product.title || product.name} cart image`}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     className="cart-item-image"
+//                   />
+//                   <div className="cart-item-details">
+//                     <h3 className="cart-item-title">
+//                       {product.title || product.name || 'Unnamed Product'}
+//                       {selectedVariant && (
+//                         <span className="variant-info">
+//                           {' '}
+//                           - {Object.entries(selectedVariant.attributes || {})
+//                             .map(([key, val]) => `${key}: ${val}`)
+//                             .join(', ')}
+//                         </span>
+//                       )}
+//                     </h3>
+//                     <p className="cart-item-price">
+//                       ₹
+//                       {(selectedVariant?.price || product.price).toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                     <div className="cart-quantity">
+//                       <button onClick={() => decreaseQuantity(product.id)} className="qty-btn">-</button>
+//                       <span className="qty-display">{quantity}</span>
+//                       <button onClick={() => increaseQuantity(product.id)} className="qty-btn">+</button>
+//                     </div>
+//                     <button onClick={() => removeFromCart(product.id)} className="remove-btn">
+//                       <FaTrash /> Remove
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+//           <div className="cart-total">
+//             <h3>
+//               Total: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </h3>
+//             <Link to="/checkout" className="checkout-btn">
+//               Proceed to Checkout
+//             </Link>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Cart;
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link } from 'react-router-dom';
+// import { FaTrash } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Cart.css';
+// import Footer from './Footer';
+// import { toast } from 'react-hot-toast';
+// import { Helmet } from 'react-helmet-async';
+
+// // Custom retry function for Supabase requests (exponential backoff)
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
+//       await new Promise(resolve => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Distance calculation function
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+//     Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Cart() {
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [products, setProducts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   const fetchCartItems = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       const {
+//         data: { session },
+//         error: sessionError,
+//       } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         return;
+//       }
+
+//       const userId = session.user.id;
+
+//       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
+//         supabase.from('cart').select('product_id, quantity, variant_id').eq('user_id', userId)
+//       );
+//       if (supabaseError) {
+//         throw supabaseError;
+//       }
+
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+
+//       const mergedCart = [];
+//       const productIdsSet = new Set();
+
+//       storedCart.forEach(item => {
+//         if (item.id) {
+//           mergedCart.push({
+//             id: item.id,
+//             quantity: item.quantity || 1,
+//             variantId: item.selectedVariant?.id || null,
+//             selectedVariant: item.selectedVariant || null,
+//           });
+//           productIdsSet.add(item.id);
+//         }
+//       });
+
+//       const variantIds = supabaseCart
+//         .filter(item => item.variant_id)
+//         .map(item => item.variant_id);
+//       let variantDetails = {};
+//       if (variantIds.length > 0) {
+//         const { data: variantData, error: variantError } = await supabase
+//           .from('product_variants')
+//           .select('id, attributes, price, images, stock')
+//           .in('id', variantIds);
+//         if (variantError) throw variantError;
+//         variantDetails = variantData.reduce((acc, variant) => {
+//           acc[variant.id] = variant;
+//           return acc;
+//         }, {});
+//       }
+
+//       supabaseCart.forEach(item => {
+//         if (!productIdsSet.has(item.product_id)) {
+//           mergedCart.push({
+//             id: item.product_id,
+//             quantity: item.quantity || 1,
+//             variantId: item.variant_id || null,
+//             selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//           });
+//           productIdsSet.add(item.product_id);
+//         } else {
+//           const existingItemIndex = mergedCart.findIndex(i => i.id === item.product_id);
+//           if (existingItemIndex !== -1) {
+//             mergedCart[existingItemIndex] = {
+//               ...mergedCart[existingItemIndex],
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : mergedCart[existingItemIndex].selectedVariant,
+//             };
+//           }
+//         }
+//       });
+
+//       setCartItems(mergedCart);
+//       localStorage.setItem('cart', JSON.stringify(mergedCart));
+//       setCartCount(mergedCart.length);
+
+//       if (mergedCart.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const productIds = mergedCart.map((item) => item.id).filter(Boolean);
+//       if (productIds.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const { data: productData, error: fetchError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,
+//             seller_id,
+//             title,
+//             name,
+//             price,
+//             stock,
+//             images,
+//             product_variants!product_variants_product_id_fkey(price, images, stock)
+//           `)
+//           .in('id', productIds)
+//           .eq('is_approved', true)
+//       );
+//       if (fetchError) throw fetchError;
+
+//       const { data: sellersData, error: sellersError } = await retryRequest(() =>
+//         supabase.from('sellers').select('id, latitude, longitude')
+//       );
+//       if (sellersError) throw sellersError;
+
+//       const validProducts = (productData || [])
+//         .filter((product) => product.id && (product.title || product.name))
+//         .map((product) => {
+//           const seller = sellersData.find((s) => s.id === product.seller_id);
+//           if (!seller || calculateDistance(buyerLocation, seller) > 40) {
+//             return null;
+//           }
+
+//           const storedItem = mergedCart.find((item) => item.id === product.id);
+//           if (storedItem?.selectedVariant) {
+//             return {
+//               ...product,
+//               selectedVariant: storedItem.selectedVariant,
+//               price: storedItem.selectedVariant.price || product.price,
+//               stock: storedItem.selectedVariant.stock !== undefined ? storedItem.selectedVariant.stock : product.stock,
+//               images: storedItem.selectedVariant.images?.length
+//                 ? storedItem.selectedVariant.images
+//                 : product.images,
+//             };
+//           }
+
+//           const variantWithImages = product.product_variants?.find(
+//             (v) => Array.isArray(v.images) && v.images.length > 0
+//           );
+//           const finalImages =
+//             product.images?.length
+//               ? product.images
+//               : variantWithImages?.images || [
+//                   'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg',
+//                 ];
+//           const productPrice =
+//             product.price !== null && product.price !== undefined
+//               ? product.price
+//               : variantWithImages?.price || 0;
+//           const productStock =
+//             product.stock !== undefined
+//               ? product.stock
+//               : variantWithImages?.stock !== undefined
+//               ? variantWithImages.stock
+//               : 0;
+//           return {
+//             ...product,
+//             images: finalImages,
+//             price: productPrice,
+//             stock: productStock,
+//           };
+//         })
+//         .filter((p) => p !== null);
+
+//       setProducts(validProducts);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
+//       toast.error(`Failed to load cart: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, setCartCount]);
+
+//   useEffect(() => {
+//     if (!buyerLocation || typeof fetchCartItems !== 'function') return;
+//     fetchCartItems();
+//   }, [buyerLocation, fetchCartItems]);
+
+//   const updateSupabaseCartItem = async (userId, productId, updatedItem) => {
+//     try {
+//       const { error: Uploader } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .upsert(
+//             {
+//               user_id: userId,
+//               product_id: productId,
+//               quantity: updatedItem.quantity || 1,
+//               variant_id: updatedItem.variantId || null,
+//             },
+//             { onConflict: ['user_id', 'product_id'] }
+//           )
+//       );
+//       if (Uploader) {
+//         console.error('Upsert error details:', Uploader.message, Uploader.code, Uploader.details);
+//         if (Uploader.code === '42P10') {
+//           setError('Database constraint missing. Please contact support to fix the cart table.');
+//           toast.error('Database issue detected. Changes may not sync.', {
+//             position: 'top-center',
+//             duration: 3000,
+//           });
+//         }
+//         throw Uploader;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromSupabaseCart = async (userId, productId) => {
+//     try {
+//       const { error: deleteError } = await retryRequest(() =>
+//         supabase.from('cart').delete().eq('user_id', userId).eq('product_id', productId)
+//       );
+//       if (deleteError) {
+//         console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
+//         throw deleteError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromCart = async (productId) => {
+//     const updatedCart = cartItems.filter((item) => item.id !== productId);
+//     setCartItems(updatedCart);
+//     setProducts((prev) => prev.filter((product) => product.id !== productId));
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Item removed from cart successfully!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       await removeFromSupabaseCart(session.user.id, productId);
+//     }
+//   };
+
+//   const increaseQuantity = async (productId) => {
+//     const product = products.find(p => p.id === productId);
+//     const cartItem = cartItems.find(item => item.id === productId);
+//     const currentQuantity = cartItem.quantity || 1;
+//     const stock = product.stock !== undefined ? product.stock : 0;
+
+//     if (currentQuantity >= stock) {
+//       toast.error('Cannot add more items. Stock limit reached.', {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       return;
+//     }
+
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.id === productId) {
+//         return { ...item, quantity: currentQuantity + 1 };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find(item => item.id === productId);
+//       await updateSupabaseCartItem(session.user.id, productId, updatedItem);
+//     }
+//   };
+
+//   const decreaseQuantity = async (productId) => {
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.id === productId) {
+//         const newQty = (item.quantity || 1) - 1;
+//         return { ...item, quantity: newQty < 1 ? 1 : newQty };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find(item => item.id === productId);
+//       await updateSupabaseCartItem(session.user.id, productId, updatedItem);
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const quantity = cartItems.find((item) => item.id === product.id)?.quantity || 1;
+//     return sum + (product.price || 0) * quantity;
+//   }, 0);
+
+//   // SEO variables
+//   const pageUrl = 'https://www.markeet.com/cart';
+
+//   if (loading) return <div className="cart-loading">Loading...</div>;
+//   if (error) return <div className="cart-error">{error}</div>;
+
+//   return (
+//     <div className="cart">
+//       <Helmet>
+//         <title>Shopping Cart - Markeet</title>
+//         <meta
+//           name="description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="keywords"
+//           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
+//         />
+//         <meta name="robots" content="noindex, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           property="og:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           property="og:image"
+//           content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//         />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           name="twitter:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="twitter:image"
+//           content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//         />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             "@context": "https://schema.org",
+//             "@type": "WebPage",
+//             name: "Shopping Cart - Markeet",
+//             description: "View and manage your shopping cart on Markeet.",
+//             url: pageUrl,
+//           })}
+//         </script>
+//       </Helmet>
+//       <h1 className="cart-title">FreshCart Cart</h1>
+//       {cartItems.length === 0 ? (
+//         <p className="empty-cart">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           <div className="cart-items">
+//             {products.map((product, index) => {
+//               const quantity = cartItems.find((item) => item.id === product.id)?.quantity || 1;
+//               const selectedVariant = product.selectedVariant;
+//               return (
+//                 <div key={`${product.id}-${index}`} className="cart-item">
+//                   <img
+//                     src={
+//                       selectedVariant?.images?.[0] ||
+//                       product.images?.[0] ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={`${product.title || product.name} cart image`}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     className="cart-item-image"
+//                   />
+//                   <div className="cart-item-details">
+//                     <h3 className="cart-item-title">
+//                       {product.title || product.name || 'Unnamed Product'}
+//                       {selectedVariant && (
+//                         <span className="variant-info">
+//                           {' '}
+//                           - {Object.entries(selectedVariant.attributes || {})
+//                             .map(([key, val]) => `${key}: ${val}`)
+//                             .join(', ')}
+//                         </span>
+//                       )}
+//                     </h3>
+//                     <p className="cart-item-price">
+//                       ₹
+//                       {(selectedVariant?.price || product.price).toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                     <div className="cart-quantity">
+//                       <button onClick={() => decreaseQuantity(product.id)} className="qty-btn">-</button>
+//                       <span className="qty-display">{quantity}</span>
+//                       <button onClick={() => increaseQuantity(product.id)} className="qty-btn">+</button>
+//                     </div>
+//                     <button onClick={() => removeFromCart(product.id)} className="remove-btn">
+//                       <FaTrash /> Remove
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+//           <div className="cart-total">
+//             <h3>
+//               Total: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </h3>
+//             <Link to="/checkout" className="checkout-btn">
+//               Proceed to Checkout
+//             </Link>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Cart;
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link } from 'react-router-dom';
+// import { FaTrash } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Cart.css';
+// import Footer from './Footer';
+// import { toast } from 'react-hot-toast';
+// import { Helmet } from 'react-helmet-async';
+
+// // Custom retry function for Supabase requests (exponential backoff)
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
+//       await new Promise(resolve => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Distance calculation function
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+//     Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Cart() {
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [products, setProducts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   const fetchCartItems = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       const {
+//         data: { session },
+//         error: sessionError,
+//       } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         return;
+//       }
+
+//       const userId = session.user.id;
+
+//       // Fetch cart items
+//       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
+//         supabase.from('cart').select('id, product_id, quantity, variant_id').eq('user_id', userId)
+//       );
+//       if (supabaseError) throw supabaseError;
+
+//       console.log('Fetched cart items:', supabaseCart);
+
+//       // Merge with local storage
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+//       const mergedCart = [];
+//       const productIdsSet = new Set();
+
+//       storedCart.forEach(item => {
+//         if (item.id) {
+//           mergedCart.push({
+//             id: item.id,
+//             cartId: item.cartId,
+//             quantity: item.quantity || 1,
+//             variantId: item.variantId || null,
+//             selectedVariant: item.selectedVariant || null,
+//           });
+//           productIdsSet.add(item.id);
+//         }
+//       });
+
+//       // Process Supabase cart items
+//       const variantIds = supabaseCart
+//         .filter(item => item.variant_id)
+//         .map(item => item.variant_id);
+//       let variantDetails = {};
+//       if (variantIds.length > 0) {
+//         const { data: variantData, error: variantError } = await supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, images, stock')
+//           .in('id', variantIds);
+//         if (variantError) throw variantError;
+//         variantDetails = variantData.reduce((acc, variant) => {
+//           acc[variant.id] = variant;
+//           return acc;
+//         }, {});
+//       }
+
+//       supabaseCart.forEach(item => {
+//         if (!productIdsSet.has(item.product_id)) {
+//           mergedCart.push({
+//             id: item.product_id,
+//             cartId: item.id,
+//             quantity: item.quantity || 1,
+//             variantId: item.variant_id || null,
+//             selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//           });
+//           productIdsSet.add(item.product_id);
+//         } else {
+//           const existingItemIndex = mergedCart.findIndex(i => i.id === item.product_id && i.variantId === item.variant_id);
+//           if (existingItemIndex !== -1) {
+//             mergedCart[existingItemIndex] = {
+//               ...mergedCart[existingItemIndex],
+//               cartId: item.id,
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : mergedCart[existingItemIndex].selectedVariant,
+//             };
+//           } else {
+//             mergedCart.push({
+//               id: item.product_id,
+//               cartId: item.id,
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//             });
+//             productIdsSet.add(item.product_id);
+//           }
+//         }
+//       });
+
+//       setCartItems(mergedCart);
+//       localStorage.setItem('cart', JSON.stringify(mergedCart));
+//       setCartCount(mergedCart.length);
+
+//       if (mergedCart.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const productIds = [...new Set(mergedCart.map(item => item.id).filter(Boolean))];
+//       if (productIds.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       // Fetch products without relying on foreign key relationship
+//       const { data: productData, error: productError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,
+//             seller_id,
+//             title,
+//             name,
+//             price,
+//             original_price,
+//             stock,
+//             images,
+//             discount_amount,
+//             commission_amount
+//           `)
+//           .in('id', productIds)
+//           .eq('is_approved', true)
+//       );
+//       if (productError) throw productError;
+
+//       // Fetch all variants for these products
+//       const { data: variantData, error: variantError } = await retryRequest(() =>
+//         supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, images, stock')
+//           .in('product_id', productIds)
+//       );
+//       if (variantError) throw variantError;
+
+//       console.log('Fetched products:', productData);
+//       console.log('Fetched variants:', variantData);
+
+//       // Fetch sellers for distance calculation
+//       const { data: sellersData, error: sellersError } = await retryRequest(() =>
+//         supabase.from('sellers').select('id, latitude, longitude')
+//       );
+//       if (sellersError) throw sellersError;
+
+//       const validProducts = (productData || [])
+//         .filter(product => product.id && (product.title || product.name))
+//         .map(product => {
+//           const seller = sellersData.find(s => s.id === product.seller_id);
+//           if (!seller || calculateDistance(buyerLocation, seller) > 40) {
+//             return null;
+//           }
+
+//           const storedItem = mergedCart.find(item => item.id === product.id && item.variantId === (variantData.find(v => v.id === item.variantId)?.id || null));
+//           const variants = variantData.filter(v => v.product_id === product.id);
+
+//           if (storedItem?.selectedVariant) {
+//             return {
+//               ...product,
+//               selectedVariant: storedItem.selectedVariant,
+//               price: storedItem.selectedVariant.price || product.original_price || product.price || 0,
+//               stock: storedItem.selectedVariant.stock !== undefined ? storedItem.selectedVariant.stock : product.stock,
+//               images: storedItem.selectedVariant.images?.length ? storedItem.selectedVariant.images : product.images,
+//               product_variants: variants,
+//             };
+//           }
+
+//           // Find matching variant if variant_id exists
+//           const variant = storedItem?.variantId ? variants.find(v => v.id === storedItem.variantId) : null;
+//           if (variant) {
+//             return {
+//               ...product,
+//               selectedVariant: variant,
+//               price: variant.price || product.original_price || product.price || 0,
+//               stock: variant.stock !== undefined ? variant.stock : product.stock,
+//               images: variant.images?.length ? variant.images : product.images,
+//               product_variants: variants,
+//             };
+//           }
+
+//           const variantWithImages = variants.find(v => Array.isArray(v.images) && v.images.length > 0);
+//           const finalImages = product.images?.length
+//             ? product.images
+//             : variantWithImages?.images || [
+//                 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg',
+//               ];
+//           const productPrice = product.original_price || product.price || variantWithImages?.price || 0;
+//           const productStock = product.stock !== undefined
+//             ? product.stock
+//             : variantWithImages?.stock !== undefined
+//             ? variantWithImages.stock
+//             : 0;
+//           return {
+//             ...product,
+//             images: finalImages,
+//             price: productPrice,
+//             stock: productStock,
+//             product_variants: variants,
+//           };
+//         })
+//         .filter(p => p !== null);
+
+//       setProducts(validProducts);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
+//       toast.error(`Failed to load cart: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Cart fetch error:', err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, setCartCount]);
+
+//   useEffect(() => {
+//     if (!buyerLocation || typeof fetchCartItems !== 'function') return;
+//     fetchCartItems();
+//   }, [buyerLocation, fetchCartItems]);
+
+//   const updateSupabaseCartItem = async (userId, cartId, productId, updatedItem) => {
+//     try {
+//       const { error: upsertError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .upsert(
+//             {
+//               id: cartId,
+//               user_id: userId,
+//               product_id: productId,
+//               quantity: updatedItem.quantity || 1,
+//               variant_id: updatedItem.variantId || null,
+//             },
+//             { onConflict: ['id'] }
+//           )
+//       );
+//       if (upsertError) {
+//         console.error('Upsert error details:', upsertError.message, upsertError.code, upsertError.details);
+//         if (upsertError.code === '42P10') {
+//           setError('Database constraint missing. Please contact support to fix the cart table.');
+//           toast.error('Database issue detected. Changes may not sync.', {
+//             position: 'top-center',
+//             duration: 3000,
+//           });
+//         }
+//         throw upsertError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromSupabaseCart = async (userId, cartId) => {
+//     try {
+//       const { error: deleteError } = await retryRequest(() =>
+//         supabase.from('cart').delete().eq('id', cartId).eq('user_id', userId)
+//       );
+//       if (deleteError) {
+//         console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
+//         throw deleteError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromCart = async (cartId, productId) => {
+//     const updatedCart = cartItems.filter(item => item.cartId !== cartId);
+//     setCartItems(updatedCart);
+//     setProducts(prev => prev.filter(product => product.id !== productId));
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Item removed from cart successfully!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       await removeFromSupabaseCart(session.user.id, cartId);
+//     }
+//   };
+
+//   const increaseQuantity = async (cartId, productId) => {
+//     const product = products.find(p => p.id === productId);
+//     const cartItem = cartItems.find(item => item.cartId === cartId);
+//     const currentQuantity = cartItem.quantity || 1;
+//     const stock = cartItem.selectedVariant ? cartItem.selectedVariant.stock : product.stock !== undefined ? product.stock : 0;
+
+//     if (currentQuantity >= stock) {
+//       toast.error('Cannot add more items. Stock limit reached.', {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       return;
+//     }
+
+//     const updatedCart = cartItems.map(item => {
+//       if (item.cartId === cartId) {
+//         return { ...item, quantity: currentQuantity + 1 };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find(item => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, updatedItem);
+//     }
+//   };
+
+//   const decreaseQuantity = async (cartId, productId) => {
+//     const updatedCart = cartItems.map(item => {
+//       if (item.cartId === cartId) {
+//         const newQty = (item.quantity || 1) - 1;
+//         return { ...item, quantity: newQty < 1 ? 1 : newQty };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find(item => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, updatedItem);
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(item => item.id === product.id && item.variantId === (product.selectedVariant?.id || null));
+//     const quantity = cartItem?.quantity || 1;
+//     const price = product.price || 0;
+//     return sum + price * quantity;
+//   }, 0);
+
+//   // SEO variables
+//   const pageUrl = 'https://www.markeet.com/cart';
+
+//   if (loading) return <div className="cart-loading">Loading...</div>;
+//   if (error) return <div className="cart-error">{error}</div>;
+
+//   return (
+//     <div className="cart">
+//       <Helmet>
+//         <title>Shopping Cart - Markeet</title>
+//         <meta
+//           name="description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="keywords"
+//           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
+//         />
+//         <meta name="robots" content="noindex, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           property="og:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           property="og:image"
+//           content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//         />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           name="twitter:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="twitter:image"
+//           content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+//         />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             "@context": "https://schema.org",
+//             "@type": "WebPage",
+//             name: "Shopping Cart - Markeet",
+//             description: "View and manage your shopping cart on Markeet.",
+//             url: pageUrl,
+//           })}
+//         </script>
+//       </Helmet>
+//       <h1 className="cart-title">FreshCart Cart</h1>
+//       {cartItems.length === 0 ? (
+//         <p className="empty-cart">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           <div className="cart-items">
+//             {products.map((product, index) => {
+//               const cartItem = cartItems.find(item => item.id === product.id && item.variantId === (product.selectedVariant?.id || null));
+//               const quantity = cartItem?.quantity || 1;
+//               const selectedVariant = product.selectedVariant;
+//               return (
+//                 <div key={`${product.id}-${cartItem?.cartId || index}`} className="cart-item">
+//                   <img
+//                     src={
+//                       selectedVariant?.images?.[0] ||
+//                       product.images?.[0] ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={`${product.title || product.name} cart image`}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     className="cart-item-image"
+//                   />
+//                   <div className="cart-item-details">
+//                     <h3 className="cart-item-title">
+//                       {product.title || product.name || 'Unnamed Product'}
+//                       {selectedVariant && (
+//                         <span className="variant-info">
+//                           {' '}
+//                           - {Object.entries(selectedVariant.attributes || {})
+//                             .map(([key, val]) => `${key}: ${val}`)
+//                             .join(', ')}
+//                         </span>
+//                       )}
+//                     </h3>
+//                     <p className="cart-item-price">
+//                       ₹
+//                       {(product.price || 0).toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                     {product.discount_amount > 0 && (
+//                       <p className="cart-item-discount">Discount: ₹{product.discount_amount}</p>
+//                     )}
+//                     {product.commission_amount > 0 && (
+//                       <p className="cart-item-commission">Commission: ₹{product.commission_amount}</p>
+//                     )}
+//                     <div className="cart-quantity">
+//                       <button onClick={() => decreaseQuantity(cartItem?.cartId, product.id)} className="qty-btn">-</button>
+//                       <span className="qty-display">{quantity}</span>
+//                       <button onClick={() => increaseQuantity(cartItem?.cartId, product.id)} className="qty-btn">+</button>
+//                     </div>
+//                     <button onClick={() => removeFromCart(cartItem?.cartId, product.id)} className="remove-btn">
+//                       <FaTrash /> Remove
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+//           <div className="cart-total">
+//             <h3>
+//               Total: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </h3>
+//             <Link to="/checkout" className="checkout-btn">
+//               Proceed to Checkout
+//             </Link>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Cart;
+
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link } from 'react-router-dom';
+// import { FaTrash } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Cart.css';
+// import Footer from './Footer';
+// import { toast } from 'react-hot-toast';
+// import { Helmet } from 'react-helmet-async';
+
+// // Custom retry function for Supabase requests (exponential backoff)
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
+//       await new Promise((resolve) => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Distance calculation function
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Cart() {
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [products, setProducts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   const fetchCartItems = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         return;
+//       }
+
+//       const userId = session.user.id;
+
+//       // Fetch cart items
+//       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .select('id, product_id, quantity, variant_id, price, title')
+//           .eq('user_id', userId)
+//       );
+//       if (supabaseError) throw supabaseError;
+
+//       console.log('Fetched cart items:', supabaseCart);
+
+//       // Merge with local storage
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+//       const mergedCart = [];
+//       const productIdsSet = new Set();
+
+//       storedCart.forEach((item) => {
+//         if (item.id) {
+//           mergedCart.push({
+//             id: item.id,
+//             cartId: item.cartId,
+//             quantity: item.quantity || 1,
+//             variantId: item.variantId || null,
+//             selectedVariant: item.selectedVariant || null,
+//             price: item.price || 0,
+//             original_price: item.original_price || null,
+//             discount_amount: item.discount_amount || 0,
+//           });
+//           productIdsSet.add(item.id);
+//         }
+//       });
+
+//       // Process Supabase cart items
+//       const variantIds = supabaseCart.filter((item) => item.variant_id).map((item) => item.variant_id);
+//       let variantDetails = {};
+//       if (variantIds.length > 0) {
+//         const { data: variantData, error: variantError } = await supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+//           .in('id', variantIds);
+//         if (variantError) throw variantError;
+//         variantDetails = variantData.reduce((acc, variant) => {
+//           acc[variant.id] = {
+//             ...variant,
+//             price: parseFloat(variant.price) || 0,
+//             original_price: variant.original_price ? parseFloat(variant.original_price) : null,
+//             discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : 0,
+//             stock: variant.stock || 0,
+//           };
+//           return acc;
+//         }, {});
+//       }
+
+//       supabaseCart.forEach((item) => {
+//         if (!productIdsSet.has(item.product_id)) {
+//           mergedCart.push({
+//             id: item.product_id,
+//             cartId: item.id,
+//             quantity: item.quantity || 1,
+//             variantId: item.variant_id || null,
+//             selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//             price: item.price || 0,
+//             original_price: item.variant_id ? variantDetails[item.variant_id]?.original_price : null,
+//             discount_amount: item.variant_id ? variantDetails[item.variant_id]?.discount_amount : 0,
+//           });
+//           productIdsSet.add(item.product_id);
+//         } else {
+//           const existingItemIndex = mergedCart.findIndex(
+//             (i) => i.id === item.product_id && i.variantId === item.variant_id
+//           );
+//           if (existingItemIndex !== -1) {
+//             mergedCart[existingItemIndex] = {
+//               ...mergedCart[existingItemIndex],
+//               cartId: item.id,
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : mergedCart[existingItemIndex].selectedVariant,
+//               price: item.price || mergedCart[existingItemIndex].price,
+//               original_price: item.variant_id
+//                 ? variantDetails[item.variant_id]?.original_price
+//                 : mergedCart[existingItemIndex].original_price,
+//               discount_amount: item.variant_id
+//                 ? variantDetails[item.variant_id]?.discount_amount
+//                 : mergedCart[existingItemIndex].discount_amount,
+//             };
+//           } else {
+//             mergedCart.push({
+//               id: item.product_id,
+//               cartId: item.id,
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//               price: item.price || 0,
+//               original_price: item.variant_id ? variantDetails[item.variant_id]?.original_price : null,
+//               discount_amount: item.variant_id ? variantDetails[item.variant_id]?.discount_amount : 0,
+//             });
+//             productIdsSet.add(item.product_id);
+//           }
+//         }
+//       });
+
+//       setCartItems(mergedCart);
+//       localStorage.setItem('cart', JSON.stringify(mergedCart));
+//       setCartCount(mergedCart.length);
+
+//       if (mergedCart.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const productIds = [...new Set(mergedCart.map((item) => item.id).filter(Boolean))];
+//       if (productIds.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       // Fetch products
+//       const { data: productData, error: productError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,
+//             seller_id,
+//             title,
+//             name,
+//             price,
+//             original_price,
+//             discount_amount,
+//             stock,
+//             images
+//           `)
+//           .in('id', productIds)
+//           .eq('is_approved', true)
+//           .eq('status', 'active')
+//       );
+//       if (productError) throw productError;
+
+//       // Fetch all variants for these products
+//       const { data: variantData, error: variantError } = await retryRequest(() =>
+//         supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+//           .in('product_id', productIds)
+//           .eq('status', 'active')
+//       );
+//       if (variantError) throw variantError;
+
+//       console.log('Fetched products:', productData);
+//       console.log('Fetched variants:', variantData);
+
+//       // Fetch sellers for distance calculation
+//       const { data: sellersData, error: sellersError } = await retryRequest(() =>
+//         supabase.from('sellers').select('id, latitude, longitude')
+//       );
+//       if (sellersError) throw sellersError;
+
+//       const validProducts = (productData || [])
+//         .filter((product) => product.id && (product.title || product.name))
+//         .map((product) => {
+//           const seller = sellersData.find((s) => s.id === product.seller_id);
+//           if (!seller || calculateDistance(buyerLocation, seller) > 40) {
+//             return null;
+//           }
+
+//           const cartItem = mergedCart.find(
+//             (item) => item.id === product.id && item.variantId === (variantData.find((v) => v.id === item.variantId)?.id || null)
+//           );
+//           const variants = variantData.filter((v) => v.product_id === product.id);
+
+//           const parsedProduct = {
+//             ...product,
+//             price: parseFloat(product.price) || 0,
+//             original_price: product.original_price ? parseFloat(product.original_price) : null,
+//             discount_amount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+//             stock: product.stock || 0,
+//             images: product.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'],
+//           };
+
+//           if (cartItem?.selectedVariant) {
+//             return {
+//               ...parsedProduct,
+//               selectedVariant: {
+//                 ...cartItem.selectedVariant,
+//                 price: parseFloat(cartItem.selectedVariant.price) || parsedProduct.price,
+//                 original_price: cartItem.selectedVariant.original_price
+//                   ? parseFloat(cartItem.selectedVariant.original_price)
+//                   : parsedProduct.original_price,
+//                 discount_amount: cartItem.selectedVariant.discount_amount
+//                   ? parseFloat(cartItem.selectedVariant.discount_amount)
+//                   : parsedProduct.discount_amount,
+//                 stock: cartItem.selectedVariant.stock || parsedProduct.stock,
+//                 images: cartItem.selectedVariant.images?.length
+//                   ? cartItem.selectedVariant.images
+//                   : parsedProduct.images,
+//               },
+//               price: cartItem.price || parsedProduct.price,
+//               original_price: cartItem.original_price || parsedProduct.original_price,
+//               discount_amount: cartItem.discount_amount || parsedProduct.discount_amount,
+//               stock: cartItem.selectedVariant.stock !== undefined ? cartItem.selectedVariant.stock : parsedProduct.stock,
+//               images: cartItem.selectedVariant.images?.length ? cartItem.selectedVariant.images : parsedProduct.images,
+//               product_variants: variants.map((v) => ({
+//                 ...v,
+//                 price: parseFloat(v.price) || 0,
+//                 original_price: v.original_price ? parseFloat(v.original_price) : null,
+//                 discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//                 stock: v.stock || 0,
+//               })),
+//             };
+//           }
+
+//           const variant = cartItem?.variantId ? variants.find((v) => v.id === cartItem.variantId) : null;
+//           if (variant) {
+//             return {
+//               ...parsedProduct,
+//               selectedVariant: {
+//                 ...variant,
+//                 price: parseFloat(variant.price) || parsedProduct.price,
+//                 original_price: variant.original_price ? parseFloat(variant.original_price) : parsedProduct.original_price,
+//                 discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : parsedProduct.discount_amount,
+//                 stock: variant.stock || parsedProduct.stock,
+//                 images: variant.images?.length ? variant.images : parsedProduct.images,
+//               },
+//               price: cartItem.price || parseFloat(variant.price) || parsedProduct.price,
+//               original_price: cartItem.original_price || variant.original_price || parsedProduct.original_price,
+//               discount_amount: cartItem.discount_amount || variant.discount_amount || parsedProduct.discount_amount,
+//               stock: variant.stock !== undefined ? variant.stock : parsedProduct.stock,
+//               images: variant.images?.length ? variant.images : parsedProduct.images,
+//               product_variants: variants.map((v) => ({
+//                 ...v,
+//                 price: parseFloat(v.price) || 0,
+//                 original_price: v.original_price ? parseFloat(v.original_price) : null,
+//                 discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//                 stock: v.stock || 0,
+//               })),
+//             };
+//           }
+
+//           const variantWithImages = variants.find((v) => Array.isArray(v.images) && v.images.length > 0);
+//           const finalImages = parsedProduct.images?.length
+//             ? parsedProduct.images
+//             : variantWithImages?.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'];
+//           return {
+//             ...parsedProduct,
+//             images: finalImages,
+//             product_variants: variants.map((v) => ({
+//               ...v,
+//               price: parseFloat(v.price) || 0,
+//               original_price: v.original_price ? parseFloat(v.original_price) : null,
+//               discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//               stock: v.stock || 0,
+//             })),
+//           };
+//         })
+//         .filter((p) => p !== null);
+
+//       setProducts(validProducts);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
+//       toast.error(`Failed to load cart: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Cart fetch error:', err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, setCartCount]);
+
+//   useEffect(() => {
+//     if (!buyerLocation || typeof fetchCartItems !== 'function') return;
+//     fetchCartItems();
+//   }, [buyerLocation, fetchCartItems]);
+
+//   const updateSupabaseCartItem = async (userId, cartId, productId, updatedItem) => {
+//     try {
+//       const { error: upsertError } = await retryRequest(() =>
+//          supabase
+//           .from('cart')
+//           .upsert(
+//             {
+//               id: cartId,
+//               user_id: userId,
+//               product_id: productId,
+//               quantity: updatedItem.quantity || 1,
+//               variant_id: updatedItem.variantId || null,
+//               price: updatedItem.price || 0,
+//               title: updatedItem.title || 'Unnamed Product',
+//             },
+//             { onConflict: ['user_id', 'product_id', 'variant_id'] }
+//           )
+//       );
+//       if (upsertError) {
+//         console.error('Upsert error details:', upsertError.message, upsertError.code, upsertError.details);
+//         if (upsertError.code === '42P10') {
+//           setError('Database constraint missing. Please contact support to fix the cart table.');
+//           toast.error('Database issue detected. Changes may not sync.', {
+//             position: 'top-center',
+//             duration: 3000,
+//           });
+//         }
+//         throw upsertError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromSupabaseCart = async (userId, cartId) => {
+//     try {
+//       const { error: deleteError } = await retryRequest(() =>
+//         supabase.from('cart').delete().eq('id', cartId).eq('user_id', userId)
+//       );
+//       if (deleteError) {
+//         console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
+//         throw deleteError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromCart = async (cartId, productId) => {
+//     const updatedCart = cartItems.filter((item) => item.cartId !== cartId);
+//     setCartItems(updatedCart);
+//     setProducts((prev) => prev.filter((product) => product.id !== productId));
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Item removed from cart successfully!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       await removeFromSupabaseCart(session.user.id, cartId);
+//     }
+//   };
+
+//   const increaseQuantity = async (cartId, productId) => {
+//     const product = products.find((p) => p.id === productId);
+//     const cartItem = cartItems.find((item) => item.cartId === cartId);
+//     const currentQuantity = cartItem.quantity || 1;
+//     const stock = cartItem.selectedVariant ? cartItem.selectedVariant.stock : product.stock !== undefined ? product.stock : 0;
+
+//     if (currentQuantity >= stock) {
+//       toast.error('Cannot add more items. Stock limit reached.', {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       return;
+//     }
+
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.cartId === cartId) {
+//         return { ...item, quantity: currentQuantity + 1 };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, {
+//         ...updatedItem,
+//         title: product.title || product.name,
+//       });
+//     }
+//   };
+
+//   const decreaseQuantity = async (cartId, productId) => {
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.cartId === cartId) {
+//         const newQty = (item.quantity || 1) - 1;
+//         return { ...item, quantity: newQty < 1 ? 1 : newQty };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, {
+//         ...updatedItem,
+//         title: products.find((p) => p.id === productId)?.title || 'Unnamed Product',
+//       });
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(
+//       (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//     );
+//     const quantity = cartItem?.quantity || 1;
+//     const price = product.price || 0;
+//     return sum + price * quantity;
+//   }, 0);
+
+//   const discountTotal = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(
+//       (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//     );
+//     const quantity = cartItem?.quantity || 1;
+//     const discount = product.discount_amount || 0;
+//     return sum + discount * quantity;
+//   }, 0);
+
+//   // SEO variables
+//   const pageUrl = 'https://www.markeet.com/cart';
+
+//   if (loading) return <div className="cart-loading">Loading...</div>;
+//   if (error) return <div className="cart-error">{error}</div>;
+
+//   return (
+//     <div className="cart">
+//       <Helmet>
+//         <title>Shopping Cart - Markeet</title>
+//         <meta
+//           name="description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="keywords"
+//           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
+//         />
+//         <meta name="robots" content="noindex, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           property="og:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           property="og:image"
+//           content={
+//             products[0]?.images?.[0] ||
+//             'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//           }
+//         />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           name="twitter:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="twitter:image"
+//           content={
+//             products[0]?.images?.[0] ||
+//             'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//           }
+//         />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             '@context': 'https://schema.org',
+//             '@type': 'WebPage',
+//             name: 'Shopping Cart - Markeet',
+//             description: 'View and manage your shopping cart on Markeet.',
+//             url: pageUrl,
+//           })}
+//         </script>
+//       </Helmet>
+//       <h1 className="cart-title">FreshCart Cart</h1>
+//       {cartItems.length === 0 ? (
+//         <p className="empty-cart">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           <div className="cart-items">
+//             {products.map((product, index) => {
+//               const cartItem = cartItems.find(
+//                 (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//               );
+//               const quantity = cartItem?.quantity || 1;
+//               const selectedVariant = product.selectedVariant;
+//               return (
+//                 <div key={`${product.id}-${cartItem?.cartId || index}`} className="cart-item">
+//                   <img
+//                     src={
+//                       selectedVariant?.images?.[0] ||
+//                       product.images?.[0] ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={`${product.title || product.name} cart image`}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     className="cart-item-image"
+//                   />
+//                   <div className="cart-item-details">
+//                     <h3 className="cart-item-title">
+//                       <Link to={`/product/${product.id}`}>
+//                         {product.title || product.name || 'Unnamed Product'}
+//                       </Link>
+//                       {selectedVariant && (
+//                         <span className="variant-info">
+//                           {' '}
+//                           -{' '}
+//                           {Object.entries(selectedVariant.attributes || {})
+//                             .filter(([key, val]) => val && val.trim())
+//                             .map(([key, val]) => `${key}: ${val}`)
+//                             .join(', ')}
+//                         </span>
+//                       )}
+//                     </h3>
+//                     <div className="cart-item-price-section">
+//                       <span className="cart-item-price">
+//                         ₹
+//                         {(product.price || 0).toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </span>
+//                       {product.original_price && product.original_price > product.price && (
+//                         <span className="cart-item-original-price">
+//                           ₹
+//                           {product.original_price.toLocaleString('en-IN', {
+//                             minimumFractionDigits: 2,
+//                             maximumFractionDigits: 2,
+//                           })}
+//                         </span>
+//                       )}
+//                     </div>
+//                     {product.discount_amount > 0 && (
+//                       <p className="cart-item-discount">
+//                         Save ₹
+//                         {(product.discount_amount * quantity).toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </p>
+//                     )}
+//                     <p className="cart-item-stock">
+//                       {product.stock > 0 ? `In Stock: ${product.stock} available` : 'Out of Stock'}
+//                     </p>
+//                     <div className="cart-quantity">
+//                       <button
+//                         onClick={() => decreaseQuantity(cartItem?.cartId, product.id)}
+//                         className="qty-btn"
+//                         disabled={quantity <= 1}
+//                       >
+//                         -
+//                       </button>
+//                       <span className="qty-display">{quantity}</span>
+//                       <button
+//                         onClick={() => increaseQuantity(cartItem?.cartId, product.id)}
+//                         className="qty-btn"
+//                         disabled={quantity >= product.stock}
+//                       >
+//                         +
+//                       </button>
+//                     </div>
+//                     <button
+//                       onClick={() => removeFromCart(cartItem?.cartId, product.id)}
+//                       className="remove-btn"
+//                     >
+//                       <FaTrash /> Remove
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+//           <div className="cart-total">
+//             <h3>
+//               Subtotal: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </h3>
+//             {discountTotal > 0 && (
+//               <p className="cart-total-discount">
+//                 Total Savings: ₹
+//                 {discountTotal.toLocaleString('en-IN', {
+//                   minimumFractionDigits: 2,
+//                   maximumFractionDigits: 2,
+//                 })}
+//               </p>
+//             )}
+//             <Link to="/checkout" className="checkout-btn">
+//               Proceed to Checkout
+//             </Link>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Cart;
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link } from 'react-router-dom';
+// import { FaTrash } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Cart.css';
+// import Footer from './Footer';
+// import { toast } from 'react-hot-toast';
+// import { Helmet } from 'react-helmet-async';
+
+// // Custom retry function for Supabase requests (exponential backoff)
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
+//       await new Promise((resolve) => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Distance calculation function
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Cart() {
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [products, setProducts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   const fetchCartItems = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         return;
+//       }
+
+//       const userId = session.user.id;
+
+//       // Fetch cart items
+//       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .select('id, product_id, quantity, variant_id, price, title')
+//           .eq('user_id', userId)
+//       );
+//       if (supabaseError) throw supabaseError;
+
+//       console.log('Fetched cart items:', supabaseCart);
+
+//       // Merge with local storage
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+//       const mergedCart = [];
+//       const productVariantSet = new Set();
+
+//       storedCart.forEach((item) => {
+//         if (item.id) {
+//           const key = `${item.id}-${item.variantId || 'no-variant'}`;
+//           if (!productVariantSet.has(key)) {
+//             mergedCart.push({
+//               id: item.id,
+//               cartId: item.cartId,
+//               quantity: item.quantity || 1,
+//               variantId: item.variantId || null,
+//               selectedVariant: item.selectedVariant || null,
+//               price: item.price || 0,
+//               original_price: item.original_price || null,
+//               discount_amount: item.discount_amount || 0,
+//               title: item.title || 'Unnamed Product',
+//             });
+//             productVariantSet.add(key);
+//           }
+//         }
+//       });
+
+//       // Process Supabase cart items
+//       const variantIds = supabaseCart.filter((item) => item.variant_id).map((item) => item.variant_id);
+//       let variantDetails = {};
+//       if (variantIds.length > 0) {
+//         const { data: variantData, error: variantError } = await supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+//           .in('id', variantIds);
+//         if (variantError) throw variantError;
+//         variantDetails = variantData.reduce((acc, variant) => {
+//           acc[variant.id] = {
+//             ...variant,
+//             price: parseFloat(variant.price) || 0,
+//             original_price: variant.original_price ? parseFloat(variant.original_price) : null,
+//             discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : 0,
+//             stock: variant.stock || 0,
+//           };
+//           return acc;
+//         }, {});
+//       }
+
+//       supabaseCart.forEach((item) => {
+//         const key = `${item.product_id}-${item.variant_id || 'no-variant'}`;
+//         if (!productVariantSet.has(key)) {
+//           mergedCart.push({
+//             id: item.product_id,
+//             cartId: item.id,
+//             quantity: item.quantity || 1,
+//             variantId: item.variant_id || null,
+//             selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//             price: item.price || 0,
+//             original_price: item.variant_id ? variantDetails[item.variant_id]?.original_price : null,
+//             discount_amount: item.variant_id ? variantDetails[item.variant_id]?.discount_amount : 0,
+//             title: item.title || 'Unnamed Product',
+//           });
+//           productVariantSet.add(key);
+//         } else {
+//           const existingItemIndex = mergedCart.findIndex(
+//             (i) => i.id === item.product_id && i.variantId === item.variant_id
+//           );
+//           if (existingItemIndex !== -1) {
+//             mergedCart[existingItemIndex] = {
+//               ...mergedCart[existingItemIndex],
+//               cartId: item.id,
+//               quantity: item.quantity || 1,
+//               variantId: item.variant_id || null,
+//               selectedVariant: item.variant_id ? variantDetails[item.variant_id] : mergedCart[existingItemIndex].selectedVariant,
+//               price: item.price || mergedCart[existingItemIndex].price,
+//               original_price: item.variant_id
+//                 ? variantDetails[item.variant_id]?.original_price
+//                 : mergedCart[existingItemIndex].original_price,
+//               discount_amount: item.variant_id
+//                 ? variantDetails[item.variant_id]?.discount_amount
+//                 : mergedCart[existingItemIndex].discount_amount,
+//               title: item.title || mergedCart[existingItemIndex].title,
+//             };
+//           }
+//         }
+//       });
+
+//       setCartItems(mergedCart);
+//       localStorage.setItem('cart', JSON.stringify(mergedCart));
+//       setCartCount(mergedCart.length);
+
+//       if (mergedCart.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const productIds = [...new Set(mergedCart.map((item) => item.id).filter(Boolean))];
+//       if (productIds.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       // Fetch products
+//       const { data: productData, error: productError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,
+//             seller_id,
+//             title,
+//             name,
+//             price,
+//             original_price,
+//             discount_amount,
+//             stock,
+//             images
+//           `)
+//           .in('id', productIds)
+//           .eq('is_approved', true)
+//           .eq('status', 'active')
+//       );
+//       if (productError) throw productError;
+
+//       // Fetch all variants for these products
+//       const { data: variantData, error: variantError } = await retryRequest(() =>
+//         supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+//           .in('product_id', productIds)
+//           .eq('status', 'active')
+//       );
+//       if (variantError) throw variantError;
+
+//       console.log('Fetched products:', productData);
+//       console.log('Fetched variants:', variantData);
+
+//       // Fetch sellers for distance calculation
+//       const { data: sellersData, error: sellersError } = await retryRequest(() =>
+//         supabase.from('sellers').select('id, latitude, longitude')
+//       );
+//       if (sellersError) throw sellersError;
+
+//       const validProducts = (productData || [])
+//         .filter((product) => product.id && (product.title || product.name))
+//         .map((product) => {
+//           const seller = sellersData.find((s) => s.id === product.seller_id);
+//           if (!seller || calculateDistance(buyerLocation, seller) > 40) {
+//             return null;
+//           }
+
+//           const cartItem = mergedCart.find(
+//             (item) => item.id === product.id && item.variantId === (variantData.find((v) => v.id === item.variantId)?.id || null)
+//           );
+//           const variants = variantData.filter((v) => v.product_id === product.id);
+
+//           const parsedProduct = {
+//             ...product,
+//             price: parseFloat(product.price) || 0,
+//             original_price: product.original_price ? parseFloat(product.original_price) : null,
+//             discount_amount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+//             stock: product.stock || 0,
+//             images: product.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'],
+//           };
+
+//           if (cartItem?.selectedVariant) {
+//             return {
+//               ...parsedProduct,
+//               selectedVariant: {
+//                 ...cartItem.selectedVariant,
+//                 price: parseFloat(cartItem.selectedVariant.price) || parsedProduct.price,
+//                 original_price: cartItem.selectedVariant.original_price
+//                   ? parseFloat(cartItem.selectedVariant.original_price)
+//                   : parsedProduct.original_price,
+//                 discount_amount: cartItem.selectedVariant.discount_amount
+//                   ? parseFloat(cartItem.selectedVariant.discount_amount)
+//                   : parsedProduct.discount_amount,
+//                 stock: cartItem.selectedVariant.stock || parsedProduct.stock,
+//                 images: cartItem.selectedVariant.images?.length
+//                   ? cartItem.selectedVariant.images
+//                   : parsedProduct.images,
+//               },
+//               price: cartItem.price || parsedProduct.price,
+//               original_price: cartItem.original_price || parsedProduct.original_price,
+//               discount_amount: cartItem.discount_amount || parsedProduct.discount_amount,
+//               stock: cartItem.selectedVariant.stock !== undefined ? cartItem.selectedVariant.stock : parsedProduct.stock,
+//               images: cartItem.selectedVariant.images?.length ? cartItem.selectedVariant.images : parsedProduct.images,
+//               product_variants: variants.map((v) => ({
+//                 ...v,
+//                 price: parseFloat(v.price) || 0,
+//                 original_price: v.original_price ? parseFloat(v.original_price) : null,
+//                 discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//                 stock: v.stock || 0,
+//               })),
+//             };
+//           }
+
+//           const variant = cartItem?.variantId ? variants.find((v) => v.id === cartItem.variantId) : null;
+//           if (variant) {
+//             return {
+//               ...parsedProduct,
+//               selectedVariant: {
+//                 ...variant,
+//                 price: parseFloat(variant.price) || parsedProduct.price,
+//                 original_price: variant.original_price ? parseFloat(variant.original_price) : parsedProduct.original_price,
+//                 discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : parsedProduct.discount_amount,
+//                 stock: variant.stock || parsedProduct.stock,
+//                 images: variant.images?.length ? variant.images : parsedProduct.images,
+//               },
+//               price: cartItem.price || parseFloat(variant.price) || parsedProduct.price,
+//               original_price: cartItem.original_price || variant.original_price || parsedProduct.original_price,
+//               discount_amount: cartItem.discount_amount || variant.discount_amount || parsedProduct.discount_amount,
+//               stock: variant.stock !== undefined ? variant.stock : parsedProduct.stock,
+//               images: variant.images?.length ? variant.images : parsedProduct.images,
+//               product_variants: variants.map((v) => ({
+//                 ...v,
+//                 price: parseFloat(v.price) || 0,
+//                 original_price: v.original_price ? parseFloat(v.original_price) : null,
+//                 discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//                 stock: v.stock || 0,
+//               })),
+//             };
+//           }
+
+//           const variantWithImages = variants.find((v) => Array.isArray(v.images) && v.images.length > 0);
+//           const finalImages = parsedProduct.images?.length
+//             ? parsedProduct.images
+//             : variantWithImages?.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'];
+//           return {
+//             ...parsedProduct,
+//             images: finalImages,
+//             product_variants: variants.map((v) => ({
+//               ...v,
+//               price: parseFloat(v.price) || 0,
+//               original_price: v.original_price ? parseFloat(v.original_price) : null,
+//               discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//               stock: v.stock || 0,
+//             })),
+//           };
+//         })
+//         .filter((p) => p !== null);
+
+//       setProducts(validProducts);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
+//       toast.error(`Failed to load cart: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Cart fetch error:', err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, setCartCount]);
+
+//   useEffect(() => {
+//     if (!buyerLocation || typeof fetchCartItems !== 'function') return;
+//     fetchCartItems();
+//   }, [buyerLocation, fetchCartItems]);
+
+//   const updateSupabaseCartItem = async (userId, cartId, productId, updatedItem) => {
+//     try {
+//       const { error: upsertError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .upsert(
+//             {
+//               id: cartId,
+//               user_id: userId,
+//               product_id: productId,
+//               quantity: updatedItem.quantity || 1,
+//               variant_id: updatedItem.variantId || null,
+//               price: updatedItem.price || 0,
+//               title: updatedItem.title || 'Unnamed Product',
+//             },
+//             { onConflict: ['user_id', 'product_id', 'variant_id'] }
+//           )
+//       );
+//       if (upsertError) {
+//         console.error('Upsert error details:', upsertError.message, upsertError.code, upsertError.details);
+//         if (upsertError.code === '42P10') {
+//           setError('Database constraint missing. Please contact support to fix the cart table.');
+//           toast.error('Database issue detected. Changes may not sync.', {
+//             position: 'top-center',
+//             duration: 3000,
+//           });
+//         }
+//         throw upsertError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromSupabaseCart = async (userId, cartId) => {
+//     try {
+//       const { error: deleteError } = await retryRequest(() =>
+//         supabase.from('cart').delete().eq('id', cartId).eq('user_id', userId)
+//       );
+//       if (deleteError) {
+//         console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
+//         throw deleteError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromCart = async (cartId, productId, variantId) => {
+//     const updatedCart = cartItems.filter((item) => item.cartId !== cartId);
+//     setCartItems(updatedCart);
+//     setProducts((prev) => prev.filter((product) => !(product.id === productId && product.selectedVariant?.id === variantId)));
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Item removed from cart successfully!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       await removeFromSupabaseCart(session.user.id, cartId);
+//     }
+//   };
+
+//   const increaseQuantity = async (cartId, productId, variantId) => {
+//     const product = products.find((p) => p.id === productId && p.selectedVariant?.id === variantId);
+//     const cartItem = cartItems.find((item) => item.cartId === cartId);
+//     const currentQuantity = cartItem.quantity || 1;
+//     const stock = cartItem.selectedVariant ? cartItem.selectedVariant.stock : product.stock !== undefined ? product.stock : 0;
+
+//     if (currentQuantity >= stock) {
+//       toast.error('Cannot add more items. Stock limit reached.', {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       return;
+//     }
+
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.cartId === cartId) {
+//         return { ...item, quantity: currentQuantity + 1 };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, {
+//         ...updatedItem,
+//         title: product.title || product.name,
+//       });
+//     }
+//   };
+
+//   const decreaseQuantity = async (cartId, productId, variantId) => {
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.cartId === cartId) {
+//         const newQty = (item.quantity || 1) - 1;
+//         return { ...item, quantity: newQty < 1 ? 1 : newQty };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, {
+//         ...updatedItem,
+//         title: products.find((p) => p.id === productId && p.selectedVariant?.id === variantId)?.title || 'Unnamed Product',
+//       });
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(
+//       (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//     );
+//     const quantity = cartItem?.quantity || 1;
+//     const price = product.price || 0;
+//     return sum + price * quantity;
+//   }, 0);
+
+//   const discountTotal = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(
+//       (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//     );
+//     const quantity = cartItem?.quantity || 1;
+//     const discount = product.discount_amount || 0;
+//     return sum + discount * quantity;
+//   }, 0);
+
+//   // SEO variables
+//   const pageUrl = 'https://www.markeet.com/cart';
+
+//   if (loading) return <div className="cart-loading">Loading...</div>;
+//   if (error) return <div className="cart-error">{error}</div>;
+
+//   return (
+//     <div className="cart">
+//       <Helmet>
+//         <title>Shopping Cart - Markeet</title>
+//         <meta
+//           name="description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="keywords"
+//           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
+//         />
+//         <meta name="robots" content="noindex, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           property="og:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           property="og:image"
+//           content={
+//             products[0]?.images?.[0] ||
+//             'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//           }
+//         />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           name="twitter:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="twitter:image"
+//           content={
+//             products[0]?.images?.[0] ||
+//             'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//           }
+//         />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             '@context': 'https://schema.org',
+//             '@type': 'WebPage',
+//             name: 'Shopping Cart - Markeet',
+//             description: 'View and manage your shopping cart on Markeet.',
+//             url: pageUrl,
+//           })}
+//         </script>
+//       </Helmet>
+//       <h1 className="cart-title">FreshCart Cart</h1>
+//       {cartItems.length === 0 ? (
+//         <p className="empty-cart">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           <div className="cart-items">
+//             {products.map((product, index) => {
+//               const cartItem = cartItems.find(
+//                 (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//               );
+//               const quantity = cartItem?.quantity || 1;
+//               const selectedVariant = product.selectedVariant;
+//               return (
+//                 <div key={`${product.id}-${cartItem?.cartId || index}`} className="cart-item">
+//                   <img
+//                     src={
+//                       selectedVariant?.images?.[0] ||
+//                       product.images?.[0] ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={`${product.title || product.name} cart image`}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     className="cart-item-image"
+//                   />
+//                   <div className="cart-item-details">
+//                     <h3 className="cart-item-title">
+//                       <Link to={`/product/${product.id}`}>
+//                         {product.title || product.name || 'Unnamed Product'}
+//                       </Link>
+//                       {selectedVariant && (
+//                         <span className="variant-info">
+//                           {' '}
+//                           -{' '}
+//                           {Object.entries(selectedVariant.attributes || {})
+//                             .filter(([key, val]) => val && val.trim())
+//                             .map(([key, val]) => `${key}: ${val}`)
+//                             .join(', ')}
+//                         </span>
+//                       )}
+//                     </h3>
+//                     <div className="cart-item-price-section">
+//                       <span className="cart-item-price">
+//                         ₹
+//                         {(product.price || 0).toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </span>
+//                       {product.original_price && product.original_price > product.price && (
+//                         <span className="cart-item-original-price">
+//                           ₹
+//                           {product.original_price.toLocaleString('en-IN', {
+//                             minimumFractionDigits: 2,
+//                             maximumFractionDigits: 2,
+//                           })}
+//                         </span>
+//                       )}
+//                     </div>
+//                     {product.discount_amount > 0 && (
+//                       <p className="cart-item-discount">
+//                         Save ₹
+//                         {(product.discount_amount * quantity).toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </p>
+//                     )}
+//                     <p className="cart-item-stock">
+//                       {product.stock > 0 ? `In Stock: ${product.stock} available` : 'Out of Stock'}
+//                     </p>
+//                     <div className="cart-quantity">
+//                       <button
+//                         onClick={() => decreaseQuantity(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+//                         className="qty-btn"
+//                         disabled={quantity <= 1}
+//                       >
+//                         -
+//                       </button>
+//                       <span className="qty-display">{quantity}</span>
+//                       <button
+//                         onClick={() => increaseQuantity(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+//                         className="qty-btn"
+//                         disabled={quantity >= product.stock}
+//                       >
+//                         +
+//                       </button>
+//                     </div>
+//                     <button
+//                       onClick={() => removeFromCart(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+//                       className="remove-btn"
+//                     >
+//                       <FaTrash /> Remove
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+//           <div className="cart-total">
+//             <h3>
+//               Subtotal: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </h3>
+//             {discountTotal > 0 && (
+//               <p className="cart-total-discount">
+//                 Total Savings: ₹
+//                 {discountTotal.toLocaleString('en-IN', {
+//                   minimumFractionDigits: 2,
+//                   maximumFractionDigits: 2,
+//                 })}
+//               </p>
+//             )}
+//             <Link to="/checkout" className="checkout-btn">
+//               Proceed to Checkout
+//             </Link>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Cart;
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { Link } from 'react-router-dom';
+// import { FaTrash } from 'react-icons/fa';
+// import { LocationContext } from '../App';
+// import '../style/Cart.css';
+// import Footer from './Footer';
+// import { toast } from 'react-hot-toast';
+// import { Helmet } from 'react-helmet-async';
+
+// // Custom retry function for Supabase requests (exponential backoff)
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
+//       await new Promise((resolve) => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Distance calculation function
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(latDiff / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// function Cart() {
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+//   const [cartItems, setCartItems] = useState([]);
+//   const [products, setProducts] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+
+//   const fetchCartItems = useCallback(async () => {
+//     setLoading(true);
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         setError('Authentication required. Please ensure you are logged in.');
+//         setLoading(false);
+//         return;
+//       }
+
+//       const userId = session.user.id;
+
+//       // Fetch cart items
+//       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .select('id, product_id, quantity, variant_id, price, title')
+//           .eq('user_id', userId)
+//       );
+//       if (supabaseError) throw supabaseError;
+
+//       console.log('Fetched cart items:', supabaseCart);
+
+//       // Merge with local storage
+//       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+//       const mergedCart = [];
+//       const productVariantSet = new Set();
+
+//       storedCart.forEach((item) => {
+//         if (item.id && item.uniqueKey) {
+//           const key = item.uniqueKey;
+//           if (!productVariantSet.has(key)) {
+//             mergedCart.push({
+//               id: item.id,
+//               cartId: item.cartId,
+//               quantity: item.quantity || 1,
+//               variantId: item.variantId || null,
+//               selectedVariant: item.selectedVariant || null,
+//               price: item.price || 0,
+//               original_price: item.original_price || null,
+//               discount_amount: item.discount_amount || 0,
+//               title: item.title || 'Unnamed Product',
+//               images: item.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'],
+//               uniqueKey: item.uniqueKey,
+//             });
+//             productVariantSet.add(key);
+//           }
+//         }
+//       });
+
+//       // Process Supabase cart items
+//       const variantIds = supabaseCart.filter((item) => item.variant_id).map((item) => item.variant_id);
+//       let variantDetails = {};
+//       if (variantIds.length > 0) {
+//         const { data: variantData, error: variantError } = await supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+//           .in('id', variantIds);
+//         if (variantError) throw variantError;
+//         variantDetails = variantData.reduce((acc, variant) => {
+//           acc[variant.id] = {
+//             ...variant,
+//             price: parseFloat(variant.price) || 0,
+//             original_price: variant.original_price ? parseFloat(variant.original_price) : null,
+//             discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : 0,
+//             stock: variant.stock || 0,
+//             images: variant.images || [],
+//           };
+//           return acc;
+//         }, {});
+//       }
+
+//       supabaseCart.forEach((item) => {
+//         const key = `${item.product_id}-${item.variant_id || 'no-variant'}`;
+//         if (!productVariantSet.has(key)) {
+//           mergedCart.push({
+//             id: item.product_id,
+//             cartId: item.id,
+//             quantity: item.quantity || 1,
+//             variantId: item.variant_id || null,
+//             selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
+//             price: item.price || 0,
+//             original_price: item.variant_id ? variantDetails[item.variant_id]?.original_price : null,
+//             discount_amount: item.variant_id ? variantDetails[item.variant_id]?.discount_amount : 0,
+//             title: item.title || 'Unnamed Product',
+//             images: item.variant_id ? variantDetails[item.variant_id]?.images : [],
+//             uniqueKey: key,
+//           });
+//           productVariantSet.add(key);
+//         } else {
+//           const existingItemIndex = mergedCart.findIndex((i) => i.uniqueKey === key);
+//           if (existingItemIndex !== -1) {
+//             mergedCart[existingItemIndex] = {
+//               ...mergedCart[existingItemIndex],
+//               cartId: item.id,
+//               quantity: item.quantity || 1,
+//               price: item.price || mergedCart[existingItemIndex].price,
+//               title: item.title || mergedCart[existingItemIndex].title,
+//             };
+//           }
+//         }
+//       });
+
+//       setCartItems(mergedCart);
+//       localStorage.setItem('cart', JSON.stringify(mergedCart));
+//       setCartCount(mergedCart.length);
+
+//       if (mergedCart.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       const productIds = [...new Set(mergedCart.map((item) => item.id).filter(Boolean))];
+//       if (productIds.length === 0) {
+//         setProducts([]);
+//         setLoading(false);
+//         return;
+//       }
+
+//       // Fetch products
+//       const { data: productData, error: productError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,
+//             seller_id,
+//             title,
+//             name,
+//             price,
+//             original_price,
+//             discount_amount,
+//             stock,
+//             images
+//           `)
+//           .in('id', productIds)
+//           .eq('is_approved', true)
+//           .eq('status', 'active')
+//       );
+//       if (productError) throw productError;
+
+//       // Fetch all variants for these products
+//       const { data: variantData, error: variantError } = await retryRequest(() =>
+//         supabase
+//           .from('product_variants')
+//           .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+//           .in('product_id', productIds)
+//           .eq('status', 'active')
+//       );
+//       if (variantError) throw variantError;
+
+//       console.log('Fetched products:', productData);
+//       console.log('Fetched variants:', variantData);
+
+//       // Fetch sellers for distance calculation
+//       const { data: sellersData, error: sellersError } = await retryRequest(() =>
+//         supabase.from('sellers').select('id, latitude, longitude')
+//       );
+//       if (sellersError) throw sellersError;
+
+//       const validProducts = (productData || [])
+//         .filter((product) => product.id && (product.title || product.name))
+//         .map((product) => {
+//           const seller = sellersData.find((s) => s.id === product.seller_id);
+//           if (!seller || calculateDistance(buyerLocation, seller) > 40) {
+//             return null;
+//           }
+
+//           const cartItem = mergedCart.find(
+//             (item) => item.id === product.id && item.variantId === (variantData.find((v) => v.id === item.variantId)?.id || null)
+//           );
+//           const variants = variantData.filter((v) => v.product_id === product.id);
+
+//           const parsedProduct = {
+//             ...product,
+//             price: parseFloat(product.price) || 0,
+//             original_price: product.original_price ? parseFloat(product.original_price) : null,
+//             discount_amount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+//             stock: product.stock || 0,
+//             images: product.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'],
+//             uniqueKey: cartItem?.uniqueKey || `${product.id}-no-variant`,
+//           };
+
+//           if (cartItem?.selectedVariant) {
+//             return {
+//               ...parsedProduct,
+//               selectedVariant: {
+//                 ...cartItem.selectedVariant,
+//                 price: parseFloat(cartItem.selectedVariant.price) || parsedProduct.price,
+//                 original_price: cartItem.selectedVariant.original_price
+//                   ? parseFloat(cartItem.selectedVariant.original_price)
+//                   : parsedProduct.original_price,
+//                 discount_amount: cartItem.selectedVariant.discount_amount
+//                   ? parseFloat(cartItem.selectedVariant.discount_amount)
+//                   : parsedProduct.discount_amount,
+//                 stock: cartItem.selectedVariant.stock || parsedProduct.stock,
+//                 images: cartItem.selectedVariant.images?.length
+//                   ? cartItem.selectedVariant.images
+//                   : parsedProduct.images,
+//               },
+//               price: cartItem.price || parsedProduct.price,
+//               original_price: cartItem.original_price || parsedProduct.original_price,
+//               discount_amount: cartItem.discount_amount || parsedProduct.discount_amount,
+//               stock: cartItem.selectedVariant.stock !== undefined ? cartItem.selectedVariant.stock : parsedProduct.stock,
+//               images: cartItem.selectedVariant.images?.length ? cartItem.selectedVariant.images : parsedProduct.images,
+//               product_variants: variants.map((v) => ({
+//                 ...v,
+//                 price: parseFloat(v.price) || 0,
+//                 original_price: v.original_price ? parseFloat(v.original_price) : null,
+//                 discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//                 stock: v.stock || 0,
+//               })),
+//             };
+//           }
+
+//           const variant = cartItem?.variantId ? variants.find((v) => v.id === cartItem.variantId) : null;
+//           if (variant) {
+//             return {
+//               ...parsedProduct,
+//               selectedVariant: {
+//                 ...variant,
+//                 price: parseFloat(variant.price) || parsedProduct.price,
+//                 original_price: variant.original_price ? parseFloat(variant.original_price) : parsedProduct.original_price,
+//                 discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : parsedProduct.discount_amount,
+//                 stock: variant.stock || parsedProduct.stock,
+//                 images: variant.images?.length ? variant.images : parsedProduct.images,
+//               },
+//               price: cartItem.price || parseFloat(variant.price) || parsedProduct.price,
+//               original_price: cartItem.original_price || variant.original_price || parsedProduct.original_price,
+//               discount_amount: cartItem.discount_amount || variant.discount_amount || parsedProduct.discount_amount,
+//               stock: variant.stock !== undefined ? variant.stock : parsedProduct.stock,
+//               images: variant.images?.length ? variant.images : parsedProduct.images,
+//               product_variants: variants.map((v) => ({
+//                 ...v,
+//                 price: parseFloat(v.price) || 0,
+//                 original_price: v.original_price ? parseFloat(v.original_price) : null,
+//                 discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//                 stock: v.stock || 0,
+//               })),
+//             };
+//           }
+
+//           const variantWithImages = variants.find((v) => Array.isArray(v.images) && v.images.length > 0);
+//           const finalImages = parsedProduct.images?.length
+//             ? parsedProduct.images
+//             : variantWithImages?.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'];
+//           return {
+//             ...parsedProduct,
+//             images: finalImages,
+//             product_variants: variants.map((v) => ({
+//               ...v,
+//               price: parseFloat(v.price) || 0,
+//               original_price: v.original_price ? parseFloat(v.original_price) : null,
+//               discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+//               stock: v.stock || 0,
+//             })),
+//           };
+//         })
+//         .filter((p) => p !== null);
+
+//       setProducts(validProducts);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
+//       toast.error(`Failed to load cart: ${err.message || 'Unknown error'}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Cart fetch error:', err);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, setCartCount]);
+
+//   useEffect(() => {
+//     if (!buyerLocation || typeof fetchCartItems !== 'function') return;
+//     fetchCartItems();
+//   }, [buyerLocation, fetchCartItems]);
+
+//   const updateSupabaseCartItem = async (userId, cartId, productId, updatedItem) => {
+//     try {
+//       const { error: upsertError } = await retryRequest(() =>
+//         supabase
+//           .from('cart')
+//           .upsert(
+//             {
+//               id: cartId,
+//               user_id: userId,
+//               product_id: productId,
+//               quantity: updatedItem.quantity || 1,
+//               variant_id: updatedItem.variantId || null,
+//               price: updatedItem.price || 0,
+//               title: updatedItem.title || 'Unnamed Product',
+//             },
+//             { onConflict: ['id'] }
+//           )
+//       );
+//       if (upsertError) {
+//         console.error('Upsert error details:', upsertError.message, upsertError.code, upsertError.details);
+//         if (upsertError.code === '42P10') {
+//           setError('Database constraint missing. Please contact support to fix the cart table.');
+//           toast.error('Database issue detected. Changes may not sync.', {
+//             position: 'top-center',
+//             duration: 3000,
+//           });
+//         }
+//         throw upsertError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message || 'Unknown error'}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromSupabaseCart = async (userId, cartId) => {
+//     try {
+//       const { error: deleteError } = await retryRequest(() =>
+//         supabase.from('cart').delete().eq('id', cartId).eq('user_id', userId)
+//       );
+//       if (deleteError) {
+//         console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
+//         throw deleteError;
+//       }
+//     } catch (err) {
+//       setError('Failed to sync cart with server. Changes may not persist.');
+//       toast.error(`Failed to sync cart with server: ${err.message || 'Unknown error'}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       console.error('Sync error:', err);
+//     }
+//   };
+
+//   const removeFromCart = async (cartId, productId, variantId) => {
+//     const updatedCart = cartItems.filter((item) => item.cartId !== cartId);
+//     setCartItems(updatedCart);
+//     setProducts((prev) => prev.filter((product) => !(product.id === productId && product.selectedVariant?.id === variantId)));
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Item removed from cart successfully!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       await removeFromSupabaseCart(session.user.id, cartId);
+//     }
+//   };
+
+//   const increaseQuantity = async (cartId, productId, variantId) => {
+//     const product = products.find((p) => p.id === productId && p.selectedVariant?.id === variantId);
+//     const cartItem = cartItems.find((item) => item.cartId === cartId);
+//     const currentQuantity = cartItem.quantity || 1;
+//     const stock = cartItem.selectedVariant ? cartItem.selectedVariant.stock : product.stock !== undefined ? product.stock : 0;
+
+//     if (currentQuantity >= stock) {
+//       toast.error('Cannot add more items. Stock limit reached.', {
+//         position: 'top-center',
+//         duration: 3000,
+//       });
+//       return;
+//     }
+
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.cartId === cartId) {
+//         return { ...item, quantity: currentQuantity + 1 };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, {
+//         ...updatedItem,
+//         title: product.title || product.name,
+//       });
+//     }
+//   };
+
+//   const decreaseQuantity = async (cartId, productId, variantId) => {
+//     const updatedCart = cartItems.map((item) => {
+//       if (item.cartId === cartId) {
+//         const newQty = (item.quantity || 1) - 1;
+//         return { ...item, quantity: newQty < 1 ? 1 : newQty };
+//       }
+//       return item;
+//     });
+//     setCartItems(updatedCart);
+//     localStorage.setItem('cart', JSON.stringify(updatedCart));
+//     setCartCount(updatedCart.length);
+//     toast.success('Cart updated!', {
+//       position: 'top-center',
+//       duration: 3000,
+//     });
+
+//     const { data: { session } } = await supabase.auth.getSession();
+//     if (session?.user) {
+//       const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+//       await updateSupabaseCartItem(session.user.id, cartId, productId, {
+//         ...updatedItem,
+//         title: products.find((p) => p.id === productId && p.selectedVariant?.id === variantId)?.title || 'Unnamed Product',
+//       });
+//     }
+//   };
+
+//   const total = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(
+//       (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//     );
+//     const quantity = cartItem?.quantity || 1;
+//     const price = product.price || 0;
+//     return sum + price * quantity;
+//   }, 0);
+
+//   const discountTotal = products.reduce((sum, product) => {
+//     const cartItem = cartItems.find(
+//       (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+//     );
+//     const quantity = cartItem?.quantity || 1;
+//     const discount = product.discount_amount || 0;
+//     return sum + discount * quantity;
+//   }, 0);
+
+//   // SEO variables
+//   const pageUrl = 'https://www.markeet.com/cart';
+
+//   if (loading) return <div className="cart-loading">Loading...</div>;
+//   if (error) return <div className="cart-error">{error}</div>;
+
+//   return (
+//     <div className="cart">
+//       <Helmet>
+//         <title>Shopping Cart - Markeet</title>
+//         <meta
+//           name="description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="keywords"
+//           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
+//         />
+//         <meta name="robots" content="noindex, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           property="og:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           property="og:image"
+//           content={
+//             products[0]?.images?.[0] ||
+//             'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//           }
+//         />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content="Shopping Cart - Markeet" />
+//         <meta
+//           name="twitter:description"
+//           content="View and manage your shopping cart on Markeet. Proceed to checkout for electronics, appliances, fashion, and more."
+//         />
+//         <meta
+//           name="twitter:image"
+//           content={
+//             products[0]?.images?.[0] ||
+//             'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//           }
+//         />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             '@context': 'https://schema.org',
+//             '@type': 'WebPage',
+//             name: 'Shopping Cart - Markeet',
+//             description: 'View and manage your shopping cart on Markeet.',
+//             url: pageUrl,
+//           })}
+//         </script>
+//       </Helmet>
+//       <h1 className="cart-title">FreshCart Cart</h1>
+//       {cartItems.length === 0 ? (
+//         <p className="empty-cart">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           <div className="cart-items">
+//             {products.map((product, index) => {
+//               const cartItem = cartItems.find(
+//                 (item) => item.uniqueKey === product.uniqueKey
+//               );
+//               const quantity = cartItem?.quantity || 1;
+//               const selectedVariant = product.selectedVariant;
+//               return (
+//                 <div key={cartItem?.uniqueKey || `${product.id}-${index}`} className="cart-item">
+//                   <img
+//                     src={
+//                       selectedVariant?.images?.[0] ||
+//                       product.images?.[0] ||
+//                       'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+//                     }
+//                     alt={`${product.title || product.name} cart image`}
+//                     onError={(e) => {
+//                       e.target.src =
+//                         'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//                     }}
+//                     className="cart-item-image"
+//                   />
+//                   <div className="cart-item-details">
+//                     <h3 className="cart-item-title">
+//                       <Link to={`/product/${product.id}`}>
+//                         {product.title || product.name || 'Unnamed Product'}
+//                       </Link>
+//                       {selectedVariant && (
+//                         <span className="variant-info">
+//                           {' '}
+//                           -{' '}
+//                           {Object.entries(selectedVariant.attributes || {})
+//                             .filter(([key, val]) => val && val.trim())
+//                             .map(([key, val]) => `${key}: ${val}`)
+//                             .join(', ')}
+//                         </span>
+//                       )}
+//                     </h3>
+//                     <div className="cart-item-price-section">
+//                       <span className="cart-item-price">
+//                         ₹
+//                         {(product.price || 0).toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </span>
+//                       {product.original_price && product.original_price > product.price && (
+//                         <span className="cart-item-original-price">
+//                           ₹
+//                           {product.original_price.toLocaleString('en-IN', {
+//                             minimumFractionDigits: 2,
+//                             maximumFractionDigits: 2,
+//                           })}
+//                         </span>
+//                       )}
+//                     </div>
+//                     {product.discount_amount > 0 && (
+//                       <p className="cart-item-discount">
+//                         Save ₹
+//                         {(product.discount_amount * quantity).toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </p>
+//                     )}
+//                     <p className="cart-item-stock">
+//                       {product.stock > 0 ? `In Stock: ${product.stock} available` : 'Out of Stock'}
+//                     </p>
+//                     <div className="cart-quantity">
+//                       <button
+//                         onClick={() => decreaseQuantity(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+//                         className="qty-btn"
+//                         disabled={quantity <= 1}
+//                       >
+//                         -
+//                       </button>
+//                       <span className="qty-display">{quantity}</span>
+//                       <button
+//                         onClick={() => increaseQuantity(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+//                         className="qty-btn"
+//                         disabled={quantity >= product.stock}
+//                       >
+//                         +
+//                       </button>
+//                     </div>
+//                     <button
+//                       onClick={() => removeFromCart(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+//                       className="remove-btn"
+//                     >
+//                       <FaTrash /> Remove
+//                     </button>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+//           <div className="cart-total">
+//             <h3>
+//               Subtotal: ₹
+//               {total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </h3>
+//             {discountTotal > 0 && (
+//               <p className="cart-total-discount">
+//                 Total Savings: ₹
+//                 {discountTotal.toLocaleString('en-IN', {
+//                   minimumFractionDigits: 2,
+//                   maximumFractionDigits: 2,
+//                 })}
+//               </p>
+//             )}
+//             <Link to="/checkout" className="checkout-btn">
+//               Proceed to Checkout
+//             </Link>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Cart;
+
+
+
+
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
@@ -2681,9 +6230,8 @@ import { FaTrash } from 'react-icons/fa';
 import { LocationContext } from '../App';
 import '../style/Cart.css';
 import Footer from './Footer';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { Helmet } from 'react-helmet-async'; // Added
+import { toast } from 'react-hot-toast';
+import { Helmet } from 'react-helmet-async';
 
 // Custom retry function for Supabase requests (exponential backoff)
 async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
@@ -2694,22 +6242,20 @@ async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
       if (attempt === maxAttempts) throw error;
       const delay = initialDelay * Math.pow(2, attempt - 1);
       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message, error.details);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 }
 
 // Distance calculation function
 function calculateDistance(userLoc, sellerLoc) {
-  if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+  if (!userLoc?.lat || !userLoc?.lon || !sellerLoc?.latitude || !sellerLoc?.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
   const R = 6371;
   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
   const a =
     Math.sin(latDiff / 2) ** 2 +
-    Math.cos(userLoc.lat * (Math.PI / 180)) *
-    Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
-    Math.sin(lonDiff / 2) ** 2;
+    Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -2724,77 +6270,121 @@ function Cart() {
   const fetchCartItems = useCallback(async () => {
     setLoading(true);
     try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session?.user) {
-        setError('Authentication required. Please ensure you are logged in.');
+        setError('Please log in to view your cart.');
         setLoading(false);
         return;
       }
 
       const userId = session.user.id;
 
+      // Fetch cart items from Supabase
       const { data: supabaseCart, error: supabaseError } = await retryRequest(() =>
-        supabase.from('cart').select('product_id, quantity, variant_id').eq('user_id', userId)
+        supabase
+          .from('cart')
+          .select('id, product_id, quantity, variant_id, price, title')
+          .eq('user_id', userId)
       );
-      if (supabaseError) {
-        throw supabaseError;
-      }
+      if (supabaseError) throw supabaseError;
 
+      console.log('Fetched cart items:', supabaseCart);
+
+      // Merge with local storage and sync unsynced items
       const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-
       const mergedCart = [];
-      const productIdsSet = new Set();
+      const productVariantSet = new Set();
 
-      storedCart.forEach(item => {
+      // Process Supabase cart items first
+      supabaseCart.forEach((item) => {
         if (item.id) {
+          const key = `${item.product_id}-${item.variant_id || 'no-variant'}`;
           mergedCart.push({
-            id: item.id,
+            id: item.product_id,
+            cartId: item.id,
             quantity: item.quantity || 1,
-            variantId: item.selectedVariant?.id || null,
-            selectedVariant: item.selectedVariant || null,
+            variantId: item.variant_id || null,
+            selectedVariant: null, // Populated later
+            price: item.price || 0,
+            title: item.title || 'Unnamed Product',
+            images: [], // Populated later
+            uniqueKey: key,
           });
-          productIdsSet.add(item.id);
+          productVariantSet.add(key);
         }
       });
 
-      const variantIds = supabaseCart
-        .filter(item => item.variant_id)
-        .map(item => item.variant_id);
+      // Sync local storage items to Supabase if not already present
+      for (const item of storedCart) {
+        if (item.id && item.uniqueKey && !productVariantSet.has(item.uniqueKey)) {
+          // Insert unsynced item into Supabase
+          const { data, error } = await supabase
+            .from('cart')
+            .insert({
+              user_id: userId,
+              product_id: item.id,
+              variant_id: item.variantId || null,
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              title: item.title || 'Unnamed Product',
+            })
+            .select('id')
+            .single();
+          if (error) {
+            console.error('Failed to sync local storage item:', error);
+            continue; // Skip item if sync fails
+          }
+
+          const key = item.uniqueKey;
+          mergedCart.push({
+            id: item.id,
+            cartId: data.id, // Use new Supabase ID
+            quantity: item.quantity || 1,
+            variantId: item.variantId || null,
+            selectedVariant: item.selectedVariant || null,
+            price: item.price || 0,
+            original_price: item.original_price || null,
+            discount_amount: item.discount_amount || 0,
+            title: item.title || 'Unnamed Product',
+            images: item.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'],
+            uniqueKey: key,
+          });
+          productVariantSet.add(key);
+        }
+      }
+
+      // Fetch variant details
+      const variantIds = mergedCart.filter((item) => item.variantId).map((item) => item.variantId);
       let variantDetails = {};
       if (variantIds.length > 0) {
         const { data: variantData, error: variantError } = await supabase
           .from('product_variants')
-          .select('id, attributes, price, images, stock')
+          .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
           .in('id', variantIds);
         if (variantError) throw variantError;
         variantDetails = variantData.reduce((acc, variant) => {
-          acc[variant.id] = variant;
+          acc[variant.id] = {
+            ...variant,
+            price: parseFloat(variant.price) || 0,
+            original_price: variant.original_price ? parseFloat(variant.original_price) : null,
+            discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : 0,
+            stock: variant.stock || 0,
+            images: variant.images || [],
+          };
           return acc;
         }, {});
       }
 
-      supabaseCart.forEach(item => {
-        if (!productIdsSet.has(item.product_id)) {
-          mergedCart.push({
-            id: item.product_id,
-            quantity: item.quantity || 1,
-            variantId: item.variant_id || null,
-            selectedVariant: item.variant_id ? variantDetails[item.variant_id] : null,
-          });
-          productIdsSet.add(item.product_id);
-        } else {
-          const existingItemIndex = mergedCart.findIndex(i => i.id === item.product_id);
-          if (existingItemIndex !== -1) {
-            mergedCart[existingItemIndex] = {
-              ...mergedCart[existingItemIndex],
-              quantity: item.quantity || 1,
-              variantId: item.variant_id || null,
-              selectedVariant: item.variant_id ? variantDetails[item.variant_id] : mergedCart[existingItemIndex].selectedVariant,
-            };
-          }
+      // Update mergedCart with variant details
+      mergedCart.forEach((item) => {
+        if (item.variantId && variantDetails[item.variantId]) {
+          item.selectedVariant = variantDetails[item.variantId];
+          item.price = variantDetails[item.variantId].price || item.price;
+          item.original_price = variantDetails[item.variantId].original_price || item.original_price;
+          item.discount_amount = variantDetails[item.variantId].discount_amount || item.discount_amount;
+          item.images = variantDetails[item.variantId].images?.length
+            ? variantDetails[item.variantId].images
+            : item.images;
         }
       });
 
@@ -2808,14 +6398,15 @@ function Cart() {
         return;
       }
 
-      const productIds = mergedCart.map((item) => item.id).filter(Boolean);
+      const productIds = [...new Set(mergedCart.map((item) => item.id).filter(Boolean))];
       if (productIds.length === 0) {
         setProducts([]);
         setLoading(false);
         return;
       }
 
-      const { data: productData, error: fetchError } = await retryRequest(() =>
+      // Fetch products
+      const { data: productData, error: productError } = await retryRequest(() =>
         supabase
           .from('products')
           .select(`
@@ -2824,15 +6415,31 @@ function Cart() {
             title,
             name,
             price,
+            original_price,
+            discount_amount,
             stock,
-            images,
-            product_variants!product_variants_product_id_fkey(price, images, stock)
+            images
           `)
           .in('id', productIds)
           .eq('is_approved', true)
+          .eq('status', 'active')
       );
-      if (fetchError) throw fetchError;
+      if (productError) throw productError;
 
+      // Fetch all variants for these products
+      const { data: variantData, error: variantError } = await retryRequest(() =>
+        supabase
+          .from('product_variants')
+          .select('id, product_id, attributes, price, original_price, discount_amount, images, stock')
+          .in('product_id', productIds)
+          .eq('status', 'active')
+      );
+      if (variantError) throw variantError;
+
+      console.log('Fetched products:', productData);
+      console.log('Fetched variants:', variantData);
+
+      // Fetch sellers for distance calculation
       const { data: sellersData, error: sellersError } = await retryRequest(() =>
         supabase.from('sellers').select('id, latitude, longitude')
       );
@@ -2846,54 +6453,103 @@ function Cart() {
             return null;
           }
 
-          const storedItem = mergedCart.find((item) => item.id === product.id);
-          if (storedItem?.selectedVariant) {
+          const cartItem = mergedCart.find(
+            (item) => item.id === product.id && item.variantId === (variantData.find((v) => v.id === item.variantId)?.id || null)
+          );
+          const variants = variantData.filter((v) => v.product_id === product.id);
+
+          const parsedProduct = {
+            ...product,
+            price: parseFloat(product.price) || 0,
+            original_price: product.original_price ? parseFloat(product.original_price) : null,
+            discount_amount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+            stock: product.stock || 0,
+            images: product.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'],
+            uniqueKey: cartItem?.uniqueKey || `${product.id}-no-variant`,
+          };
+
+          if (cartItem?.selectedVariant) {
             return {
-              ...product,
-              selectedVariant: storedItem.selectedVariant,
-              price: storedItem.selectedVariant.price || product.price,
-              stock: storedItem.selectedVariant.stock !== undefined ? storedItem.selectedVariant.stock : product.stock,
-              images: storedItem.selectedVariant.images?.length
-                ? storedItem.selectedVariant.images
-                : product.images,
+              ...parsedProduct,
+              selectedVariant: {
+                ...cartItem.selectedVariant,
+                price: parseFloat(cartItem.selectedVariant.price) || parsedProduct.price,
+                original_price: cartItem.selectedVariant.original_price
+                  ? parseFloat(cartItem.selectedVariant.original_price)
+                  : parsedProduct.original_price,
+                discount_amount: cartItem.selectedVariant.discount_amount
+                  ? parseFloat(cartItem.selectedVariant.discount_amount)
+                  : parsedProduct.discount_amount,
+                stock: cartItem.selectedVariant.stock || parsedProduct.stock,
+                images: cartItem.selectedVariant.images?.length
+                  ? cartItem.selectedVariant.images
+                  : parsedProduct.images,
+              },
+              price: cartItem.price || parsedProduct.price,
+              original_price: cartItem.original_price || parsedProduct.original_price,
+              discount_amount: cartItem.discount_amount || parsedProduct.discount_amount,
+              stock: cartItem.selectedVariant.stock !== undefined ? cartItem.selectedVariant.stock : parsedProduct.stock,
+              images: cartItem.selectedVariant.images?.length ? cartItem.selectedVariant.images : parsedProduct.images,
+              product_variants: variants.map((v) => ({
+                ...v,
+                price: parseFloat(v.price) || 0,
+                original_price: v.original_price ? parseFloat(v.original_price) : null,
+                discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+                stock: v.stock || 0,
+              })),
             };
           }
 
-          const variantWithImages = product.product_variants?.find(
-            (v) => Array.isArray(v.images) && v.images.length > 0
-          );
-          const finalImages =
-            product.images?.length
-              ? product.images
-              : variantWithImages?.images || [
-                  'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg',
-                ];
-          const productPrice =
-            product.price !== null && product.price !== undefined
-              ? product.price
-              : variantWithImages?.price || 0;
-          const productStock =
-            product.stock !== undefined
-              ? product.stock
-              : variantWithImages?.stock !== undefined
-              ? variantWithImages.stock
-              : 0;
+          const variant = cartItem?.variantId ? variants.find((v) => v.id === cartItem.variantId) : null;
+          if (variant) {
+            return {
+              ...parsedProduct,
+              selectedVariant: {
+                ...variant,
+                price: parseFloat(variant.price) || parsedProduct.price,
+                original_price: variant.original_price ? parseFloat(variant.original_price) : parsedProduct.original_price,
+                discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : parsedProduct.discount_amount,
+                stock: variant.stock || parsedProduct.stock,
+                images: variant.images?.length ? variant.images : parsedProduct.images,
+              },
+              price: cartItem.price || parseFloat(variant.price) || parsedProduct.price,
+              original_price: cartItem.original_price || variant.original_price || parsedProduct.original_price,
+              discount_amount: cartItem.discount_amount || variant.discount_amount || parsedProduct.discount_amount,
+              stock: variant.stock !== undefined ? variant.stock : parsedProduct.stock,
+              images: variant.images?.length ? variant.images : parsedProduct.images,
+              product_variants: variants.map((v) => ({
+                ...v,
+                price: parseFloat(v.price) || 0,
+                original_price: v.original_price ? parseFloat(v.original_price) : null,
+                discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+                stock: v.stock || 0,
+              })),
+            };
+          }
+
+          const variantWithImages = variants.find((v) => Array.isArray(v.images) && v.images.length > 0);
+          const finalImages = parsedProduct.images?.length
+            ? parsedProduct.images
+            : variantWithImages?.images || ['https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'];
           return {
-            ...product,
+            ...parsedProduct,
             images: finalImages,
-            price: productPrice,
-            stock: productStock,
+            product_variants: variants.map((v) => ({
+              ...v,
+              price: parseFloat(v.price) || 0,
+              original_price: v.original_price ? parseFloat(v.original_price) : null,
+              discount_amount: v.discount_amount ? parseFloat(v.discount_amount) : 0,
+              stock: v.stock || 0,
+            })),
           };
         })
         .filter((p) => p !== null);
 
       setProducts(validProducts);
     } catch (err) {
-      setError(`Error: ${err.message || 'Failed to load cart. Please try again later.'}`);
-      toast.error(`Failed to load cart: ${err.message}`, {
-        position: "top-center",
-        autoClose: 3000,
-      });
+      setError(`Error: ${err.message || 'Failed to load cart.'}`);
+      toast.error(`Failed to load cart: ${err.message || 'Unknown error'}`, { duration: 3000 });
+      console.error('Cart fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -2904,94 +6560,110 @@ function Cart() {
     fetchCartItems();
   }, [buyerLocation, fetchCartItems]);
 
-  const updateSupabaseCartItem = async (userId, productId, updatedItem) => {
+  const updateSupabaseCartItem = async (userId, cartId, productId, updatedItem) => {
+    if (!cartId) {
+      console.warn('Cannot update cart item: cartId is undefined');
+      toast.error('Cannot update cart: Invalid cart ID.', { duration: 3000 });
+      return;
+    }
     try {
       const { error: upsertError } = await retryRequest(() =>
         supabase
           .from('cart')
           .upsert(
             {
+              id: cartId,
               user_id: userId,
               product_id: productId,
               quantity: updatedItem.quantity || 1,
               variant_id: updatedItem.variantId || null,
+              price: updatedItem.price || 0,
+              title: updatedItem.title || 'Unnamed Product',
             },
-            { onConflict: ['user_id', 'product_id'] }
+            { onConflict: ['id'] }
           )
       );
-      if (upsertError) {
-        console.error('Upsert error details:', upsertError.message, upsertError.code, upsertError.details);
-        if (upsertError.code === '42P10') {
-          setError('Database constraint missing. Please contact support to fix the cart table.');
-          toast.error('Database issue detected. Changes may not sync.', {
-            position: "top-center",
-            autoClose: 3000,
-          });
-        }
-        throw upsertError;
-      }
+      if (upsertError) throw upsertError;
     } catch (err) {
-      setError('Failed to sync cart with server. Changes may not persist.');
-      toast.error(`Failed to sync cart with server: ${err.message}`, {
-        position: "top-center",
-        autoClose: 3000,
-      });
+      setError('Failed to sync cart with server.');
+      toast.error(`Failed to sync cart: ${err.message || 'Unknown error'}`, { duration: 3000 });
       console.error('Sync error:', err);
     }
   };
 
-  const removeFromSupabaseCart = async (userId, productId) => {
+  const removeFromSupabaseCart = async (userId, cartId) => {
+    if (!cartId) {
+      console.warn('Cannot delete cart item: cartId is undefined');
+      toast.error('Cannot remove item: Invalid cart ID.', { duration: 3000 });
+      return false;
+    }
     try {
       const { error: deleteError } = await retryRequest(() =>
-        supabase.from('cart').delete().eq('user_id', userId).eq('product_id', productId)
+        supabase.from('cart').delete().eq('id', cartId).eq('user_id', userId)
       );
-      if (deleteError) {
-        console.error('Delete error details:', deleteError.message, deleteError.code, deleteError.details);
-        throw deleteError;
-      }
+      if (deleteError) throw deleteError;
+      return true;
     } catch (err) {
-      setError('Failed to sync cart with server. Changes may not persist.');
-      toast.error(`Failed to sync cart with server: ${err.message}`, {
-        position: "top-center",
-        autoClose: 3000,
-      });
+      setError('Failed to sync cart with server.');
+      toast.error(`Failed to sync cart: ${err.message || 'Unknown error'}`, { duration: 3000 });
       console.error('Sync error:', err);
+      return false;
     }
   };
 
-  const removeFromCart = async (productId) => {
-    const updatedCart = cartItems.filter((item) => item.id !== productId);
+  const removeFromCart = async (cartId, productId, variantId) => {
+    if (!cartId) {
+      console.warn('Cannot remove cart item: cartId is undefined');
+      toast.error('Cannot remove item: Invalid cart ID.', { duration: 3000 });
+      return;
+    }
+
+    // Store current state for potential rollback
+    const previousCartItems = [...cartItems];
+    const previousProducts = [...products];
+
+    // Update client-side state
+    const updatedCart = cartItems.filter((item) => item.cartId !== cartId);
     setCartItems(updatedCart);
-    setProducts((prev) => prev.filter((product) => product.id !== productId));
+    setProducts((prev) => prev.filter((product) => !(product.id === productId && product.selectedVariant?.id === variantId)));
     localStorage.setItem('cart', JSON.stringify(updatedCart));
     setCartCount(updatedCart.length);
-    toast.success('Item removed from cart successfully!', {
-      position: "top-center",
-      autoClose: 3000,
-    });
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      await removeFromSupabaseCart(session.user.id, productId);
+      const success = await removeFromSupabaseCart(session.user.id, cartId);
+      if (!success) {
+        // Revert client-side changes if Supabase deletion fails
+        setCartItems(previousCartItems);
+        setProducts(previousProducts);
+        localStorage.setItem('cart', JSON.stringify(previousCartItems));
+        setCartCount(previousCartItems.length);
+        return;
+      }
     }
+
+    toast.success('Item removed from cart!', { duration: 3000 });
   };
 
-  const increaseQuantity = async (productId) => {
-    const product = products.find(p => p.id === productId);
-    const cartItem = cartItems.find(item => item.id === productId);
+  const increaseQuantity = async (cartId, productId, variantId) => {
+    if (!cartId) {
+      console.warn('Cannot increase quantity: cartId is undefined');
+      toast.error('Cannot update quantity: Invalid cart ID.', { duration: 3000 });
+      return;
+    }
+
+    const product = products.find((p) => p.id === productId && p.selectedVariant?.id === variantId);
+    const cartItem = cartItems.find((item) => item.cartId === cartId);
     const currentQuantity = cartItem.quantity || 1;
-    const stock = product.stock !== undefined ? product.stock : 0;
+    const stock = cartItem.selectedVariant ? cartItem.selectedVariant.stock : product.stock !== undefined ? product.stock : 0;
 
     if (currentQuantity >= stock) {
-      toast.error('Cannot add more items. Stock limit reached.', {
-        position: "top-center",
-        autoClose: 3000,
-      });
+      toast.error('Stock limit reached.', { duration: 3000 });
       return;
     }
 
     const updatedCart = cartItems.map((item) => {
-      if (item.id === productId) {
+      if (item.cartId === cartId) {
         return { ...item, quantity: currentQuantity + 1 };
       }
       return item;
@@ -2999,21 +6671,27 @@ function Cart() {
     setCartItems(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
     setCartCount(updatedCart.length);
-    toast.success('Cart updated!', {
-      position: "top-center",
-      autoClose: 3000,
-    });
+    toast.success('Cart updated!', { duration: 3000 });
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      const updatedItem = updatedCart.find(item => item.id === productId);
-      await updateSupabaseCartItem(session.user.id, productId, updatedItem);
+      const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+      await updateSupabaseCartItem(session.user.id, cartId, productId, {
+        ...updatedItem,
+        title: product.title || product.name,
+      });
     }
   };
 
-  const decreaseQuantity = async (productId) => {
+  const decreaseQuantity = async (cartId, productId, variantId) => {
+    if (!cartId) {
+      console.warn('Cannot decrease quantity: cartId is undefined');
+      toast.error('Cannot update quantity: Invalid cart ID.', { duration: 3000 });
+      return;
+    }
+
     const updatedCart = cartItems.map((item) => {
-      if (item.id === productId) {
+      if (item.cartId === cartId) {
         const newQty = (item.quantity || 1) - 1;
         return { ...item, quantity: newQty < 1 ? 1 : newQty };
       }
@@ -3022,21 +6700,34 @@ function Cart() {
     setCartItems(updatedCart);
     localStorage.setItem('cart', JSON.stringify(updatedCart));
     setCartCount(updatedCart.length);
-    toast.success('Cart updated!', {
-      position: "top-center",
-      autoClose: 3000,
-    });
+    toast.success('Cart updated!', { duration: 3000 });
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      const updatedItem = updatedCart.find(item => item.id === productId);
-      await updateSupabaseCartItem(session.user.id, productId, updatedItem);
+      const updatedItem = updatedCart.find((item) => item.cartId === cartId);
+      await updateSupabaseCartItem(session.user.id, cartId, productId, {
+        ...updatedItem,
+        title: products.find((p) => p.id === productId && p.selectedVariant?.id === variantId)?.title || 'Unnamed Product',
+      });
     }
   };
 
   const total = products.reduce((sum, product) => {
-    const quantity = cartItems.find((item) => item.id === product.id)?.quantity || 1;
-    return sum + (product.price || 0) * quantity;
+    const cartItem = cartItems.find(
+      (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+    );
+    const quantity = cartItem?.quantity || 1;
+    const price = product.price || 0;
+    return sum + price * quantity;
+  }, 0);
+
+  const discountTotal = products.reduce((sum, product) => {
+    const cartItem = cartItems.find(
+      (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+    );
+    const quantity = cartItem?.quantity || 1;
+    const discount = product.discount_amount || 0;
+    return sum + discount * quantity;
   }, 0);
 
   // SEO variables
@@ -3057,7 +6748,7 @@ function Cart() {
           name="keywords"
           content="cart, shopping cart, ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet"
         />
-        <meta name="robots" content="noindex, follow" /> {/* Cart is user-specific, so noindex */}
+        <meta name="robots" content="noindex, follow" />
         <link rel="canonical" href={pageUrl} />
         <meta property="og:title" content="Shopping Cart - Markeet" />
         <meta
@@ -3066,7 +6757,10 @@ function Cart() {
         />
         <meta
           property="og:image"
-          content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+          content={
+            products[0]?.images?.[0] ||
+            'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+          }
         />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:type" content="website" />
@@ -3078,19 +6772,21 @@ function Cart() {
         />
         <meta
           name="twitter:image"
-          content={products[0]?.images?.[0] || 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'}
+          content={
+            products[0]?.images?.[0] ||
+            'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg'
+          }
         />
         <script type="application/ld+json">
           {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "WebPage",
-            name: "Shopping Cart - Markeet",
-            description: "View and manage your shopping cart on Markeet.",
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: 'Shopping Cart - Markeet',
+            description: 'View and manage your shopping cart on Markeet.',
             url: pageUrl,
           })}
         </script>
       </Helmet>
-      <ToastContainer position="top-center" autoClose={3000} />
       <h1 className="cart-title">FreshCart Cart</h1>
       {cartItems.length === 0 ? (
         <p className="empty-cart">Your cart is empty.</p>
@@ -3098,10 +6794,19 @@ function Cart() {
         <>
           <div className="cart-items">
             {products.map((product, index) => {
-              const quantity = cartItems.find((item) => item.id === product.id)?.quantity || 1;
+              const cartItem = cartItems.find(
+                (item) => item.id === product.id && item.variantId === (product.selectedVariant?.id || null)
+              );
+              
+              if (!cartItem || !cartItem.cartId) {
+                console.warn("Missing or invalid cartItem for product:", product.id, product.selectedVariant?.id);
+                return null;
+              }
+              
+              const quantity = cartItem?.quantity || 1;
               const selectedVariant = product.selectedVariant;
               return (
-                <div key={`${product.id}-${index}`} className="cart-item">
+                <div key={cartItem?.uniqueKey || `${product.id}-${index}`} className="cart-item">
                   <img
                     src={
                       selectedVariant?.images?.[0] ||
@@ -3117,29 +6822,71 @@ function Cart() {
                   />
                   <div className="cart-item-details">
                     <h3 className="cart-item-title">
-                      {product.title || product.name || 'Unnamed Product'}
+                      <Link to={`/product/${product.id}`}>
+                        {product.title || product.name || 'Unnamed Product'}
+                      </Link>
                       {selectedVariant && (
                         <span className="variant-info">
                           {' '}
-                          - {Object.entries(selectedVariant.attributes || {})
+                          -{' '}
+                          {Object.entries(selectedVariant.attributes || {})
+                            .filter(([key, val]) => val && val.trim())
                             .map(([key, val]) => `${key}: ${val}`)
                             .join(', ')}
                         </span>
                       )}
                     </h3>
-                    <p className="cart-item-price">
-                      ₹
-                      {(selectedVariant?.price || product.price).toLocaleString('en-IN', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                    <div className="cart-item-price-section">
+                      <span className="cart-item-price">
+                        ₹
+                        {(product.price || 0).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                      {product.original_price && product.original_price > product.price && (
+                        <span className="cart-item-original-price">
+                          ₹
+                          {product.original_price.toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    {product.discount_amount > 0 && (
+                      <p className="cart-item-discount">
+                        Save ₹
+                        {(product.discount_amount * quantity).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    )}
+                    <p className="cart-item-stock">
+                      {product.stock > 0 ? `In Stock: ${product.stock} available` : 'Out of Stock'}
                     </p>
                     <div className="cart-quantity">
-                      <button onClick={() => decreaseQuantity(product.id)} className="qty-btn">-</button>
+                      <button
+                        onClick={() => decreaseQuantity(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+                        className="qty-btn"
+                        disabled={quantity <= 1}
+                      >
+                        -
+                      </button>
                       <span className="qty-display">{quantity}</span>
-                      <button onClick={() => increaseQuantity(product.id)} className="qty-btn">+</button>
+                      <button
+                        onClick={() => increaseQuantity(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+                        className="qty-btn"
+                        disabled={quantity >= product.stock}
+                      >
+                        +
+                      </button>
                     </div>
-                    <button onClick={() => removeFromCart(product.id)} className="remove-btn">
+                    <button
+                      onClick={() => removeFromCart(cartItem?.cartId, product.id, product.selectedVariant?.id || null)}
+                      className="remove-btn"
+                    >
                       <FaTrash /> Remove
                     </button>
                   </div>
@@ -3149,12 +6896,21 @@ function Cart() {
           </div>
           <div className="cart-total">
             <h3>
-              Total: ₹
+              Subtotal: ₹
               {total.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </h3>
+            {discountTotal > 0 && (
+              <p className="cart-total-discount">
+                Total Savings: ₹
+                {discountTotal.toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            )}
             <Link to="/checkout" className="checkout-btn">
               Proceed to Checkout
             </Link>

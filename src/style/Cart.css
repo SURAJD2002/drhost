@@ -290,3 +290,41 @@
     font-size: 18px;
   }
 }
+.cart-item-price-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.5rem 0;
+}
+.cart-item-price {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #333;
+}
+.cart-item-original-price {
+  font-size: 1rem;
+  color: #999;
+  text-decoration: line-through;
+}
+.cart-item-discount {
+  font-size: 0.9rem;
+  color: #2ecc71;
+  margin: 0.2rem 0;
+}
+.cart-item-stock {
+  font-size: 0.9rem;
+  color: #e74c3c;
+  margin: 0.2rem 0;
+}
+.cart-total-discount {
+  font-size: 1rem;
+  color: #2ecc71;
+  margin: 0.5rem 0;
+}
+.cart-item-title a {
+  color: #1890ff;
+  text-decoration: none;
+}
+.cart-item-title a:hover {
+  text-decoration: underline;
+}

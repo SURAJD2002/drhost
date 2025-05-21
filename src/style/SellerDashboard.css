@@ -311,4 +311,24 @@
   .seller-dashboard-text {
     font-size: 0.85rem;
   }
+}.seller-dashboard-btn.btn-edit {
+  background-color: #1890ff;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.seller-dashboard-btn.btn-edit:hover {
+  background-color: #40a9ff;
+}
+
+.seller-dashboard-btn.btn-edit:disabled {
+  background-color: #bfbfbf;
+  cursor: not-allowed;
 }

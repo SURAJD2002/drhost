@@ -3046,12 +3046,1058 @@
 
 
 
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { ToastContainer, toast } from 'react-toastify';
+// import 'react-toastify/dist/ReactToastify.css';
+// import '../style/Products.css';
+// import Footer from './Footer';
+// import { Helmet } from 'react-helmet-async';
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const lat = sellerLoc.latitude;
+//   const lon = sellerLoc.longitude;
+//   const dLat = ((lat - userLoc.lat) * Math.PI) / 180;
+//   const dLon = ((lon - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(dLat / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(lat * (Math.PI / 180)) *
+//     Math.sin(dLon / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// // Check network connectivity
+// const checkNetworkStatus = () => {
+//   if (!navigator.onLine) {
+//     toast.error('No internet connection. Please check your network and try again.', {
+//       position: "top-center",
+//       autoClose: 3000,
+//     });
+//     return false;
+//   }
+//   return true;
+// };
+
+// function Products() {
+//   const { buyerLocation, setBuyerLocation, session, setCartCount } = useContext(LocationContext);
+//   const [searchParams] = useSearchParams();
+//   const categoryId = searchParams.get('category');
+//   const [products, setProducts] = useState([]);
+//   const [categoryName, setCategoryName] = useState('');
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const navigate = useNavigate();
+
+//   const fetchCategoryName = useCallback(async () => {
+//     if (!categoryId) return;
+//     try {
+//       const { data, error } = await supabase
+//         .from('categories')
+//         .select('name')
+//         .eq('id', parseInt(categoryId, 10))
+//         .single();
+//       if (error) throw error;
+//       setCategoryName(data?.name || '');
+//     } catch (err) {
+//       console.error('Error fetching category name:', err);
+//     }
+//   }, [categoryId]);
+
+//   const fetchProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       toast.warn('No buyer location available. Please allow location access.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       setProducts([]);
+//       setLoading(false);
+//       return;
+//     }
+//     if (!categoryId) {
+//       setError('No category specified.');
+//       setProducts([]);
+//       setLoading(false);
+//       return;
+//     }
+//     if (!checkNetworkStatus()) {
+//       setLoading(false);
+//       return;
+//     }
+
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data: sellersData, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = sellersData
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         toast.info('No sellers nearby within 40km for this category.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//         setLoading(false);
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, category_id, title, name, price, original_price, discount_amount, images, seller_id, stock')
+//         .eq('category_id', parseInt(categoryId, 10))
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || product.name || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+//         discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+//         stock: product.stock || 0,
+//         seller_id: product.seller_id, // Fixed typo
+//       }));
+
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while fetching products. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       } else {
+//         toast.error('Failed to fetch products.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//       setProducts([]);
+//       setError(`Error: ${err.message || 'Failed to fetch products.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, categoryId]);
+
+//   const addToCart = async (product) => {
+//     if (!product || !product.id || product.price === undefined || product.stock <= 0) {
+//       toast.error(product.stock <= 0 ? 'Out of stock.' : 'Invalid product.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.warn('Please log in to add items to cart.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+
+//     try {
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .maybeSingle();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = (existingCartItem.quantity || 0) + 1;
+//         if (newQuantity > product.stock) {
+//           toast.warn('Exceeds stock.', {
+//             position: "top-center",
+//             autoClose: 3000,
+//           });
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//         toast.success(`${product.name} quantity updated in cart!`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//         toast.success(`${product.name} added to cart!`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+
+//       const { data: cartData, error: cartError } = await supabase
+//         .from('cart')
+//         .select('*', { count: 'exact' })
+//         .eq('user_id', session.user.id);
+//       if (cartError) throw cartError;
+//       setCartCount(cartData.length);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while adding to cart. Please check your connection.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       } else {
+//         toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//       }
+//     }
+//   };
+
+//   const handleBuyNow = (product) => {
+//     if (!product || !product.id || product.price === undefined || product.stock <= 0) {
+//       toast.error(product.stock <= 0 ? 'Out of stock.' : 'Invalid product.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.warn('Please log in to proceed to checkout.', {
+//         position: "top-center",
+//         autoClose: 3000,
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     navigate('/checkout', { state: { product } });
+//   };
+
+//   useEffect(() => {
+//     fetchCategoryName();
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       if (navigator.geolocation) {
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newLocation = {
+//               lat: position.coords.latitude,
+//               lon: position.coords.longitude,
+//             };
+//             setBuyerLocation(newLocation);
+//             fetchProducts();
+//           },
+//           (error) => {
+//             console.error('Geolocation error:', error);
+//             let errorMessage = 'Unable to fetch your location.';
+//             if (error.code === error.PERMISSION_DENIED) {
+//               errorMessage = 'Location access denied. Please enable location services.';
+//             } else if (error.code === error.POSITION_UNAVAILABLE) {
+//               errorMessage = 'Location information is unavailable. Please try again.';
+//             } else if (error.code === error.TIMEOUT) {
+//               errorMessage = 'Location request timed out. Please try again.';
+//             }
+//             toast.warn(errorMessage, {
+//               position: "top-center",
+//               autoClose: 3000,
+//             });
+//             const defaultLoc = { lat: 12.9753, lon: 77.591 };
+//             setBuyerLocation(defaultLoc);
+//             fetchProducts();
+//           },
+//           { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+//         );
+//       } else {
+//         toast.error('Geolocation is not supported by this browser.', {
+//           position: "top-center",
+//           autoClose: 3000,
+//         });
+//         const defaultLoc = { lat: 12.9753, lon: 77.591 };
+//         setBuyerLocation(defaultLoc);
+//         fetchProducts();
+//       }
+//     } else {
+//       fetchProducts();
+//     }
+//   }, [buyerLocation, setBuyerLocation, fetchProducts, fetchCategoryName]);
+
+//   const pageTitle = categoryName ? `${categoryName} Products - Markeet` : 'Products - Markeet';
+//   const pageDescription = categoryName
+//     ? `Shop ${categoryName.toLowerCase()} products on Markeet. Find electronics, appliances, fashion, jewellery, and more with fast local delivery.`
+//     : 'Shop products on Markeet. Find electronics, appliances, fashion, jewellery, and more with fast local delivery.';
+//   const pageUrl = categoryId ? `https://www.markeet.com/products?category=${categoryId}` : 'https://www.markeet.com/products';
+//   const productList = products.map((product, index) => ({
+//     "@type": "ListItem",
+//     position: index + 1,
+//     name: product.name,
+//     item: `https://www.markeet.com/product/${product.id}`,
+//   }));
+
+//   if (loading) return (
+//     <div className="prod-loading">
+//       <svg className="prod-spinner" viewBox="0 0 50 50">
+//         <circle className="prod-path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   if (error) return (
+//     <div className="prod-error">
+//       {error}
+//       <div className="prod-error-actions">
+//         <button onClick={() => fetchProducts()} className="prod-retry-btn">Retry</button>
+//         <button onClick={() => navigate('/')} className="prod-back-btn">Back to Home</button>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="prod-page">
+//       <Helmet>
+//         <title>{pageTitle}</title>
+//         <meta name="description" content={pageDescription} />
+//         <meta
+//           name="keywords"
+//           content={`${categoryName ? categoryName.toLowerCase() : 'products'}, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, ecommerce`}
+//         />
+//         <meta name="robots" content="index, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content={pageTitle} />
+//         <meta property="og:description" content={pageDescription} />
+//         <meta property="og:image" content={products[0]?.images[0] || 'https://dummyimage.com/150'} />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content={pageTitle} />
+//         <meta name="twitter:description" content={pageDescription} />
+//         <meta name="twitter:image" content={products[0]?.images[0] || 'https://dummyimage.com/150'} />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             "@context": "https://schema.org",
+//             "@type": "ItemList",
+//             itemListElement: productList,
+//           })}
+//         </script>
+//       </Helmet>
+//       <ToastContainer position="top-center" autoClose={3000} />
+//       {products.length === 0 ? (
+//         <div className="prod-no-items">
+//           No products found within 40km for this category.
+//         </div>
+//       ) : (
+//         <>
+//           <h1 className="prod-title">{categoryName ? `${categoryName} Products` : 'Products in Category'}</h1>
+//           <div className="prod-grid">
+//             {products.map((product) => (
+//               <Link
+//                 to={`/product/${product.id}`}
+//                 key={product.id}
+//                 className="prod-item"
+//                 style={{ textDecoration: 'none' }}
+//               >
+//                 <div className="product-image-wrapper">
+//                   {product.discountAmount > 0 && (
+//                     <span className="offer-badge">
+//                       <span className="offer-label">Offer!</span>
+//                       Save ₹{product.discountAmount.toFixed(2)}
+//                     </span>
+//                   )}
+//                   <img
+//                     src={product.images[0]}
+//                     alt={`${product.name} product image`}
+//                     onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                   />
+//                 </div>
+//                 <h3 className="prod-item-name">{product.name}</h3>
+//                 <div className="price-section">
+//                   <p className="prod-item-price">
+//                     ₹{product.price.toLocaleString('en-IN', {
+//                       minimumFractionDigits: 2,
+//                       maximumFractionDigits: 2,
+//                     })}
+//                   </p>
+//                   {product.originalPrice && product.originalPrice > product.price && (
+//                     <p className="original-price">
+//                       ₹{product.originalPrice.toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                   )}
+//                 </div>
+//                 <div className="prod-item-actions">
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       addToCart(product);
+//                     }}
+//                     className="prod-add-cart"
+//                     disabled={product.stock <= 0}
+//                   >
+//                     {product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+//                   </button>
+//                   <button
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       handleBuyNow(product);
+//                     }}
+//                     className="prod-buy-now"
+//                     disabled={product.stock <= 0}
+//                   >
+//                     Buy Now
+//                   </button>
+//                 </div>
+//               </Link>
+//             ))}
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Products;
+
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { LocationContext } from '../App';
+// import { Toaster, toast } from 'react-hot-toast';
+// import '../style/Products.css';
+// import Footer from './Footer';
+// import { Helmet } from 'react-helmet-async';
+
+// // Distance calculation
+// function calculateDistance(userLoc, sellerLoc) {
+//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+//   const R = 6371;
+//   const lat = sellerLoc.latitude;
+//   const lon = sellerLoc.longitude;
+//   const dLat = ((lat - userLoc.lat) * Math.PI) / 180;
+//   const dLon = ((lon - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(dLat / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//     Math.cos(lat * (Math.PI / 180)) *
+//     Math.sin(dLon / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return R * c;
+// }
+
+// // Check network connectivity
+// const checkNetworkStatus = () => {
+//   if (!navigator.onLine) {
+//     toast.error('No internet connection. Please check your network and try again.', {
+//       duration: 4000,
+//       position: 'top-center',
+//       style: {
+//         background: '#ff4d4f',
+//         color: '#fff',
+//         fontWeight: 'bold',
+//         borderRadius: '8px',
+//         padding: '16px',
+//         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//       },
+//     });
+//     return false;
+//   }
+//   return true;
+// };
+
+// function Products() {
+//   const { buyerLocation, setBuyerLocation, session, setCartCount } = useContext(LocationContext);
+//   const [searchParams] = useSearchParams();
+//   const categoryId = searchParams.get('category');
+//   const [products, setProducts] = useState([]);
+//   const [categoryName, setCategoryName] = useState('');
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const navigate = useNavigate();
+
+//   const fetchCategoryName = useCallback(async () => {
+//     if (!categoryId) return;
+//     try {
+//       const { data, error } = await supabase
+//         .from('categories')
+//         .select('name')
+//         .eq('id', parseInt(categoryId, 10))
+//         .single();
+//       if (error) throw error;
+//       setCategoryName(data?.name || '');
+//     } catch (err) {
+//       console.error('Error fetching category name:', err);
+//     }
+//   }, [categoryId]);
+
+//   const fetchProducts = useCallback(async () => {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       toast.error('No buyer location available. Please allow location access.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       setProducts([]);
+//       setLoading(false);
+//       return;
+//     }
+//     if (!categoryId) {
+//       setError('No category specified.');
+//       setProducts([]);
+//       setLoading(false);
+//       return;
+//     }
+//     if (!checkNetworkStatus()) {
+//       setLoading(false);
+//       return;
+//     }
+
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data: sellersData, error: sellersError } = await supabase
+//         .from('sellers')
+//         .select('id, latitude, longitude')
+//         .not('latitude', 'is', null)
+//         .not('longitude', 'is', null);
+//       if (sellersError) throw sellersError;
+
+//       const nearbySellerIds = sellersData
+//         .filter((seller) => {
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           return distance !== null && distance <= 40;
+//         })
+//         .map((seller) => seller.id);
+
+//       if (nearbySellerIds.length === 0) {
+//         setProducts([]);
+//         toast.info('No sellers nearby within 40km for this category.', {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#1890ff',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//         setLoading(false);
+//         return;
+//       }
+
+//       const { data, error } = await supabase
+//         .from('products')
+//         .select('id, category_id, title, name, price, original_price, discount_amount, images, seller_id, stock')
+//         .eq('category_id', parseInt(categoryId, 10))
+//         .eq('is_approved', true)
+//         .in('seller_id', nearbySellerIds);
+//       if (error) throw error;
+
+//       const mappedProducts = data.map((product) => ({
+//         id: product.id,
+//         name: product.title || product.name || 'Unnamed Product',
+//         images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+//         price: parseFloat(product.price) || 0,
+//         originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+//         discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+//         stock: product.stock || 0,
+//         seller_id: product.seller_id,
+//       }));
+
+//       setProducts(mappedProducts);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching products:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while fetching products. Please check your connection.', {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#ff4d4f',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//       } else {
+//         toast.error('Failed to fetch products.', {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#ff4d4f',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//       }
+//       setProducts([]);
+//       setError(`Error: ${err.message || 'Failed to fetch products.'}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [buyerLocation, categoryId]);
+
+//   const addToCart = async (product) => {
+//     if (!product || !product.id || product.price === undefined || product.stock <= 0) {
+//       toast.error(product.stock <= 0 ? 'Out of stock.' : 'Invalid product.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.error('Please log in to add items to cart.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     if (!checkNetworkStatus()) return;
+
+//     try {
+//       const { data: existingCartItem, error: fetchError } = await supabase
+//         .from('cart')
+//         .select('id, quantity')
+//         .eq('user_id', session.user.id)
+//         .eq('product_id', product.id)
+//         .maybeSingle();
+
+//       if (fetchError && fetchError.code !== 'PGRST116') {
+//         throw fetchError;
+//       }
+
+//       if (existingCartItem) {
+//         const newQuantity = (existingCartItem.quantity || 0) + 1;
+//         if (newQuantity > product.stock) {
+//           toast.error('Exceeds stock.', {
+//             duration: 4000,
+//             position: 'top-center',
+//             style: {
+//               background: '#ff4d4f',
+//               color: '#fff',
+//               fontWeight: 'bold',
+//               borderRadius: '8px',
+//               padding: '16px',
+//               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             },
+//           });
+//           return;
+//         }
+//         const { error: updateError } = await supabase
+//           .from('cart')
+//           .update({ quantity: newQuantity })
+//           .eq('id', existingCartItem.id);
+//         if (updateError) throw updateError;
+//         toast.success(`${product.name} quantity updated in cart!`, {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#52c41a',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//       } else {
+//         const { error: insertError } = await supabase
+//           .from('cart')
+//           .insert({
+//             user_id: session.user.id,
+//             product_id: product.id,
+//             quantity: 1,
+//             price: product.price,
+//             title: product.name,
+//           });
+//         if (insertError) throw insertError;
+//         toast.success(`${product.name} added to cart!`, {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#52c41a',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//       }
+
+//       const { data: cartData, error: cartError } = await supabase
+//         .from('cart')
+//         .select('*', { count: 'exact' })
+//         .eq('user_id', session.user.id);
+//       if (cartError) throw cartError;
+//       setCartCount(cartData.length);
+//     } catch (err) {
+//       console.error('Error adding to cart:', err);
+//       if (err.message.includes('Network')) {
+//         toast.error('Network error while adding to cart. Please check your connection.', {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#ff4d4f',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//       } else {
+//         toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#ff4d4f',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//       }
+//     }
+//   };
+
+//   const handleBuyNow = (product) => {
+//     if (!product || !product.id || product.price === undefined || product.stock <= 0) {
+//       toast.error(product.stock <= 0 ? 'Out of stock.' : 'Invalid product.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       return;
+//     }
+//     if (!session?.user) {
+//       toast.error('Please log in to proceed to checkout.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       navigate('/auth');
+//       return;
+//     }
+//     navigate('/checkout', { state: { product } });
+//   };
+
+//   useEffect(() => {
+//     fetchCategoryName();
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       if (navigator.geolocation) {
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newLocation = {
+//               lat: position.coords.latitude,
+//               lon: position.coords.longitude,
+//             };
+//             setBuyerLocation(newLocation);
+//             fetchProducts();
+//           },
+//           (error) => {
+//             console.error('Geolocation error:', error);
+//             let errorMessage = 'Unable to fetch your location.';
+//             if (error.code === error.PERMISSION_DENIED) {
+//               errorMessage = 'Location access denied. Please enable location services.';
+//             } else if (error.code === error.POSITION_UNAVAILABLE) {
+//               errorMessage = 'Location information is unavailable. Please try again.';
+//             } else if (error.code === error.TIMEOUT) {
+//               errorMessage = 'Location request timed out. Please try again.';
+//             }
+//             toast.error(errorMessage, {
+//               duration: 4000,
+//               position: 'top-center',
+//               style: {
+//                 background: '#ff4d4f',
+//                 color: '#fff',
+//                 fontWeight: 'bold',
+//                 borderRadius: '8px',
+//                 padding: '16px',
+//                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//               },
+//             });
+//             const defaultLoc = { lat: 12.9753, lon: 77.591 };
+//             setBuyerLocation(defaultLoc);
+//             fetchProducts();
+//           },
+//           { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+//         );
+//       } else {
+//         toast.error('Geolocation is not supported by this browser.', {
+//           duration: 4000,
+//           position: 'top-center',
+//           style: {
+//             background: '#ff4d4f',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//         const defaultLoc = { lat: 12.9753, lon: 77.591 };
+//         setBuyerLocation(defaultLoc);
+//         fetchProducts();
+//       }
+//     } else {
+//       fetchProducts();
+//     }
+//   }, [buyerLocation, setBuyerLocation, fetchProducts, fetchCategoryName]);
+
+//   const pageTitle = categoryName ? `${categoryName} Products - Markeet` : 'Products - Markeet';
+//   const pageDescription = categoryName
+//     ? `Shop ${categoryName.toLowerCase()} products on Markeet. Find electronics, appliances, fashion, jewellery, and more with fast local delivery.`
+//     : 'Shop products on Markeet. Find electronics, appliances, fashion, jewellery, and more with fast local delivery.';
+//   const pageUrl = categoryId ? `https://www.markeet.com/products?category=${categoryId}` : 'https://www.markeet.com/products';
+//   const productList = products.map((product, index) => ({
+//     "@type": "ListItem",
+//     position: index + 1,
+//     name: product.name,
+//     item: `https://www.markeet.com/product/${product.id}`,
+//   }));
+
+//   if (loading) return (
+//     <div className="prod-loading">
+//       <svg className="prod-spinner" viewBox="0 0 50 50">
+//         <circle className="prod-path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//       </svg>
+//       Loading...
+//     </div>
+//   );
+
+//   if (error) return (
+//     <div className="prod-error">
+//       {error}
+//       <div className="prod-error-actions">
+//         <button onClick={() => fetchProducts()} className="prod-retry-btn">Retry</button>
+//         <button onClick={() => navigate('/')} className="prod-back-btn">Back to Home</button>
+//       </div>
+//     </div>
+//   );
+
+//   return (
+//     <div className="prod-page">
+//       <Helmet>
+//         <title>{pageTitle}</title>
+//         <meta name="description" content={pageDescription} />
+//         <meta
+//           name="keywords"
+//           content={`${categoryName ? categoryName.toLowerCase() : 'products'}, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, ecommerce`}
+//         />
+//         <meta name="robots" content="index, follow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content={pageTitle} />
+//         <meta property="og:description" content={pageDescription} />
+//         <meta property="og:image" content={products[0]?.images[0] || 'https://dummyimage.com/150'} />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content={pageTitle} />
+//         <meta name="twitter:description" content={pageDescription} />
+//         <meta name="twitter:image" content={products[0]?.images[0] || 'https://dummyimage.com/150'} />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             "@context": "https://schema.org",
+//             "@type": "ItemList",
+//             itemListElement: productList,
+//           })}
+//         </script>
+//       </Helmet>
+//       <Toaster
+//         position="top-center"
+//         toastOptions={{
+//           duration: 4000,
+//           style: {
+//             borderRadius: '8px',
+//             padding: '16px',
+//             fontWeight: 'bold',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             fontSize: '16px',
+//             transition: 'all 0.3s ease-in-out',
+//           },
+//           success: {
+//             style: {
+//               background: '#52c41a',
+//               color: '#fff',
+//             },
+//             iconTheme: {
+//               primary: '#fff',
+//               secondary: '#52c41a',
+//             },
+//           },
+//           error: {
+//             style: {
+//               background: '#ff4d4f',
+//               color: '#fff',
+//             },
+//             iconTheme: {
+//               primary: '#fff',
+//               secondary: '#ff4d4f',
+//             },
+//           },
+//         }}
+//       />
+//       {products.length === 0 ? (
+//         <div className="prod-no-items">
+//           No products found within 40km for this category.
+//         </div>
+//       ) : (
+//         <>
+//           <h1 className="prod-title">{categoryName ? `${categoryName} Products` : 'Products in Category'}</h1>
+//           <div className="prod-grid">
+//             {products.map((product) => (
+//               <div key={product.id} className="prod-item">
+//                 <Link
+//                   to={`/product/${product.id}`}
+//                   style={{ textDecoration: 'none' }}
+//                   className="prod-item-link"
+//                 >
+//                   <div className="product-image-wrapper">
+//                     {product.discountAmount > 0 && (
+//                       <span className="offer-badge">
+//                         <span className="offer-label">Offer!</span>
+//                         Save ₹{product.discountAmount.toFixed(2)}
+//                       </span>
+//                     )}
+//                     <img
+//                       src={product.images[0]}
+//                       alt={`${product.name} product image`}
+//                       onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+//                     />
+//                   </div>
+//                   <h3 className="prod-item-name">{product.name}</h3>
+//                   <div className="price-section">
+//                     <p className="prod-item-price">
+//                       ₹{product.price.toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                     {product.originalPrice && product.originalPrice > product.price && (
+//                       <p className="original-price">
+//                         ₹{product.originalPrice.toLocaleString('en-IN', {
+//                           minimumFractionDigits: 2,
+//                           maximumFractionDigits: 2,
+//                         })}
+//                       </p>
+//                     )}
+//                   </div>
+//                 </Link>
+//                 <div className="prod-item-actions">
+//                   <button
+//                     onClick={() => addToCart(product)}
+//                     className="prod-add-cart"
+//                     disabled={product.stock <= 0}
+//                   >
+//                     {product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
+//                   </button>
+//                   <button
+//                     onClick={() => handleBuyNow(product)}
+//                     className="prod-buy-now"
+//                     disabled={product.stock <= 0}
+//                   >
+//                     Buy Now
+//                   </button>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default Products;
+
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { LocationContext } from '../App';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from 'react-hot-toast'; // Removed Toaster import
 import '../style/Products.css';
 import Footer from './Footer';
 import { Helmet } from 'react-helmet-async';
@@ -3077,8 +4123,16 @@ function calculateDistance(userLoc, sellerLoc) {
 const checkNetworkStatus = () => {
   if (!navigator.onLine) {
     toast.error('No internet connection. Please check your network and try again.', {
-      position: "top-center",
-      autoClose: 3000,
+      duration: 4000,
+      position: 'top-center',
+      style: {
+        background: '#ff4d4f',
+        color: '#fff',
+        fontWeight: 'bold',
+        borderRadius: '8px',
+        padding: '16px',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+      },
     });
     return false;
   }
@@ -3112,9 +4166,17 @@ function Products() {
 
   const fetchProducts = useCallback(async () => {
     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
-      toast.warn('No buyer location available. Please allow location access.', {
-        position: "top-center",
-        autoClose: 3000,
+      toast.error('No buyer location available. Please allow location access.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
       });
       setProducts([]);
       setLoading(false);
@@ -3151,8 +4213,16 @@ function Products() {
       if (nearbySellerIds.length === 0) {
         setProducts([]);
         toast.info('No sellers nearby within 40km for this category.', {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#1890ff',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
         setLoading(false);
         return;
@@ -3174,7 +4244,7 @@ function Products() {
         originalPrice: product.original_price ? parseFloat(product.original_price) : null,
         discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
         stock: product.stock || 0,
-        seller_id: product.seller_id, // Fixed typo
+        seller_id: product.seller_id,
       }));
 
       setProducts(mappedProducts);
@@ -3183,13 +4253,29 @@ function Products() {
       console.error('Error fetching products:', err);
       if (err.message.includes('Network')) {
         toast.error('Network error while fetching products. Please check your connection.', {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#ff4d4f',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
       } else {
         toast.error('Failed to fetch products.', {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#ff4d4f',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
       }
       setProducts([]);
@@ -3202,15 +4288,31 @@ function Products() {
   const addToCart = async (product) => {
     if (!product || !product.id || product.price === undefined || product.stock <= 0) {
       toast.error(product.stock <= 0 ? 'Out of stock.' : 'Invalid product.', {
-        position: "top-center",
-        autoClose: 3000,
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
       });
       return;
     }
     if (!session?.user) {
-      toast.warn('Please log in to add items to cart.', {
-        position: "top-center",
-        autoClose: 3000,
+      toast.error('Please log in to add items to cart.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
       });
       navigate('/auth');
       return;
@@ -3232,9 +4334,17 @@ function Products() {
       if (existingCartItem) {
         const newQuantity = (existingCartItem.quantity || 0) + 1;
         if (newQuantity > product.stock) {
-          toast.warn('Exceeds stock.', {
-            position: "top-center",
-            autoClose: 3000,
+          toast.error('Exceeds stock.', {
+            duration: 4000,
+            position: 'top-center',
+            style: {
+              background: '#ff4d4f',
+              color: '#fff',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              padding: '16px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+            },
           });
           return;
         }
@@ -3244,8 +4354,16 @@ function Products() {
           .eq('id', existingCartItem.id);
         if (updateError) throw updateError;
         toast.success(`${product.name} quantity updated in cart!`, {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#52c41a',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
       } else {
         const { error: insertError } = await supabase
@@ -3259,8 +4377,16 @@ function Products() {
           });
         if (insertError) throw insertError;
         toast.success(`${product.name} added to cart!`, {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#52c41a',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
       }
 
@@ -3274,13 +4400,29 @@ function Products() {
       console.error('Error adding to cart:', err);
       if (err.message.includes('Network')) {
         toast.error('Network error while adding to cart. Please check your connection.', {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#ff4d4f',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
       } else {
         toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#ff4d4f',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
       }
     }
@@ -3289,15 +4431,31 @@ function Products() {
   const handleBuyNow = (product) => {
     if (!product || !product.id || product.price === undefined || product.stock <= 0) {
       toast.error(product.stock <= 0 ? 'Out of stock.' : 'Invalid product.', {
-        position: "top-center",
-        autoClose: 3000,
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
       });
       return;
     }
     if (!session?.user) {
-      toast.warn('Please log in to proceed to checkout.', {
-        position: "top-center",
-        autoClose: 3000,
+      toast.error('Please log in to proceed to checkout.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
       });
       navigate('/auth');
       return;
@@ -3328,9 +4486,17 @@ function Products() {
             } else if (error.code === error.TIMEOUT) {
               errorMessage = 'Location request timed out. Please try again.';
             }
-            toast.warn(errorMessage, {
-              position: "top-center",
-              autoClose: 3000,
+            toast.error(errorMessage, {
+              duration: 4000,
+              position: 'top-center',
+              style: {
+                background: '#ff4d4f',
+                color: '#fff',
+                fontWeight: 'bold',
+                borderRadius: '8px',
+                padding: '16px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+              },
             });
             const defaultLoc = { lat: 12.9753, lon: 77.591 };
             setBuyerLocation(defaultLoc);
@@ -3340,8 +4506,16 @@ function Products() {
         );
       } else {
         toast.error('Geolocation is not supported by this browser.', {
-          position: "top-center",
-          autoClose: 3000,
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#ff4d4f',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
         });
         const defaultLoc = { lat: 12.9753, lon: 77.591 };
         setBuyerLocation(defaultLoc);
@@ -3411,7 +4585,6 @@ function Products() {
           })}
         </script>
       </Helmet>
-      <ToastContainer position="top-center" autoClose={3000} />
       {products.length === 0 ? (
         <div className="prod-no-items">
           No products found within 40km for this category.
@@ -3421,65 +4594,60 @@ function Products() {
           <h1 className="prod-title">{categoryName ? `${categoryName} Products` : 'Products in Category'}</h1>
           <div className="prod-grid">
             {products.map((product) => (
-              <Link
-                to={`/product/${product.id}`}
-                key={product.id}
-                className="prod-item"
-                style={{ textDecoration: 'none' }}
-              >
-                <div className="product-image-wrapper">
-                  {product.discountAmount > 0 && (
-                    <span className="offer-badge">
-                      <span className="offer-label">Offer!</span>
-                      Save ₹{product.discountAmount.toFixed(2)}
-                    </span>
-                  )}
-                  <img
-                    src={product.images[0]}
-                    alt={`${product.name} product image`}
-                    onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
-                  />
-                </div>
-                <h3 className="prod-item-name">{product.name}</h3>
-                <div className="price-section">
-                  <p className="prod-item-price">
-                    ₹{product.price.toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <p className="original-price">
-                      ₹{product.originalPrice.toLocaleString('en-IN', {
+              <div key={product.id} className="prod-item">
+                <Link
+                  to={`/product/${product.id}`}
+                  style={{ textDecoration: 'none' }}
+                  className="prod-item-link"
+                >
+                  <div className="product-image-wrapper">
+                    {product.discountAmount > 0 && (
+                      <span className="offer-badge">
+                        <span className="offer-label">Offer!</span>
+                        Save ₹{product.discountAmount.toFixed(2)}
+                      </span>
+                    )}
+                    <img
+                      src={product.images[0]}
+                      alt={`${product.name} product image`}
+                      onError={(e) => { e.target.src = 'https://dummyimage.com/150'; }}
+                    />
+                  </div>
+                  <h3 className="prod-item-name">{product.name}</h3>
+                  <div className="price-section">
+                    <p className="prod-item-price">
+                      ₹{product.price.toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </p>
-                  )}
-                </div>
+                    {product.originalPrice && product.originalPrice > product.price && (
+                      <p className="original-price">
+                        ₹{product.originalPrice.toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </Link>
                 <div className="prod-item-actions">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToCart(product);
-                    }}
+                    onClick={() => addToCart(product)}
                     className="prod-add-cart"
                     disabled={product.stock <= 0}
                   >
                     {product.stock <= 0 ? 'Out of Stock' : 'Add to Cart'}
                   </button>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBuyNow(product);
-                    }}
+                    onClick={() => handleBuyNow(product)}
                     className="prod-buy-now"
                     disabled={product.stock <= 0}
                   >
                     Buy Now
                   </button>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </>

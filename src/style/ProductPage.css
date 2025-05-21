@@ -792,3 +792,8 @@
     font-size: 13px;
   }
 }
+.variant-price-info {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0.5rem 0;
+}

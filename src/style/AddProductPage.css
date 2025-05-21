@@ -248,3 +248,23 @@
   color: #10b981;
   margin-top: 5px;
 }
+.remove-image-btn {
+  background-color: #ff4d4f;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.remove-image-btn:hover {
+  background-color: #d9363e;
+}
+
+.image-preview-item {
+  position: relative;
+  display: inline-block;
+  margin-right: 10px;
+}
