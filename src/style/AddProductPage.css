@@ -268,3 +268,226 @@
   display: inline-block;
   margin-right: 10px;
 }
+/* AddProductPage.css */
+.add-product-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.add-product-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.success-message {
+  color: #52c41a;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.error-message {
+  color: #ff4d4f;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+
+.loading-spinner {
+  text-align: center;
+  color: #1890ff;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.add-product-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-weight: 500;
+  color: #333;
+}
+
+.form-input, .form-textarea, .form-select {
+  padding: 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-select {
+  appearance: none;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="#333" d="M6 9L1 4h10z"/></svg>') no-repeat right 10px center;
+}
+
+.error-text {
+  color: #ff4d4f;
+  font-size: 12px;
+}
+
+.image-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.image-preview-item {
+  position: relative;
+  cursor: pointer;
+}
+
+.preview-image {
+  max-width: 150px;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: border 0.3s ease, filter 0.3s ease;
+  filter: contrast(1.1) brightness(1.05); /* Enhance image */
+}
+
+.preview-image.primary-image {
+  border: 2px solid #1890ff;
+}
+
+.preview-image.lazy-load {
+  filter: blur(5px);
+}
+
+.preview-image.lazy-load.loaded {
+  filter: contrast(1.1) brightness(1.05);
+}
+
+.primary-label {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: #1890ff;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.spec-field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.spec-input {
+  flex: 1;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.variant-toggle {
+  margin-left: 20px;
+  font-weight: normal;
+}
+
+.variant-field {
+  border: 1px solid #d9d9d9;
+  padding: 15px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.variant-input {
+  margin-bottom: 10px;
+}
+
+.add-spec-btn, .add-variant-btn, .remove-spec-btn, .remove-variant-btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.add-spec-btn, .add-variant-btn {
+  background: #1890ff;
+  color: #fff;
+  border: none;
+}
+
+.remove-spec-btn, .remove-variant-btn {
+  background: #ff4d4f;
+  color: #fff;
+  border: none;
+}
+
+.add-spec-btn:hover, .add-variant-btn:hover {
+  background: #40a9ff;
+}
+
+.remove-spec-btn:hover, .remove-variant-btn:hover {
+  background: #ff7875;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.submit-btn, .cancel-btn {
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.submit-btn {
+  background: #1890ff;
+  color: #fff;
+  border: none;
+}
+
+.submit-btn:hover {
+  background: #40a9ff;
+}
+
+.cancel-btn {
+  background: #fff;
+  color: #333;
+  border: 1px solid #d9d9d9;
+}
+
+.cancel-btn:hover {
+  background: #f5f5f5;
+}
+
+.submit-btn:disabled, .cancel-btn:disabled {
+  background: #d9d9d9;
+  cursor: not-allowed;
+}
+
+.no-variants {
+  color: #666;
+  font-style: italic;
+}

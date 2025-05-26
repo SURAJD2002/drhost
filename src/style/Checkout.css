@@ -1,23 +1,30 @@
+/* Base Container */
 .checkout {
   padding: 20px;
   background-color: #f9fafb;
   min-height: 100vh;
   max-width: 960px;
   margin: 0 auto;
+  font-family: 'Arial', sans-serif;
 }
 
-.checkout h1 {
+/* Title */
+.checkout-title {
   font-size: 28px;
+  font-weight: 700;
   color: #007bff;
+  text-align: center;
   margin-bottom: 20px;
 }
 
+/* Items List */
 .checkout-items {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
+/* Individual Item */
 .checkout-item {
   display: flex;
   gap: 15px;
@@ -25,15 +32,21 @@
   padding: 15px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
 }
 
-.checkout-item img {
+.checkout-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.checkout-item-image {
   width: 100px;
   height: 100px;
   object-fit: cover;
   border-radius: 6px;
 }
 
+/* Item Details */
 .checkout-item-details {
   flex: 1;
   display: flex;
@@ -41,24 +54,73 @@
   gap: 6px;
 }
 
-.checkout-item-details h3 {
+.checkout-item-title {
   font-size: 16px;
   font-weight: 600;
   color: #1f2937;
   margin: 0;
 }
 
-.checkout-item-details p {
-  font-size: 14px;
-  color: #1f2937;
-  margin: 0;
-}
-
-.variant-details {
+.variant-info {
   font-size: 13px;
   color: #6b7280;
 }
 
+/* Price Section */
+.checkout-item-price-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.price-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.checkout-item-final-price {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #16a34a; /* Green for final price */
+}
+
+.checkout-item-original-price {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  text-decoration: line-through;
+  margin-left: 0.5rem;
+}
+
+.discount-badge {
+  background-color: #fef2f2;
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  margin-left: -20.5rem;
+  transition: transform 0.2s ease;
+}
+
+.price-container:hover .discount-badge {
+  transform: scale(1.05);
+}
+
+.checkout-item-details p {
+  font-size: 14px;
+  color: #374151;
+  margin: 0;
+}
+
+.checkout-item-details p:last-child {
+  font-weight: 600;
+  color: #1f2937;
+  margin-top: 0.5rem;
+}
+
+/* Checkout Details Section */
 .checkout-details {
   margin-top: 20px;
   padding: 20px;
@@ -67,102 +129,133 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.checkout-details h2 {
+.checkout-summary-title {
   font-size: 20px;
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 15px;
 }
 
-.checkout-details p {
-  font-size: 16px;
-  color: #1f2937;
+.checkout-total {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #16a34a;
   margin-bottom: 15px;
 }
 
-.checkout-details h3 {
+.checkout-section-title {
   font-size: 18px;
   font-weight: 600;
   color: #1f2937;
   margin: 15px 0 10px;
 }
 
-.checkout-details textarea {
-  width: 100%;
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.3s ease;
-}
-
-.checkout-details textarea:focus {
-  border-color: #007bff;
-}
-
-.checkout-details select {
-  width: 100%;
-  padding: 10px;
-  font-size: 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  outline: none;
-  transition: border-color 0.3s ease;
-}
-
-.checkout-details select:focus {
-  border-color: #007bff;
-}
-
-.emi-option {
-  margin: 15px 0;
-}
-
-.emi-option button {
-  width: 100%;
-  padding: 12px;
-  background-color: #007bff;
-  color: white;
+/* Location Detection Button */
+.detect-location-btn {
+  padding: 6px 12px;
   border: none;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 600;
+  border-radius: 5px;
   cursor: pointer;
+  color: #fff;
+  background-color: #007bff;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
   transition: background-color 0.3s ease;
 }
 
-.emi-option button:hover {
+.detect-location-btn:hover {
   background-color: #0056b3;
 }
 
-.checkout-action {
-  margin-top: 20px;
-}
-
-.checkout-action button {
-  width: 100%;
-  padding: 12px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.checkout-action button:hover {
-  background-color: #0056b3;
-}
-
-.checkout-action button:disabled {
+.detect-location-btn:disabled {
   background-color: #93c5fd;
   cursor: not-allowed;
 }
 
+.location-message {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0.5rem 0;
+}
+
+.detected-address,
+.no-address {
+  font-size: 0.875rem;
+  color: #374151;
+  margin: 0.5rem 0;
+}
+
+/* Form Elements */
+.address-label,
+.payment-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.address-textarea,
+.payment-select {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.address-textarea:focus,
+.payment-select:focus {
+  border-color: #007bff;
+}
+
+.address-textarea {
+  resize: vertical;
+}
+
+.address-error {
+  color: #dc2626;
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+/* EMI and Checkout Buttons */
+.emi-option {
+  margin: 15px 0;
+}
+
+.emi-btn,
+.place-order-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.emi-btn:hover,
+.place-order-btn:hover {
+  background-color: #0056b3;
+}
+
+.emi-btn:disabled,
+.place-order-btn:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+.checkout-action {
+  margin-top: 20px;
+  text-align: right;
+}
+
+/* Loading, Error, and Success States */
 .checkout-loading {
   text-align: center;
   padding: 20px;
@@ -205,7 +298,7 @@
     padding: 25px;
   }
 
-  .checkout h1 {
+  .checkout-title {
     font-size: 32px;
   }
 
@@ -213,12 +306,12 @@
     padding: 20px;
   }
 
-  .checkout-item img {
+  .checkout-item-image {
     width: 120px;
     height: 120px;
   }
 
-  .checkout-item-details h3 {
+  .checkout-item-title {
     font-size: 18px;
   }
 
@@ -226,7 +319,7 @@
     font-size: 16px;
   }
 
-  .variant-details {
+  .variant-info {
     font-size: 14px;
   }
 
@@ -234,26 +327,26 @@
     padding: 25px;
   }
 
-  .checkout-details h2 {
+  .checkout-summary-title {
     font-size: 22px;
   }
 
-  .checkout-details p {
+  .checkout-total {
     font-size: 18px;
   }
 
-  .checkout-details h3 {
+  .checkout-section-title {
     font-size: 20px;
   }
 
-  .checkout-details textarea,
-  .checkout-details select {
+  .address-textarea,
+  .payment-select {
     font-size: 16px;
     padding: 12px;
   }
 
-  .emi-option button,
-  .checkout-action button {
+  .emi-btn,
+  .place-order-btn {
     padding: 14px;
     font-size: 18px;
   }
@@ -264,16 +357,16 @@
     padding: 30px;
   }
 
-  .checkout h1 {
+  .checkout-title {
     font-size: 36px;
   }
 
-  .checkout-item img {
+  .checkout-item-image {
     width: 140px;
     height: 140px;
   }
 
-  .checkout-item-details h3 {
+  .checkout-item-title {
     font-size: 20px;
   }
 
@@ -281,93 +374,19 @@
     font-size: 18px;
   }
 
-  .variant-details {
+  .variant-info {
     font-size: 15px;
   }
 
-  .checkout-details h2 {
+  .checkout-summary-title {
     font-size: 24px;
   }
 
-  .checkout-details p {
+  .checkout-total {
     font-size: 20px;
   }
 
-  .checkout-details h3 {
+  .checkout-section-title {
     font-size: 22px;
   }
-}
-.address-error {
-  color: red;
-  font-size: 0.9em;
-  margin-top: 5px;
-}
-.map-container {
-  width: 100%;
-  height: 300px;
-  margin-bottom: 10px;
-}
-.geocoder-container .mapboxgl-ctrl-geocoder {
-  width: 100%;
-  max-width: none;
-  box-shadow: none;
-}
-.geocoder-container .mapboxgl-ctrl-geocoder input {
-  padding: 8px;
-  font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  width: 100%;
-}
-.address-error {
-  color: red;
-  font-size: 14px;
-  margin-top: 5px;
-}
-/* Location Inputs */
-.detect-location-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  color: #fff;
-  background-color: #007bff;
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-}
-
-.detect-location-btn:hover {
-  background-color: #0056b3;
-}
-
-.manual-location {
-  margin: 8px 0;
-}
-
-.manual-location p {
-  font-size: 0.9rem;
-  margin-bottom: 4px;
-}
-
-.manual-input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-}
-
-.manual-location-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  color: #fff;
-  background-color: #28a745;
-  font-size: 0.9rem;
-}
-
-.manual-location-btn:hover {
-  background-color: #218838;
 }
