@@ -3723,833 +3723,6 @@
 
 
 
-import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import { LocationContext } from '../App';
-import { FaShoppingCart, FaSearch } from 'react-icons/fa';
-import Slider from 'react-slick';
-import 'slick-carousel/slick/slick-theme.css';
-import 'slick-carousel/slick/slick.css';
-import { Toaster, toast } from 'react-hot-toast';
-import '../style/Home.css';
-import Footer from './Footer';
-import { Helmet } from 'react-helmet-async';
-
-// Utility to debounce a function
-const debounce = (func, delay) => {
-  let timeoutId;
-  return (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
-  };
-};
-
-// Distance calculation
-function calculateDistance(userLoc, sellerLoc) {
-  if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
-  const R = 6371;
-  const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
-  const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-  const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function Home() {
-  const { buyerLocation, setBuyerLocation, session, cartCount, setCartCount } = useContext(LocationContext);
-  const navigate = useNavigate();
-  const [products, setProducts] = useState([]);
-  const [bannerImages, setBannerImages] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [error, setError] = useState(null);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [loadingBanners, setLoadingBanners] = useState(true);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSeller, setIsSeller] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const searchRef = useRef(null);
-
-  // Debounced search handler
-  const debouncedSetSearchTerm = useCallback(
-    debounce((value) => {
-      setSearchTerm(value);
-    }, 300),
-    []
-  );
-
-  // Check network connectivity
-  const checkNetworkStatus = () => {
-    if (!navigator.onLine) {
-      toast.error('No internet connection. Please check your network and try again.', {
-        duration: 3000,
-        position: 'top-center',
-      });
-      return false;
-    }
-    return true;
-  };
-
-  // Fetch user role
-  const fetchUserRole = useCallback(async () => {
-    if (!session?.user) {
-      setIsSeller(false);
-      return;
-    }
-    if (!checkNetworkStatus()) return;
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('is_seller')
-        .eq('id', session.user.id)
-        .single();
-      if (profileError) throw profileError;
-      setIsSeller(profileData?.is_seller || false);
-    } catch (err) {
-      console.error('Error fetching user role:', err);
-      toast.error('Failed to fetch user role.', {
-        duration: 3000,
-        position: 'top-center',
-      });
-    }
-  }, [session]);
-
-  // Fetch categories
-  const fetchCategories = useCallback(async () => {
-    if (!checkNetworkStatus()) {
-      setLoadingCategories(false);
-      return;
-    }
-    setLoadingCategories(true);
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name')
-        .limit(6);
-      if (error) throw error;
-      setCategories(data || []);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching categories:', err);
-      setError('Failed to load categories. Please try again.');
-      setCategories([]);
-    } finally {
-      setLoadingCategories(false);
-    }
-  }, []);
-
-  // Fetch nearby products and their variants
-  const fetchNearbyProducts = useCallback(async () => {
-    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
-      setLoadingProducts(false);
-      return;
-    }
-    if (!checkNetworkStatus()) {
-      setLoadingProducts(false);
-      return;
-    }
-    setLoadingProducts(true);
-    try {
-      const { data: allSellers, error: sellersError } = await supabase
-        .from('sellers')
-        .select('id, latitude, longitude')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-      if (sellersError) throw sellersError;
-
-      const nearbySellerIds = allSellers
-        .filter((seller) => {
-          const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
-          return distance !== null && distance <= 40;
-        })
-        .map((seller) => seller.id);
-
-      if (nearbySellerIds.length === 0) {
-        setProducts([]);
-        return;
-      }
-
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .select('id, title, price, original_price, discount_amount, images, seller_id, stock, category_id')
-        .eq('is_approved', true)
-        .eq('status', 'active')
-        .in('seller_id', nearbySellerIds);
-      if (productError) throw productError;
-
-      const productIds = productData.map((p) => p.id);
-      const { data: variantData, error: variantError } = await supabase
-        .from('product_variants')
-        .select('id, product_id, price, original_price, stock, attributes, images')
-        .eq('status', 'active')
-        .in('product_id', productIds);
-      if (variantError) throw variantError;
-
-      const mappedProducts = productData.map((product) => {
-        const variants = variantData.filter((v) => v.product_id === product.id).map((v) => ({
-          id: v.id,
-          price: parseFloat(v.price) || 0,
-          originalPrice: v.original_price ? parseFloat(v.original_price) : null,
-          stock: v.stock || 0,
-          attributes: v.attributes || {},
-          images: v.images && v.images.length > 0 ? v.images : product.images,
-        }));
-        return {
-          id: product.id,
-          name: product.title || 'Unnamed Product',
-          images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
-          price: parseFloat(product.price) || 0,
-          originalPrice: product.original_price ? parseFloat(product.original_price) : null,
-          discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
-          stock: product.stock || 0,
-          categoryId: product.category_id,
-          variants,
-          displayPrice: variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : parseFloat(product.price),
-          displayOriginalPrice:
-            variants.length > 0
-              ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
-                product.original_price
-              : product.original_price,
-        };
-      });
-      setProducts(mappedProducts);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching products:', err);
-      setError('Failed to load products. Please try again.');
-      setProducts([]);
-    } finally {
-      setLoadingProducts(false);
-    }
-  }, [buyerLocation]);
-
-  // Fetch banner images
-  const fetchBannerImages = useCallback(async () => {
-    if (!checkNetworkStatus()) {
-      setLoadingBanners(false);
-      return;
-    }
-    setLoadingBanners(true);
-    try {
-      const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
-      const banners = await Promise.all(
-        data
-          .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
-          .map(async (file) => {
-            const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
-            return { url: publicUrl, name: file.name };
-          })
-      );
-      setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-    } catch (err) {
-      console.error('Error fetching banner images:', err);
-      setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-    } finally {
-      setLoadingBanners(false);
-    }
-  }, []);
-
-  // Validate variant ID exists in product_variants table
-  const validateVariant = async (variantId) => {
-    if (!variantId) return true;
-    const { data, error } = await supabase
-      .from('product_variants')
-      .select('id')
-      .eq('id', variantId)
-      .eq('status', 'active')
-      .single();
-    if (error || !data) {
-      console.error('Variant validation failed:', error);
-      return false;
-    }
-    return true;
-  };
-
-  // Add to cart
-  const addToCart = useCallback(async (product) => {
-    if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-      toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-      return;
-    }
-    if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-      toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-      return;
-    }
-    if (!session?.user) {
-      toast.error('Please log in to add items to cart.', { duration: 3000, position: 'top-center' });
-      navigate('/auth');
-      return;
-    }
-    if (!checkNetworkStatus()) return;
-
-    try {
-      // Validate product exists and is active
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .select('id, seller_id')
-        .eq('id', product.id)
-        .eq('is_approved', true)
-        .eq('status', 'active')
-        .single();
-      if (productError || !productData) {
-        toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-        return;
-      }
-
-      // Validate seller distance
-      const { data: sellerData, error: sellerError } = await supabase
-        .from('sellers')
-        .select('id, latitude, longitude')
-        .eq('id', productData.seller_id)
-        .single();
-      if (sellerError || !sellerData || calculateDistance(buyerLocation, sellerData) > 40) {
-        toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-        return;
-      }
-
-      // Select the cheapest variant with stock if variants exist
-      let itemToAdd = product;
-      let variantId = null;
-
-      if (product.variants.length > 0) {
-        const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-        if (validVariants.length === 0) {
-          toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-          return;
-        }
-        itemToAdd = validVariants.reduce((cheapest, variant) =>
-          variant.price < cheapest.price ? variant : cheapest
-        );
-        variantId = itemToAdd.id;
-
-        // Validate variant exists in database
-        const isValidVariant = await validateVariant(variantId);
-        if (!isValidVariant) {
-          toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-          return;
-        }
-      }
-
-      // Build the query to check for existing cart item
-      let query = supabase
-        .from('cart')
-        .select('id, quantity, variant_id')
-        .eq('user_id', session.user.id)
-        .eq('product_id', product.id);
-
-      if (variantId === null) {
-        query = query.is('variant_id', null);
-      } else {
-        query = query.eq('variant_id', variantId);
-      }
-
-      const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Fetch cart item error:', fetchError);
-        throw new Error(fetchError.message || 'Failed to check cart');
-      }
-
-      if (existingCartItem) {
-        const newQuantity = existingCartItem.quantity + 1;
-        const stockLimit = itemToAdd.stock || product.stock;
-        if (newQuantity > stockLimit) {
-          toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-          return;
-        }
-        const { error: updateError } = await supabase
-          .from('cart')
-          .update({ quantity: newQuantity })
-          .eq('id', existingCartItem.id);
-        if (updateError) {
-          console.error('Update cart error:', updateError);
-          throw new Error(updateError.message || 'Failed to update cart');
-        }
-        toast.success(`${product.name} quantity updated in cart!`, { duration: 3000, position: 'top-center' });
-      } else {
-        const { data, error: insertError } = await supabase
-          .from('cart')
-          .insert({
-            user_id: session.user.id,
-            product_id: product.id,
-            variant_id: variantId,
-            quantity: 1,
-            price: itemToAdd.price || product.displayPrice,
-            title: product.name,
-          })
-          .select('id')
-          .single();
-        if (insertError) {
-          console.error('Insert cart error:', insertError);
-          throw new Error(insertError.message || 'Failed to add to cart');
-        }
-        setCartCount((prev) => prev + 1);
-        const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-        storedCart.push({
-          id: product.id,
-          cartId: data.id,
-          quantity: 1,
-          variantId,
-          price: itemToAdd.price || product.displayPrice,
-          title: product.name,
-          images: product.images,
-          uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-        });
-        localStorage.setItem('cart', JSON.stringify(storedCart));
-        toast.success(`${product.name} added to cart!`, { duration: 3000, position: 'top-center' });
-      }
-    } catch (err) {
-      console.error('Error adding to cart:', err);
-      toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
-    }
-  }, [navigate, session, setCartCount, buyerLocation]);
-
-  // Buy now
-  const buyNow = useCallback(async (product) => {
-    if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-      toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-      return;
-    }
-    if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-      toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-      return;
-    }
-    if (!session?.user) {
-      toast.error('Please log in to proceed to cart.', { duration: 3000, position: 'top-center' });
-      navigate('/auth');
-      return;
-    }
-    if (!checkNetworkStatus()) return;
-
-    try {
-      // Validate product exists and is active
-      const { data: productData, error: productError } = await supabase
-        .from('products')
-        .select('id, seller_id')
-        .eq('id', product.id)
-        .eq('is_approved', true)
-        .eq('status', 'active')
-        .single();
-      if (productError || !productData) {
-        toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-        return;
-      }
-
-      // Validate seller distance
-      const { data: sellerData, error: sellerError } = await supabase
-        .from('sellers')
-        .select('id, latitude, longitude')
-        .eq('id', productData.seller_id)
-        .single();
-      if (sellerError || !sellerData || calculateDistance(buyerLocation, sellerData) > 40) {
-        toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-        return;
-      }
-
-      // Select the cheapest variant with stock if variants exist
-      let itemToAdd = product;
-      let variantId = null;
-
-      if (product.variants.length > 0) {
-        const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-        if (validVariants.length === 0) {
-          toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-          return;
-        }
-        itemToAdd = validVariants.reduce((cheapest, variant) =>
-          variant.price < cheapest.price ? variant : cheapest
-        );
-        variantId = itemToAdd.id;
-
-        // Validate variant exists in database
-        const isValidVariant = await validateVariant(variantId);
-        if (!isValidVariant) {
-          toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-          return;
-        }
-      }
-
-      // Build the query to check for existing cart item
-      let query = supabase
-        .from('cart')
-        .select('id, quantity, variant_id')
-        .eq('user_id', session.user.id)
-        .eq('product_id', product.id);
-
-      if (variantId === null) {
-        query = query.is('variant_id', null);
-      } else {
-        query = query.eq('variant_id', variantId);
-      }
-
-      const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Fetch cart item error:', fetchError);
-        throw new Error(fetchError.message || 'Failed to check cart');
-      }
-
-      if (existingCartItem) {
-        const newQuantity = existingCartItem.quantity + 1;
-        const stockLimit = itemToAdd.stock || product.stock;
-        if (newQuantity > stockLimit) {
-          toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-          return;
-        }
-        const { error: updateError } = await supabase
-          .from('cart')
-          .update({ quantity: newQuantity })
-          .eq('id', existingCartItem.id);
-        if (updateError) {
-          console.error('Update cart error:', updateError);
-          throw new Error(updateError.message || 'Failed to update cart');
-        }
-      } else {
-        const { data, error: insertError } = await supabase
-          .from('cart')
-          .insert({
-            user_id: session.user.id,
-            product_id: product.id,
-            variant_id: variantId,
-            quantity: 1,
-            price: itemToAdd.price || product.displayPrice,
-            title: product.name,
-          })
-          .select('id')
-          .single();
-        if (insertError) {
-          console.error('Insert cart error:', insertError);
-          throw new Error(insertError.message || 'Failed to add to cart');
-        }
-        setCartCount((prev) => prev + 1);
-        const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-        storedCart.push({
-          id: product.id,
-          cartId: data.id,
-          quantity: 1,
-          variantId,
-          price: itemToAdd.price || product.displayPrice,
-          title: product.name,
-          images: product.images,
-          uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-        });
-        localStorage.setItem('cart', JSON.stringify(storedCart));
-      }
-
-      toast.success('Added to cart! Redirecting...', { duration: 2000, position: 'top-center' });
-      setTimeout(() => navigate('/cart'), 2000);
-    } catch (err) {
-      console.error('Error in Buy Now:', err);
-      toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
-    }
-  }, [navigate, session, setCartCount, buyerLocation]);
-
-  // Compute search suggestions
-  useEffect(() => {
-    if (!searchTerm || !isSearchFocused) {
-      setSuggestions([]);
-      return;
-    }
-
-    const filteredSuggestions = products
-      .filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      .slice(0, 5);
-    setSuggestions(filteredSuggestions);
-  }, [searchTerm, products, isSearchFocused]);
-
-  // Handle clicks outside the search bar
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setIsSearchFocused(false);
-        setSuggestions([]);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Fetch data on mount and handle location
-  useEffect(() => {
-    fetchUserRole();
-    fetchBannerImages();
-    fetchCategories();
-
-    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const newLocation = {
-              lat: position.coords.latitude,
-              lon: position.coords.longitude,
-            };
-            setBuyerLocation(newLocation);
-            fetchNearbyProducts();
-          },
-          (error) => {
-            console.error('Geolocation error:', error);
-            fetchNearbyProducts();
-          },
-          { timeout: 10000 }
-        );
-      } else {
-        fetchNearbyProducts();
-      }
-    } else {
-      fetchNearbyProducts();
-    }
-  }, [fetchUserRole, fetchBannerImages, fetchCategories, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
-
-  // Filter products
-  const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products;
-    return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [products, searchTerm]);
-
-  // Slider settings
-  const sliderSettings = {
-    dots: true,
-    infinite: true,
-    speed: 500,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    autoplay: true,
-    autoplaySpeed: 3000,
-    arrows: true,
-  };
-
-  if (loadingProducts && loadingBanners && loadingCategories) return (
-    <div className="td-loading-container">
-      <div className="td-loading-animation">
-        <div className="td-loading-box">
-          <FaShoppingCart className="td-loading-icon" />
-          <span>Finding the best deals for you...</span>
-        </div>
-        <div className="td-loading-dots">
-          <span>.</span><span>.</span><span>.</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="td-home">
-      <Helmet>
-        <title>Markeet - Shop Electronics, Fashion, Jewellery & More</title>
-        <meta
-          name="description"
-          content="Discover electronics, appliances, fashion, jewellery, gifts, and home decoration on Markeet. Fast delivery within 40km in India."
-        />
-        <meta
-          name="keywords"
-          content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, local shopping"
-        />
-        <meta name="robots" content="index, follow" />
-        <link rel="canonical" href="https://www.markeet.com/" />
-      </Helmet>
-      <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
-
-      {/* Sticky Search Bar with Suggestions */}
-      <div className="td-search-bar sticky" ref={searchRef}>
-        <FaSearch className="td-search-icon" />
-        <input
-          type="text"
-          placeholder="Search electronics, fashion, jewellery..."
-          onChange={(e) => debouncedSetSearchTerm(e.target.value)}
-          onFocus={() => setIsSearchFocused(true)}
-          aria-label="Search products"
-        />
-        {suggestions.length > 0 && isSearchFocused && (
-          <ul className="td-search-suggestions">
-            {suggestions.map((suggestion) => (
-              <li
-                key={suggestion.id}
-                className="td-suggestion-item"
-                onClick={() => {
-                  setSearchTerm(suggestion.name);
-                  setIsSearchFocused(false);
-                  setSuggestions([]);
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyPress={(e) => e.key === 'Enter' && setSearchTerm(suggestion.name) && setIsSearchFocused(false) && setSuggestions([])}
-                aria-label={`Select ${suggestion.name}`}
-              >
-                {suggestion.name}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Banner Slider */}
-      <div className="td-banner-slider">
-        {loadingBanners ? (
-          <div className="td-banner-skeleton" />
-        ) : (
-          <Slider {...sliderSettings}>
-            {bannerImages.map((banner) => (
-              <div key={banner.name} className="td-banner-wrapper">
-                <img src={banner.url} alt={`Markeet ${banner.name} Offer`} loading="lazy" />
-                <button
-                  className="td-view-offers-btn"
-                  onClick={() => navigate('/categories')}
-                  aria-label="View Offers"
-                >
-                  View Offers
-                </button>
-              </div>
-            ))}
-          </Slider>
-        )}
-      </div>
-
-      {/* Featured Categories Section */}
-      <section className="td-categories-section">
-        <header className="td-cat-header">
-          <h2 className="td-cat-title">Explore Categories</h2>
-          <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
-            View All
-          </Link>
-        </header>
-        {error && <p className="td-cat-error">{error}</p>}
-        {loadingCategories ? (
-          <div className="td-cat-scroll">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="td-cat-card-skeleton" />
-            ))}
-          </div>
-        ) : categories.length === 0 ? (
-          <p className="td-cat-no-categories">No categories available.</p>
-        ) : (
-          <div className="td-cat-scroll">
-            {categories.map((category) => (
-              <Link
-                to={`/products?category=${category.id}`}
-                key={category.id}
-                className="td-cat-card"
-                aria-label={`View ${category.name} products`}
-              >
-                <img
-                  src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
-                  alt={`${category.name} category`}
-                  className="td-cat-image"
-                  onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
-                  loading="lazy"
-                />
-                <h3 className="td-cat-name">{category.name.trim()}</h3>
-              </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Products Section */}
-      <section className="td-products-section">
-        <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
-        {loadingProducts ? (
-          <div className="td-product-grid">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="td-product-card-skeleton">
-                <div className="td-skeleton-image" />
-                <div className="td-skeleton-text" />
-                <div className="td-skeleton-text short" />
-                <div className="td-skeleton-buttons">
-                  <div className="td-skeleton-btn" />
-                  <div className="td-skeleton-btn" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
-        ) : (
-          <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="td-product-card"
-                onClick={() => navigate(`/product/${product.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-                aria-label={`View ${product.name}`}
-              >
-                <div className="td-product-image-wrapper">
-                  {product.discountAmount > 0 && (
-                    <span className="td-offer-badge">
-                      <span className="td-offer-label">Offer!</span>
-                      Save ₹{product.discountAmount.toFixed(2)}
-                    </span>
-                  )}
-                  <img
-                    src={product.images[0]}
-                    alt={`${product.name} product`}
-                    onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-                    loading="lazy"
-                  />
-                </div>
-                <div className="td-product-info">
-                  <h3 className="td-product-name">{product.name}</h3>
-                  <div className="td-price-section">
-                    <p className="td-product-price">
-                      ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-                      <p className="td-original-price">
-                        ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    )}
-                  </div>
-                  <div className="td-product-buttons">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToCart(product);
-                      }}
-                      className="td-cart-action-btn"
-                      disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-                      aria-label={`Add ${product.name} to cart`}
-                    >
-                      <FaShoppingCart /> Add to Cart
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        buyNow(product);
-                      }}
-                      className="td-buy-action-btn"
-                      disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-                      aria-label={`Buy ${product.name} now`}
-                    >
-                      Buy Now
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <Footer />
-    </div>
-  );
-}
-
-export default React.memo(Home);
-
-
-
-////////////Recommended system intigration
-
-
 // import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
 // import { useNavigate, Link } from 'react-router-dom';
 // import { supabase } from '../supabaseClient';
@@ -4563,6 +3736,7 @@ export default React.memo(Home);
 // import Footer from './Footer';
 // import { Helmet } from 'react-helmet-async';
 
+// // Utility to debounce a function
 // const debounce = (func, delay) => {
 //   let timeoutId;
 //   return (...args) => {
@@ -4571,6 +3745,7 @@ export default React.memo(Home);
 //   };
 // };
 
+// // Distance calculation
 // function calculateDistance(userLoc, sellerLoc) {
 //   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
 //   const R = 6371;
@@ -4585,12 +3760,10 @@ export default React.memo(Home);
 //   const { buyerLocation, setBuyerLocation, session, cartCount, setCartCount } = useContext(LocationContext);
 //   const navigate = useNavigate();
 //   const [products, setProducts] = useState([]);
-//   const [recommendations, setRecommendations] = useState([]);
 //   const [bannerImages, setBannerImages] = useState([]);
 //   const [categories, setCategories] = useState([]);
 //   const [error, setError] = useState(null);
 //   const [loadingProducts, setLoadingProducts] = useState(true);
-//   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
 //   const [loadingBanners, setLoadingBanners] = useState(true);
 //   const [loadingCategories, setLoadingCategories] = useState(true);
 //   const [searchTerm, setSearchTerm] = useState('');
@@ -4599,6 +3772,7 @@ export default React.memo(Home);
 //   const [suggestions, setSuggestions] = useState([]);
 //   const searchRef = useRef(null);
 
+//   // Debounced search handler
 //   const debouncedSetSearchTerm = useCallback(
 //     debounce((value) => {
 //       setSearchTerm(value);
@@ -4606,6 +3780,7 @@ export default React.memo(Home);
 //     []
 //   );
 
+//   // Check network connectivity
 //   const checkNetworkStatus = () => {
 //     if (!navigator.onLine) {
 //       toast.error('No internet connection. Please check your network and try again.', {
@@ -4617,6 +3792,7 @@ export default React.memo(Home);
 //     return true;
 //   };
 
+//   // Fetch user role
 //   const fetchUserRole = useCallback(async () => {
 //     if (!session?.user) {
 //       setIsSeller(false);
@@ -4640,6 +3816,7 @@ export default React.memo(Home);
 //     }
 //   }, [session]);
 
+//   // Fetch categories
 //   const fetchCategories = useCallback(async () => {
 //     if (!checkNetworkStatus()) {
 //       setLoadingCategories(false);
@@ -4664,6 +3841,7 @@ export default React.memo(Home);
 //     }
 //   }, []);
 
+//   // Fetch nearby products and their variants
 //   const fetchNearbyProducts = useCallback(async () => {
 //     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
 //       setLoadingProducts(false);
@@ -4748,34 +3926,7 @@ export default React.memo(Home);
 //     }
 //   }, [buyerLocation]);
 
-//   const fetchRecommendations = useCallback(async () => {
-//     if (!session?.user?.id || !buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
-//       setRecommendations([]);
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     setLoadingRecommendations(true);
-//     try {
-//       const url = `https://your-app-id.appspot.com/recommendations/${session.user.id}/${buyerLocation.lat}/${buyerLocation.lon}`;
-//       const response = await fetch(url);
-//       if (!response.ok) throw new Error("Failed to load recommendations");
-//       const data = await response.json();
-//       setRecommendations(data);
-//       setError(null);
-//     } catch (err) {
-//       console.error("Error fetching recommendations:", err);
-//       setError("Failed to load recommendations. Please try again.");
-//       setRecommendations([]);
-//       toast.error("Failed to load recommendations");
-//     } finally {
-//       setLoadingRecommendations(false);
-//     }
-//   }, [session, buyerLocation]);
-
+//   // Fetch banner images
 //   const fetchBannerImages = useCallback(async () => {
 //     if (!checkNetworkStatus()) {
 //       setLoadingBanners(false);
@@ -4801,6 +3952,7 @@ export default React.memo(Home);
 //     }
 //   }, []);
 
+//   // Validate variant ID exists in product_variants table
 //   const validateVariant = async (variantId) => {
 //     if (!variantId) return true;
 //     const { data, error } = await supabase
@@ -4816,6 +3968,7 @@ export default React.memo(Home);
 //     return true;
 //   };
 
+//   // Add to cart
 //   const addToCart = useCallback(async (product) => {
 //     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
 //       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
@@ -4833,6 +3986,7 @@ export default React.memo(Home);
 //     if (!checkNetworkStatus()) return;
 
 //     try {
+//       // Validate product exists and is active
 //       const { data: productData, error: productError } = await supabase
 //         .from('products')
 //         .select('id, seller_id')
@@ -4845,6 +3999,7 @@ export default React.memo(Home);
 //         return;
 //       }
 
+//       // Validate seller distance
 //       const { data: sellerData, error: sellerError } = await supabase
 //         .from('sellers')
 //         .select('id, latitude, longitude')
@@ -4855,6 +4010,7 @@ export default React.memo(Home);
 //         return;
 //       }
 
+//       // Select the cheapest variant with stock if variants exist
 //       let itemToAdd = product;
 //       let variantId = null;
 
@@ -4869,6 +4025,7 @@ export default React.memo(Home);
 //         );
 //         variantId = itemToAdd.id;
 
+//         // Validate variant exists in database
 //         const isValidVariant = await validateVariant(variantId);
 //         if (!isValidVariant) {
 //           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
@@ -4876,6 +4033,7 @@ export default React.memo(Home);
 //         }
 //       }
 
+//       // Build the query to check for existing cart item
 //       let query = supabase
 //         .from('cart')
 //         .select('id, quantity, variant_id')
@@ -4949,6 +4107,7 @@ export default React.memo(Home);
 //     }
 //   }, [navigate, session, setCartCount, buyerLocation]);
 
+//   // Buy now
 //   const buyNow = useCallback(async (product) => {
 //     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
 //       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
@@ -4966,6 +4125,7 @@ export default React.memo(Home);
 //     if (!checkNetworkStatus()) return;
 
 //     try {
+//       // Validate product exists and is active
 //       const { data: productData, error: productError } = await supabase
 //         .from('products')
 //         .select('id, seller_id')
@@ -4978,6 +4138,7 @@ export default React.memo(Home);
 //         return;
 //       }
 
+//       // Validate seller distance
 //       const { data: sellerData, error: sellerError } = await supabase
 //         .from('sellers')
 //         .select('id, latitude, longitude')
@@ -4988,6 +4149,7 @@ export default React.memo(Home);
 //         return;
 //       }
 
+//       // Select the cheapest variant with stock if variants exist
 //       let itemToAdd = product;
 //       let variantId = null;
 
@@ -5002,6 +4164,7 @@ export default React.memo(Home);
 //         );
 //         variantId = itemToAdd.id;
 
+//         // Validate variant exists in database
 //         const isValidVariant = await validateVariant(variantId);
 //         if (!isValidVariant) {
 //           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
@@ -5009,6 +4172,7 @@ export default React.memo(Home);
 //         }
 //       }
 
+//       // Build the query to check for existing cart item
 //       let query = supabase
 //         .from('cart')
 //         .select('id, quantity, variant_id')
@@ -5083,6 +4247,7 @@ export default React.memo(Home);
 //     }
 //   }, [navigate, session, setCartCount, buyerLocation]);
 
+//   // Compute search suggestions
 //   useEffect(() => {
 //     if (!searchTerm || !isSearchFocused) {
 //       setSuggestions([]);
@@ -5095,6 +4260,7 @@ export default React.memo(Home);
 //     setSuggestions(filteredSuggestions);
 //   }, [searchTerm, products, isSearchFocused]);
 
+//   // Handle clicks outside the search bar
 //   useEffect(() => {
 //     const handleClickOutside = (event) => {
 //       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -5109,11 +4275,11 @@ export default React.memo(Home);
 //     };
 //   }, []);
 
+//   // Fetch data on mount and handle location
 //   useEffect(() => {
 //     fetchUserRole();
 //     fetchBannerImages();
 //     fetchCategories();
-//     fetchRecommendations();
 
 //     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
 //       if (navigator.geolocation) {
@@ -5125,30 +4291,28 @@ export default React.memo(Home);
 //             };
 //             setBuyerLocation(newLocation);
 //             fetchNearbyProducts();
-//             fetchRecommendations();
 //           },
 //           (error) => {
 //             console.error('Geolocation error:', error);
 //             fetchNearbyProducts();
-//             fetchRecommendations();
 //           },
 //           { timeout: 10000 }
 //         );
 //       } else {
 //         fetchNearbyProducts();
-//         fetchRecommendations();
 //       }
 //     } else {
 //       fetchNearbyProducts();
-//       fetchRecommendations();
 //     }
-//   }, [fetchUserRole, fetchBannerImages, fetchCategories, fetchNearbyProducts, fetchRecommendations, buyerLocation, setBuyerLocation]);
+//   }, [fetchUserRole, fetchBannerImages, fetchCategories, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
 
+//   // Filter products
 //   const filteredProducts = useMemo(() => {
 //     if (!searchTerm) return products;
 //     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 //   }, [products, searchTerm]);
 
+//   // Slider settings
 //   const sliderSettings = {
 //     dots: true,
 //     infinite: true,
@@ -5160,7 +4324,7 @@ export default React.memo(Home);
 //     arrows: true,
 //   };
 
-//   if (loadingProducts && loadingBanners && loadingCategories && loadingRecommendations) return (
+//   if (loadingProducts && loadingBanners && loadingCategories) return (
 //     <div className="td-loading-container">
 //       <div className="td-loading-animation">
 //         <div className="td-loading-box">
@@ -5191,6 +4355,7 @@ export default React.memo(Home);
 //       </Helmet>
 //       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
 
+//       {/* Sticky Search Bar with Suggestions */}
 //       <div className="td-search-bar sticky" ref={searchRef}>
 //         <FaSearch className="td-search-icon" />
 //         <input
@@ -5223,6 +4388,7 @@ export default React.memo(Home);
 //         )}
 //       </div>
 
+//       {/* Banner Slider */}
 //       <div className="td-banner-slider">
 //         {loadingBanners ? (
 //           <div className="td-banner-skeleton" />
@@ -5244,6 +4410,7 @@ export default React.memo(Home);
 //         )}
 //       </div>
 
+//       {/* Featured Categories Section */}
 //       <section className="td-categories-section">
 //         <header className="td-cat-header">
 //           <h2 className="td-cat-title">Explore Categories</h2>
@@ -5283,93 +4450,7 @@ export default React.memo(Home);
 //         )}
 //       </section>
 
-//       <section className="td-recommendations-section">
-//         <h2 className="td-section-title">Recommended for You</h2>
-//         {loadingRecommendations ? (
-//           <div className="td-product-grid">
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : recommendations.length === 0 ? (
-//           <p className="td-no-products">No recommendations available.</p>
-//         ) : (
-//           <div className={`td-product-grid ${recommendations.length === 1 ? 'single-product' : ''}`}>
-//             {recommendations.map((product) => (
-//               <div
-//                 key={product.id}
-//                 className="td-product-card"
-//                 onClick={() => navigate(`/product/${product.id}`)}
-//                 role="button"
-//                 tabIndex={0}
-//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                 aria-label={`View ${product.name}`}
-//               >
-//                 <div className="td-product-image-wrapper">
-//                   {product.discountAmount > 0 && (
-//                     <span className="td-offer-badge">
-//                       <span className="td-offer-label">Offer!</span>
-//                       Save ₹{product.discountAmount.toFixed(2)}
-//                     </span>
-//                   )}
-//                   <img
-//                     src={product.images[0]}
-//                     alt={`${product.name} product`}
-//                     onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                     loading="lazy"
-//                   />
-//                 </div>
-//                 <div className="td-product-info">
-//                   <h3 className="td-product-name">{product.name}</h3>
-//                   <div className="td-price-section">
-//                     <p className="td-product-price">
-//                       ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                     </p>
-//                     {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                       <p className="td-original-price">
-//                         ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                       </p>
-//                     )}
-//                   </div>
-//                   <div className="td-product-buttons">
-//                     <button
-//                       onClick={(e) => {
-//                         e.stopPropagation();
-//                         addToCart(product);
-//                       }}
-//                       className="td-cart-action-btn"
-//                       disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                       aria-label={`Add ${product.name} to cart`}
-//                     >
-//                       <FaShoppingCart /> Add to Cart
-//                     </button>
-//                     <button
-//                       onClick={(e) => {
-//                         e.stopPropagation();
-//                         buyNow(product);
-//                       }}
-//                       className="td-buy-action-btn"
-//                       disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                       aria-label={`Buy ${product.name} now`}
-//                     >
-//                       Buy Now
-//                     </button>
-//                   </div>
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         )}
-//       </section>
-
+//       {/* Products Section */}
 //       <section className="td-products-section">
 //         <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
 //         {loadingProducts ? (
@@ -5479,7 +4560,6 @@ export default React.memo(Home);
 // import '../style/Home.css';
 // import Footer from './Footer';
 // import { Helmet } from 'react-helmet-async';
-// import ErrorBoundary from './ErrorBoundary';
 
 // // Utility to debounce a function
 // const debounce = (func, delay) => {
@@ -5505,24 +4585,19 @@ export default React.memo(Home);
 //   const { buyerLocation, setBuyerLocation, session, cartCount, setCartCount } = useContext(LocationContext);
 //   const navigate = useNavigate();
 //   const [products, setProducts] = useState([]);
-//   const [recommendations, setRecommendations] = useState([]);
 //   const [bannerImages, setBannerImages] = useState([]);
 //   const [categories, setCategories] = useState([]);
 //   const [error, setError] = useState(null);
 //   const [loadingProducts, setLoadingProducts] = useState(true);
-//   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
 //   const [loadingBanners, setLoadingBanners] = useState(true);
 //   const [loadingCategories, setLoadingCategories] = useState(true);
 //   const [searchTerm, setSearchTerm] = useState('');
 //   const [isSeller, setIsSeller] = useState(false);
 //   const [isSearchFocused, setIsSearchFocused] = useState(false);
 //   const [suggestions, setSuggestions] = useState([]);
-//   const [hasFetchedRecommendations, setHasFetchedRecommendations] = useState(false);
-//   const [hasFetchedProducts, setHasFetchedProducts] = useState(false); // Prevent duplicate fetches
 //   const searchRef = useRef(null);
 
-//   const memoizedBuyerLocation = useMemo(() => buyerLocation, [buyerLocation]);
-
+//   // Debounced search handler
 //   const debouncedSetSearchTerm = useCallback(
 //     debounce((value) => {
 //       setSearchTerm(value);
@@ -5530,6 +4605,7 @@ export default React.memo(Home);
 //     []
 //   );
 
+//   // Check network connectivity
 //   const checkNetworkStatus = () => {
 //     if (!navigator.onLine) {
 //       toast.error('No internet connection. Please check your network and try again.', {
@@ -5541,6 +4617,7 @@ export default React.memo(Home);
 //     return true;
 //   };
 
+//   // Fetch user role
 //   const fetchUserRole = useCallback(async () => {
 //     if (!session?.user) {
 //       setIsSeller(false);
@@ -5564,6 +4641,7 @@ export default React.memo(Home);
 //     }
 //   }, [session]);
 
+//   // Fetch categories
 //   const fetchCategories = useCallback(async () => {
 //     if (!checkNetworkStatus()) {
 //       setLoadingCategories(false);
@@ -5588,8 +4666,9 @@ export default React.memo(Home);
 //     }
 //   }, []);
 
+//   // Fetch nearby products and their variants
 //   const fetchNearbyProducts = useCallback(async () => {
-//     if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
 //       setLoadingProducts(false);
 //       return;
 //     }
@@ -5597,7 +4676,6 @@ export default React.memo(Home);
 //       setLoadingProducts(false);
 //       return;
 //     }
-//     if (hasFetchedProducts) return; // Prevent duplicate fetches
 //     setLoadingProducts(true);
 //     try {
 //       const { data: allSellers, error: sellersError } = await supabase
@@ -5609,7 +4687,7 @@ export default React.memo(Home);
 
 //       const nearbySellerIds = allSellers
 //         .filter((seller) => {
-//           const distance = calculateDistance(memoizedBuyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+//           const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
 //           return distance !== null && distance <= 40;
 //         })
 //         .map((seller) => seller.id);
@@ -5649,7 +4727,7 @@ export default React.memo(Home);
 //           name: product.title || 'Unnamed Product',
 //           images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
 //           price: parseFloat(product.price) || 0,
-//           originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+//           originalPrice: product.original_price ? parseFloat(product.original_price) : null, // Fixed: Changed 'v' to 'product'
 //           discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
 //           stock: product.stock || 0,
 //           categoryId: product.category_id,
@@ -5660,58 +4738,25 @@ export default React.memo(Home);
 //               ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
 //                 product.original_price
 //               : product.original_price,
+//           distance: calculateDistance(buyerLocation, allSellers.find((s) => s.id === product.seller_id)),
 //         };
-//       });
+//       }).sort((a, b) => a.displayPrice - b.displayPrice); // Sort by price
 //       setProducts(mappedProducts);
 //       setError(null);
 //     } catch (err) {
 //       console.error('Error fetching products:', err);
-//       setError('Failed to load products. Please try again.');
+//       const errorMessage = err.message.includes('Network')
+//         ? 'Network error. Please check your connection.'
+//         : 'Failed to load products. Please try again.';
+//       setError(errorMessage);
+//       toast.error(errorMessage, { duration: 3000, position: 'top-center' });
 //       setProducts([]);
 //     } finally {
-//       setTimeout(() => setLoadingProducts(false), 300); // Smooth transition
-//       setHasFetchedProducts(true);
+//       setLoadingProducts(false);
 //     }
-//   }, [memoizedBuyerLocation, hasFetchedProducts]);
+//   }, [buyerLocation]);
 
-//   const fetchRecommendations = useCallback(async () => {
-//     if (!session?.user?.id || !memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setRecommendations([]);
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     setLoadingRecommendations(true);
-//     const controller = new AbortController();
-//     try {
-//       const timeoutId = setTimeout(() => controller.abort(), 10000);
-//       const url = `${process.env.REACT_APP_API_URL}/recommendations/${session.user.id}/${memoizedBuyerLocation.lat}/${memoizedBuyerLocation.lon}`;
-//       console.log('Fetching recommendations from:', url);
-//       const response = await fetch(url, { signal: controller.signal });
-//       clearTimeout(timeoutId);
-//       if (!response.ok) {
-//         throw new Error(`Failed to load recommendations: ${response.status} ${response.statusText}`);
-//       }
-//       const data = await response.json();
-//       setRecommendations(data);
-//       setError(null);
-//     } catch (err) {
-//       console.error("Error fetching recommendations:", err);
-//       setError("We couldn't fetch personalized recommendations right now. Showing popular products instead.");
-//       const popularProducts = products
-//         .sort((a, b) => b.stock - a.stock)
-//         .slice(0, 5);
-//       setRecommendations(popularProducts);
-//       toast.error("Couldn't load recommendations. Showing popular products.");
-//     } finally {
-//       setTimeout(() => setLoadingRecommendations(false), 300); // Smooth transition
-//       setHasFetchedRecommendations(true);
-//     }
-//   }, [session, memoizedBuyerLocation, products]);
-
+//   // Fetch banner images
 //   const fetchBannerImages = useCallback(async () => {
 //     if (!checkNetworkStatus()) {
 //       setLoadingBanners(false);
@@ -5737,6 +4782,7 @@ export default React.memo(Home);
 //     }
 //   }, []);
 
+//   // Validate variant ID exists in product_variants table
 //   const validateVariant = async (variantId) => {
 //     if (!variantId) return true;
 //     const { data, error } = await supabase
@@ -5752,6 +4798,7 @@ export default React.memo(Home);
 //     return true;
 //   };
 
+//   // Add to cart
 //   const addToCart = useCallback(async (product) => {
 //     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
 //       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
@@ -5769,6 +4816,7 @@ export default React.memo(Home);
 //     if (!checkNetworkStatus()) return;
 
 //     try {
+//       // Validate product exists and is active
 //       const { data: productData, error: productError } = await supabase
 //         .from('products')
 //         .select('id, seller_id')
@@ -5781,16 +4829,18 @@ export default React.memo(Home);
 //         return;
 //       }
 
+//       // Validate seller distance
 //       const { data: sellerData, error: sellerError } = await supabase
 //         .from('sellers')
 //         .select('id, latitude, longitude')
 //         .eq('id', productData.seller_id)
 //         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
+//       if (sellerError || !sellerData || calculateDistance(buyerLocation, sellerData) > 40) {
 //         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
 //         return;
 //       }
 
+//       // Select the cheapest variant with stock if variants exist
 //       let itemToAdd = product;
 //       let variantId = null;
 
@@ -5805,6 +4855,7 @@ export default React.memo(Home);
 //         );
 //         variantId = itemToAdd.id;
 
+//         // Validate variant exists in database
 //         const isValidVariant = await validateVariant(variantId);
 //         if (!isValidVariant) {
 //           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
@@ -5812,6 +4863,7 @@ export default React.memo(Home);
 //         }
 //       }
 
+//       // Build the query to check for existing cart item
 //       let query = supabase
 //         .from('cart')
 //         .select('id, quantity, variant_id')
@@ -5883,8 +4935,9 @@ export default React.memo(Home);
 //       console.error('Error adding to cart:', err);
 //       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
 //     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
+//   }, [navigate, session, setCartCount, buyerLocation]);
 
+//   // Buy now
 //   const buyNow = useCallback(async (product) => {
 //     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
 //       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
@@ -5902,6 +4955,7 @@ export default React.memo(Home);
 //     if (!checkNetworkStatus()) return;
 
 //     try {
+//       // Validate product exists and is active
 //       const { data: productData, error: productError } = await supabase
 //         .from('products')
 //         .select('id, seller_id')
@@ -5914,16 +4968,18 @@ export default React.memo(Home);
 //         return;
 //       }
 
+//       // Validate seller distance
 //       const { data: sellerData, error: sellerError } = await supabase
 //         .from('sellers')
 //         .select('id, latitude, longitude')
 //         .eq('id', productData.seller_id)
 //         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
+//       if (sellerError || !sellerData || calculateDistance(buyerLocation, sellerData) > 40) {
 //         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
 //         return;
 //       }
 
+//       // Select the cheapest variant with stock if variants exist
 //       let itemToAdd = product;
 //       let variantId = null;
 
@@ -5938,6 +4994,7 @@ export default React.memo(Home);
 //         );
 //         variantId = itemToAdd.id;
 
+//         // Validate variant exists in database
 //         const isValidVariant = await validateVariant(variantId);
 //         if (!isValidVariant) {
 //           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
@@ -5945,6 +5002,7 @@ export default React.memo(Home);
 //         }
 //       }
 
+//       // Build the query to check for existing cart item
 //       let query = supabase
 //         .from('cart')
 //         .select('id, quantity, variant_id')
@@ -6017,8 +5075,9 @@ export default React.memo(Home);
 //       console.error('Error in Buy Now:', err);
 //       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
 //     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
+//   }, [navigate, session, setCartCount, buyerLocation]);
 
+//   // Compute search suggestions
 //   useEffect(() => {
 //     if (!searchTerm || !isSearchFocused) {
 //       setSuggestions([]);
@@ -6031,6 +5090,7 @@ export default React.memo(Home);
 //     setSuggestions(filteredSuggestions);
 //   }, [searchTerm, products, isSearchFocused]);
 
+//   // Handle clicks outside the search bar
 //   useEffect(() => {
 //     const handleClickOutside = (event) => {
 //       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -6045,70 +5105,54 @@ export default React.memo(Home);
 //     };
 //   }, []);
 
-//   // Initial data fetching
+//   // Fetch data on mount and handle location
 //   useEffect(() => {
 //     fetchUserRole();
 //     fetchBannerImages();
 //     fetchCategories();
-//   }, [fetchUserRole, fetchBannerImages, fetchCategories]);
 
-//   // Consolidated useEffect for location, products, and recommendations
-//   useEffect(() => {
-//     let isMounted = true;
-
-//     const fetchData = async () => {
-//       // Step 1: Ensure location is set
-//       if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//         if (navigator.geolocation) {
-//           try {
-//             const position = await new Promise((resolve, reject) => {
-//               navigator.geolocation.getCurrentPosition(
-//                 resolve,
-//                 reject,
-//                 { timeout: 10000 }
-//               );
-//             });
-//             if (isMounted) {
-//               const newLocation = {
-//                 lat: position.coords.latitude,
-//                 lon: position.coords.longitude,
-//               };
-//               setBuyerLocation(newLocation);
-//             }
-//           } catch (error) {
+//     if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+//       if (navigator.geolocation) {
+//         navigator.geolocation.getCurrentPosition(
+//           (position) => {
+//             const newLocation = {
+//               lat: position.coords.latitude,
+//               lon: position.coords.longitude,
+//             };
+//             setBuyerLocation(newLocation);
+//             fetchNearbyProducts();
+//           },
+//           (error) => {
 //             console.error('Geolocation error:', error);
-//             if (isMounted) {
-//               setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//             }
-//           }
-//         } else {
-//           if (isMounted) {
-//             setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//           }
-//         }
+//             toast.error('Unable to fetch location. Using default location (Bangalore).', {
+//               duration: 3000,
+//               position: 'top-center',
+//             });
+//             setBuyerLocation({ lat: 12.9716, lon: 77.5946 }); // Bangalore coordinates
+//             fetchNearbyProducts();
+//           },
+//           { timeout: 10000, enableHighAccuracy: true }
+//         );
+//       } else {
+//         toast.error('Geolocation not supported. Using default location (Bangalore).', {
+//           duration: 3000,
+//           position: 'top-center',
+//         });
+//         setBuyerLocation({ lat: 12.9716, lon: 77.5946 }); // Bangalore coordinates
+//         fetchNearbyProducts();
 //       }
+//     } else {
+//       fetchNearbyProducts();
+//     }
+//   }, [fetchUserRole, fetchBannerImages, fetchCategories, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
 
-//       // Step 2: Fetch products and recommendations
-//       if (memoizedBuyerLocation?.lat && memoizedBuyerLocation?.lon) {
-//         await fetchNearbyProducts();
-//         if (!hasFetchedRecommendations) {
-//           await fetchRecommendations();
-//         }
-//       }
-//     };
-
-//     fetchData();
-
-//     return () => {
-//       isMounted = false;
-//     };
-//   }, [memoizedBuyerLocation, fetchNearbyProducts, fetchRecommendations, setBuyerLocation, hasFetchedRecommendations]);
-
+//   // Filter products
 //   const filteredProducts = useMemo(() => {
 //     if (!searchTerm) return products;
 //     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 //   }, [products, searchTerm]);
 
+//   // Slider settings
 //   const sliderSettings = {
 //     dots: true,
 //     infinite: true,
@@ -6118,11 +5162,9 @@ export default React.memo(Home);
 //     autoplay: true,
 //     autoplaySpeed: 3000,
 //     arrows: true,
-//     accessibility: true,
-//     focusOnSelect: true,
 //   };
 
-//   if (loadingProducts && loadingBanners && loadingCategories && loadingRecommendations) return (
+//   if (loadingProducts && loadingBanners && loadingCategories) return (
 //     <div className="td-loading-container">
 //       <div className="td-loading-animation">
 //         <div className="td-loading-box">
@@ -6153,6 +5195,7 @@ export default React.memo(Home);
 //       </Helmet>
 //       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
 
+//       {/* Sticky Search Bar with Suggestions */}
 //       <div className="td-search-bar sticky" ref={searchRef}>
 //         <FaSearch className="td-search-icon" />
 //         <input
@@ -6173,7 +5216,7 @@ export default React.memo(Home);
 //                   setIsSearchFocused(false);
 //                   setSuggestions([]);
 //                 }}
-//                 role=" doorbell"
+//                 role="button"
 //                 tabIndex={0}
 //                 onKeyPress={(e) => e.key === 'Enter' && setSearchTerm(suggestion.name) && setIsSearchFocused(false) && setSuggestions([])}
 //                 aria-label={`Select ${suggestion.name}`}
@@ -6185,6 +5228,7 @@ export default React.memo(Home);
 //         )}
 //       </div>
 
+//       {/* Banner Slider */}
 //       <div className="td-banner-slider">
 //         {loadingBanners ? (
 //           <div className="td-banner-skeleton" />
@@ -6196,7 +5240,6 @@ export default React.memo(Home);
 //                 <button
 //                   className="td-view-offers-btn"
 //                   onClick={() => navigate('/categories')}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate('/categories')}
 //                   aria-label="View Offers"
 //                 >
 //                   View Offers
@@ -6207,6 +5250,7 @@ export default React.memo(Home);
 //         )}
 //       </div>
 
+//       {/* Featured Categories Section */}
 //       <section className="td-categories-section">
 //         <header className="td-cat-header">
 //           <h2 className="td-cat-title">Explore Categories</h2>
@@ -6234,7 +5278,7 @@ export default React.memo(Home);
 //               >
 //                 <img
 //                   src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
-//                   alt={category.image_url ? `${category.name} category` : 'No category image available'}
+//                   alt={`${category.name} category`}
 //                   className="td-cat-image"
 //                   onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
 //                   loading="lazy"
@@ -6246,95 +5290,7 @@ export default React.memo(Home);
 //         )}
 //       </section>
 
-//       <section className="td-recommendations-section">
-//         <h2 className="td-section-title">Recommended for You</h2>
-//         {loadingRecommendations ? (
-//           <div className="td-product-grid" style={{ minHeight: '300px' }}>
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : recommendations.length === 0 ? (
-//           <p className="td-no-products">No recommendations available.</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${recommendations.length === 1 ? 'single-product' : ''}`}>
-//               {recommendations.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
+//       {/* Products Section */}
 //       <section className="td-products-section">
 //         <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
 //         {loadingProducts ? (
@@ -6352,1029 +5308,93 @@ export default React.memo(Home);
 //             ))}
 //           </div>
 //         ) : filteredProducts.length === 0 ? (
-//           <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
-//               {filteredProducts.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
+//           <p className="td-no-products">
+//             {searchTerm ? 'No products found.' : 'No products nearby. '}
+//             {!searchTerm && (
+//               <>
+//                 <Link to="/categories">Browse all categories</Link> or{' '}
+//                 <button
+//                   onClick={() => {
+//                     setBuyerLocation(null);
+//                     toast.info('Please allow location access or enter a new location.', {
+//                       duration: 3000,
+//                       position: 'top-center',
+//                     });
+//                   }}
+//                   className="td-change-location-btn"
+//                   aria-label="Change location"
 //                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <Footer />
-//     </div>
-//   );
-// }
-
-// export default React.memo(Home);
-
-
-
-// import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
-// import { useNavigate, Link, useLocation } from 'react-router-dom'; // Added useLocation
-// import { supabase } from '../supabaseClient';
-// import { LocationContext } from '../App';
-// import { FaShoppingCart, FaSearch } from 'react-icons/fa';
-// import Slider from 'react-slick';
-// import 'slick-carousel/slick/slick-theme.css';
-// import 'slick-carousel/slick/slick.css';
-// import { Toaster, toast } from 'react-hot-toast';
-// import '../style/Home.css';
-// import Footer from './Footer';
-// import { Helmet } from 'react-helmet-async';
-// import ErrorBoundary from './ErrorBoundary';
-
-// // Utility to debounce a function
-// const debounce = (func, delay) => {
-//   let timeoutId;
-//   return (...args) => {
-//     clearTimeout(timeoutId);
-//     timeoutId = setTimeout(() => func(...args), delay);
-//   };
-// };
-
-// // Distance calculation
-// function calculateDistance(userLoc, sellerLoc) {
-//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
-//   const R = 6371;
-//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
-//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// }
-
-// function Home() {
-//   const { buyerLocation, setBuyerLocation, session, setCartCount } = useContext(LocationContext);
-//   const navigate = useNavigate();
-//   const location = useLocation(); // Added to detect navigation
-//   const [products, setProducts] = useState([]);
-//   const [recommendations, setRecommendations] = useState([]);
-//   const [bannerImages, setBannerImages] = useState([]);
-//   const [categories, setCategories] = useState([]);
-//   const [error, setError] = useState(null);
-//   const [loadingProducts, setLoadingProducts] = useState(true);
-//   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
-//   const [loadingBanners, setLoadingBanners] = useState(true);
-//   const [loadingCategories, setLoadingCategories] = useState(true);
-//   const [searchTerm, setSearchTerm] = useState('');
-//   const [isSearchFocused, setIsSearchFocused] = useState(false);
-//   const [suggestions, setSuggestions] = useState([]);
-//   const hasFetchedRecommendationsRef = useRef(false);
-//   const [hasFetchedProducts, setHasFetchedProducts] = useState(false);
-//   const searchRef = useRef(null);
-//   const lastNavigationTimeRef = useRef(0); // Track last navigation time
-
-//   const memoizedBuyerLocation = useMemo(() => buyerLocation, [buyerLocation]);
-
-//   const debouncedSetSearchTerm = debounce((value) => {
-//     setSearchTerm(value);
-//   }, 300);
-
-//   const checkNetworkStatus = () => {
-//     if (!navigator.onLine) {
-//       toast.error('No internet connection. Please check your network and try again.', {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const fetchCategories = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingCategories(false);
-//       return;
-//     }
-//     setLoadingCategories(true);
-//     try {
-//       const { data, error } = await supabase
-//         .from('categories')
-//         .select('*')
-//         .order('name')
-//         .limit(6);
-//       if (error) throw error;
-//       setCategories(data || []);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching categories:', err);
-//       setError('Failed to load categories. Please try again.');
-//       setCategories([]);
-//     } finally {
-//       setLoadingCategories(false);
-//     }
-//   }, []);
-
-//   const fetchNearbyProducts = useCallback(async () => {
-//     if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (hasFetchedProducts) return;
-//     setLoadingProducts(true);
-//     try {
-//       const { data: allSellers, error: sellersError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .not('latitude', 'is', null)
-//         .not('longitude', 'is', null);
-//       if (sellersError) throw sellersError;
-
-//       const nearbySellerIds = allSellers
-//         .filter((seller) => {
-//           const distance = calculateDistance(memoizedBuyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
-//           return distance !== null && distance <= 40;
-//         })
-//         .map((seller) => seller.id);
-
-//       if (nearbySellerIds.length === 0) {
-//         setProducts([]);
-//         return;
-//       }
-
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, title, price, original_price, discount_amount, images, seller_id, stock, category_id')
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .in('seller_id', nearbySellerIds);
-//       if (productError) throw productError;
-
-//       const productIds = productData.map((p) => p.id);
-//       const { data: variantData, error: variantError } = await supabase
-//         .from('product_variants')
-//         .select('id, product_id, price, original_price, stock, attributes, images')
-//         .eq('status', 'active')
-//         .in('product_id', productIds);
-//       if (variantError) throw variantError;
-
-//       const mappedProducts = productData.map((product) => {
-//         const variants = variantData.filter((v) => v.product_id === product.id).map((v) => ({
-//           id: v.id,
-//           price: parseFloat(v.price) || 0,
-//           originalPrice: v.original_price ? parseFloat(v.original_price) : null,
-//           stock: v.stock || 0,
-//           attributes: v.attributes || {},
-//           images: v.images && v.images.length > 0 ? v.images : product.images,
-//         }));
-//         return {
-//           id: product.id,
-//           name: product.title || 'Unnamed Product',
-//           images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
-//           price: parseFloat(product.price) || 0,
-//           originalPrice: product.original_price ? parseFloat(product.original_price) : null,
-//           discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
-//           stock: product.stock || 0,
-//           categoryId: product.category_id,
-//           variants,
-//           displayPrice: variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : parseFloat(product.price),
-//           displayOriginalPrice:
-//             variants.length > 0
-//               ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
-//                 product.original_price
-//               : product.original_price,
-//         };
-//       });
-//       setProducts(mappedProducts);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching products:', err);
-//       setError('Failed to load products. Please try again.');
-//       setProducts([]);
-//     } finally {
-//       setTimeout(() => setLoadingProducts(false), 300);
-//       setHasFetchedProducts(true);
-//     }
-//   }, [memoizedBuyerLocation, hasFetchedProducts]);
-
-//   const fetchRecommendations = useCallback(async (forceRefresh = false) => {
-//     if (!session?.user?.id || !memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setRecommendations([]);
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (hasFetchedRecommendationsRef.current && !forceRefresh) return; // Allow refresh if forceRefresh is true
-//     setLoadingRecommendations(true);
-//     const controller = new AbortController();
-//     try {
-//       const timeoutId = setTimeout(() => controller.abort(), 10000);
-//       const url = `${process.env.REACT_APP_API_URL}/recommendations/${session.user.id}/${memoizedBuyerLocation.lat}/${memoizedBuyerLocation.lon}`;
-//       console.log('Fetching recommendations from:', url);
-//       const response = await fetch(url, { signal: controller.signal });
-//       clearTimeout(timeoutId);
-//       if (!response.ok) {
-//         throw new Error(`Failed to load recommendations: ${response.status} ${response.statusText}`);
-//       }
-//       const data = await response.json();
-//       setRecommendations(data);
-//       setError(null);
-//     } catch (err) {
-//       console.error("Error fetching recommendations:", err);
-//       setError("We couldn't fetch personalized recommendations right now. Showing popular products instead.");
-//       const popularProducts = products
-//         .sort((a, b) => b.stock - a.stock)
-//         .slice(0, 5);
-//       setRecommendations(popularProducts);
-//       toast.error("Couldn't load recommendations. Showing popular products.");
-//     } finally {
-//       setTimeout(() => setLoadingRecommendations(false), 300);
-//       hasFetchedRecommendationsRef.current = true;
-//     }
-//   }, [session, memoizedBuyerLocation, products]);
-
-//   const fetchBannerImages = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingBanners(false);
-//       return;
-//     }
-//     setLoadingBanners(true);
-//     try {
-//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
-//       const banners = await Promise.all(
-//         data
-//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
-//           .map(async (file) => {
-//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
-//             return { url: publicUrl, name: file.name };
-//           })
-//       );
-//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } catch (err) {
-//       console.error('Error fetching banner images:', err);
-//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } finally {
-//       setLoadingBanners(false);
-//     }
-//   }, []);
-
-//   const validateVariant = async (variantId) => {
-//     if (!variantId) return true;
-//     const { data, error } = await supabase
-//       .from('product_variants')
-//       .select('id')
-//       .eq('id', variantId)
-//       .eq('status', 'active')
-//       .single();
-//     if (error || !data) {
-//       console.error('Variant validation failed:', error);
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const addToCart = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to add items to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//         toast.success(`${product.name} quantity updated in cart!`, { duration: 3000, position: 'top-center' });
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-//         toast.success(`${product.name} added to cart!`, { duration: 3000, position: 'top-center' });
-//       }
-//     } catch (err) {
-//       console.error('Error adding to cart:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   const buyNow = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to proceed to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-//       }
-
-//       toast.success('Added to cart! Redirecting...', { duration: 2000, position: 'top-center' });
-//       setTimeout(() => navigate('/cart'), 2000);
-//     } catch (err) {
-//       console.error('Error in Buy Now:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   useEffect(() => {
-//     if (!searchTerm || !isSearchFocused) {
-//       setSuggestions([]);
-//       return;
-//     }
-
-//     const filteredSuggestions = products
-//       .filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
-//       .slice(0, 5);
-//     setSuggestions(filteredSuggestions);
-//   }, [searchTerm, products, isSearchFocused]);
-
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (searchRef.current && !searchRef.current.contains(event.target)) {
-//         setIsSearchFocused(false);
-//         setSuggestions([]);
-//       }
-//     };
-
-//     document.addEventListener('mousedown', handleClickOutside);
-//     return () => {
-//       document.removeEventListener('mousedown', handleClickOutside);
-//     };
-//   }, []);
-
-//   // Detect navigation to refresh recommendations
-//   useEffect(() => {
-//     const currentTime = Date.now();
-//     // Refresh recommendations if navigating to home page after 5 minutes
-//     if (location.pathname === '/' && currentTime - lastNavigationTimeRef.current > 5 * 60 * 1000) {
-//       hasFetchedRecommendationsRef.current = false; // Reset to allow refresh
-//       fetchRecommendations(true); // Force refresh
-//       lastNavigationTimeRef.current = currentTime;
-//     }
-//   }, [location, fetchRecommendations]);
-
-//   // Initial data fetching
-//   useEffect(() => {
-//     fetchBannerImages();
-//     fetchCategories();
-//   }, [fetchBannerImages, fetchCategories]);
-
-//   // Consolidated useEffect for location, products, and recommendations
-//   useEffect(() => {
-//     let isMounted = true;
-
-//     const fetchData = async () => {
-//       if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//         if (navigator.geolocation) {
-//           try {
-//             const position = await new Promise((resolve, reject) => {
-//               navigator.geolocation.getCurrentPosition(
-//                 resolve,
-//                 reject,
-//                 { timeout: 10000 }
-//               );
-//             });
-//             if (isMounted) {
-//               const newLocation = {
-//                 lat: position.coords.latitude,
-//                 lon: position.coords.longitude,
-//               };
-//               setBuyerLocation(newLocation);
-//             }
-//           } catch (error) {
-//             console.error('Geolocation error:', error);
-//             if (isMounted) {
-//               setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//             }
-//           }
-//         } else {
-//           if (isMounted) {
-//             setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//           }
-//         }
-//       }
-
-//       if (memoizedBuyerLocation?.lat && memoizedBuyerLocation?.lon) {
-//         await fetchNearbyProducts();
-//         await fetchRecommendations();
-//       }
-//     };
-
-//     fetchData();
-
-//     return () => {
-//       isMounted = false;
-//     };
-//   }, [memoizedBuyerLocation, fetchNearbyProducts, fetchRecommendations, setBuyerLocation]);
-
-//   const filteredProducts = useMemo(() => {
-//     if (!searchTerm) return products;
-//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-//   }, [products, searchTerm]);
-
-//   const sliderSettings = {
-//     dots: true,
-//     infinite: true,
-//     speed: 500,
-//     slidesToShow: 1,
-//     slidesToScroll: 1,
-//     autoplay: true,
-//     autoplaySpeed: 3000,
-//     arrows: true,
-//     accessibility: true,
-//     focusOnSelect: true,
-//   };
-
-//   if (loadingProducts && loadingBanners && loadingCategories && loadingRecommendations) return (
-//     <div className="td-loading-container">
-//       <div className="td-loading-animation">
-//         <div className="td-loading-box">
-//           <FaShoppingCart className="td-loading-icon" />
-//           <span>Finding the best deals for you...</span>
-//         </div>
-//         <div className="td-loading-dots">
-//           <span>.</span><span>.</span><span>.</span>
-//         </div>
-//       </div>
-//     </div>
-//   );
-
-//   return (
-//     <div className="td-home">
-//       <Helmet>
-//         <title>Markeet - Shop Electronics, Fashion, Jewellery & More</title>
-//         <meta
-//           name="description"
-//           content="Discover electronics, appliances, fashion, jewellery, gifts, and home decoration on Markeet. Fast delivery within 40km in India."
-//         />
-//         <meta
-//           name="keywords"
-//           content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, local shopping"
-//         />
-//         <meta name="robots" content="index, follow" />
-//         <link rel="canonical" href="https://www.markeet.com/" />
-//       </Helmet>
-//       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
-
-//       <div className="td-search-bar sticky" ref={searchRef}>
-//         <FaSearch className="td-search-icon" />
-//         <input
-//           type="text"
-//           placeholder="Search electronics, fashion, jewellery..."
-//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
-//           onFocus={() => setIsSearchFocused(true)}
-//           aria-label="Search products"
-//         />
-//         {suggestions.length > 0 && isSearchFocused && (
-//           <ul className="td-search-suggestions">
-//             {suggestions.map((suggestion) => (
-//               <li
-//                 key={suggestion.id}
-//                 className="td-suggestion-item"
-//                 onClick={() => {
-//                   setSearchTerm(suggestion.name);
-//                   setIsSearchFocused(false);
-//                   setSuggestions([]);
-//                 }}
+//                   Change Location
+//                 </button>
+//               </>
+//             )}
+//           </p>
+//         ) : (
+//           <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
+//             {filteredProducts.map((product) => (
+//               <div
+//                 key={product.id}
+//                 className="td-product-card"
+//                 onClick={() => navigate(`/product/${product.id}`)}
 //                 role="button"
 //                 tabIndex={0}
-//                 onKeyPress={(e) => {
-//                   if (e.key === 'Enter') {
-//                     setSearchTerm(suggestion.name);
-//                     setIsSearchFocused(false);
-//                     setSuggestions([]);
-//                   }
-//                 }}
-//                 aria-label={`Select ${suggestion.name}`}
+//                 onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+//                 aria-label={`View ${product.name}`}
 //               >
-//                 {suggestion.name}
-//               </li>
-//             ))}
-//           </ul>
-//         )}
-//       </div>
-
-//       <div className="td-banner-slider">
-//         {loadingBanners ? (
-//           <div className="td-banner-skeleton" />
-//         ) : (
-//           <Slider {...sliderSettings}>
-//             {bannerImages.map((banner) => (
-//               <div key={banner.name} className="td-banner-wrapper">
-//                 <img src={banner.url} alt={`Markeet ${banner.name} Offer`} loading="lazy" />
-//                 <button
-//                   className="td-view-offers-btn"
-//                   onClick={() => navigate('/categories')}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate('/categories')}
-//                   aria-label="View Offers"
-//                 >
-//                   View Offers
-//                 </button>
-//               </div>
-//             ))}
-//           </Slider>
-//         )}
-//       </div>
-
-//       <section className="td-categories-section">
-//         <header className="td-cat-header">
-//           <h2 className="td-cat-title">Explore Categories</h2>
-//           <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
-//             View All
-//           </Link>
-//         </header>
-//         {error && <p className="td-cat-error">{error}</p>}
-//         {loadingCategories ? (
-//           <div className="td-cat-scroll">
-//             {[...Array(6)].map((_, i) => (
-//               <div key={i} className="td-cat-card-skeleton" />
-//             ))}
-//           </div>
-//         ) : categories.length === 0 ? (
-//           <p className="td-cat-no-categories">No categories available.</p>
-//         ) : (
-//           <div className="td-cat-scroll">
-//             {categories.map((category) => (
-//               <Link
-//                 to={`/products?category=${category.id}`}
-//                 key={category.id}
-//                 className="td-cat-card"
-//                 aria-label={`View ${category.name} products`}
-//               >
-//                 <img
-//                   src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
-//                   alt={category.image_url ? `${category.name} category` : 'No category image available'}
-//                   className="td-cat-image"
-//                   onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
-//                   loading="lazy"
-//                 />
-//                 <h3 className="td-cat-name">{category.name.trim()}</h3>
-//               </Link>
-//             ))}
-//           </div>
-//         )}
-//       </section>
-
-//       <section className="td-recommendations-section">
-//         <h2 className="td-section-title">Recommended for You</h2>
-//         {loadingRecommendations ? (
-//           <div className="td-product-grid" style={{ minHeight: '300px' }}>
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
+//                 <div className="td-product-image-wrapper">
+//                   {product.discountAmount > 0 && (
+//                     <span className="td-offer-badge">
+//                       <span className="td-offer-label">Offer!</span>
+//                       Save ₹{product.discountAmount.toFixed(2)}
+//                     </span>
+//                   )}
+//                   <img
+//                     src={product.images[0]}
+//                     alt={`${product.name} product`}
+//                     onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
+//                     loading="lazy"
+//                   />
 //                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : recommendations.length === 0 ? (
-//           <p className="td-no-products">No recommendations available.</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${recommendations.length === 1 ? 'single-product' : ''}`}>
-//               {recommendations.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                 <div className="td-product-info">
+//                   <h3 className="td-product-name">{product.name}</h3>
+//                   <div className="td-price-section">
+//                     <p className="td-product-price">
+//                       ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//                     </p>
+//                     {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
+//                       <p className="td-original-price">
+//                         ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 //                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
+//                     )}
 //                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <section className="td-products-section">
-//         <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
-//         {loadingProducts ? (
-//           <div className="td-product-grid">
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
+//                   <div className="td-product-buttons">
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         addToCart(product);
+//                       }}
+//                       className="td-cart-action-btn"
+//                       disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
+//                       aria-label={`Add ${product.name} to cart`}
+//                     >
+//                       <FaShoppingCart /> Add to Cart
+//                     </button>
+//                     <button
+//                       onClick={(e) => {
+//                         e.stopPropagation();
+//                         buyNow(product);
+//                       }}
+//                       className="td-buy-action-btn"
+//                       disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
+//                       aria-label={`Buy ${product.name} now`}
+//                     >
+//                       Buy Now
+//                     </button>
+//                   </div>
 //                 </div>
 //               </div>
 //             ))}
 //           </div>
-//         ) : filteredProducts.length === 0 ? (
-//           <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
-//               {filteredProducts.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
 //         )}
 //       </section>
 
@@ -7387,3139 +5407,953 @@ export default React.memo(Home);
 
 
 
-// import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
-// import { useNavigate, Link, useLocation } from 'react-router-dom';
-// import { supabase } from '../supabaseClient';
-// import { LocationContext } from '../App';
-// import { FaShoppingCart, FaSearch } from 'react-icons/fa';
-// import Slider from 'react-slick';
-// import 'slick-carousel/slick/slick-theme.css';
-// import 'slick-carousel/slick/slick.css';
-// import { Toaster, toast } from 'react-hot-toast';
-// import '../style/Home.css';
-// import Footer from './Footer';
-// import { Helmet } from 'react-helmet-async';
-// import ErrorBoundary from './ErrorBoundary';
-
-// // Utility to debounce a function
-// const debounce = (func, delay) => {
-//   let timeoutId;
-//   return (...args) => {
-//     clearTimeout(timeoutId);
-//     timeoutId = setTimeout(() => func(...args), delay);
-//   };
-// };
-
-// // Distance calculation
-// // Distance calculation
-// function calculateDistance(userLoc, sellerLoc) {
-//   if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
-//   const R = 6371;
-//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
-//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-//   const a = Math.sin(latDiff / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// }
-
-// function Home() {
-//   const { buyerLocation, setBuyerLocation, session, setCartCount } = useContext(LocationContext);
-//   const navigate = useNavigate();
-//   const location = useLocation();
-//   const [products, setProducts] = useState([]);
-//   const [recommendations, setRecommendations] = useState([]);
-//   const [bannerImages, setBannerImages] = useState([]);
-//   const [categories, setCategories] = useState([]);
-//   const [error, setError] = useState(null);
-//   const [loadingProducts, setLoadingProducts] = useState(true);
-//   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
-//   const [loadingBanners, setLoadingBanners] = useState(true);
-//   const [loadingCategories, setLoadingCategories] = useState(true);
-//   const [searchTerm, setSearchTerm] = useState('');
-//   const [isSearchFocused, setIsSearchFocused] = useState(false);
-//   const [suggestions, setSuggestions] = useState([]);
-//   const hasFetchedRecommendationsRef = useRef(false);
-//   const [hasFetchedProducts, setHasFetchedProducts] = useState(false);
-//   const searchRef = useRef(null);
-//   const lastNavigationTimeRef = useRef(0);
-//   const lastFetchParamsRef = useRef(null); // Track last fetch parameters
-
-//   const memoizedBuyerLocation = useMemo(() => buyerLocation, [buyerLocation]);
-
-//   const debouncedSetSearchTerm = debounce((value) => {
-//     setSearchTerm(value);
-//   }, 300);
-
-//   const checkNetworkStatus = () => {
-//     if (!navigator.onLine) {
-//       toast.error('No internet connection. Please check your network and try again.', {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const fetchCategories = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingCategories(false);
-//       return;
-//     }
-//     setLoadingCategories(true);
-//     try {
-//       const { data, error } = await supabase
-//         .from('categories')
-//         .select('*')
-//         .order('name')
-//         .limit(6);
-//       if (error) throw error;
-//       setCategories(data || []);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching categories:', err);
-//       setError('Failed to load categories. Please try again.');
-//       setCategories([]);
-//     } finally {
-//       setLoadingCategories(false);
-//     }
-//   }, []);
-
-//   const fetchNearbyProducts = useCallback(async () => {
-//     if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (hasFetchedProducts) return;
-//     setLoadingProducts(true);
-//     try {
-//       const { data: allSellers, error: sellersError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .not('latitude', 'is', null)
-//         .not('longitude', 'is', null);
-//       if (sellersError) throw sellersError;
-
-//       const nearbySellerIds = allSellers
-//         .filter((seller) => {
-//           const distance = calculateDistance(memoizedBuyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
-//           return distance !== null && distance <= 40;
-//         })
-//         .map((seller) => seller.id);
-
-//       if (nearbySellerIds.length === 0) {
-//         setProducts([]);
-//         return;
-//       }
-
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, title, price, original_price, discount_amount, images, seller_id, stock, category_id')
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .in('seller_id', nearbySellerIds);
-//       if (productError) throw productError;
-
-//       const productIds = productData.map((p) => p.id);
-//       const { data: variantData, error: variantError } = await supabase
-//         .from('product_variants')
-//         .select('id, product_id, price, original_price, stock, attributes, images')
-//         .eq('status', 'active')
-//         .in('product_id', productIds);
-//       if (variantError) throw variantError;
-
-//       const mappedProducts = productData.map((product) => {
-//         const variants = variantData.filter((v) => v.product_id === product.id).map((v) => ({
-//           id: v.id,
-//           price: parseFloat(v.price) || 0,
-//           originalPrice: v.original_price ? parseFloat(v.original_price) : null,
-//           stock: v.stock || 0,
-//           attributes: v.attributes || {},
-//           images: v.images && v.images.length > 0 ? v.images : product.images,
-//         }));
-//         return {
-//           id: product.id,
-//           name: product.title || 'Unnamed Product',
-//           images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
-//           price: parseFloat(product.price) || 0,
-//           originalPrice: product.original_price ? parseFloat(product.original_price) : null,
-//           discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
-//           stock: product.stock || 0,
-//           categoryId: product.category_id,
-//           variants,
-//           displayPrice: variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : parseFloat(product.price),
-//           displayOriginalPrice:
-//             variants.length > 0
-//               ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
-//                 product.original_price
-//               : product.original_price,
-//         };
-//       });
-//       setProducts(mappedProducts);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching products:', err);
-//       setError('Failed to load products. Please try again.');
-//       setProducts([]);
-//     } finally {
-//       setTimeout(() => setLoadingProducts(false), 300);
-//       setHasFetchedProducts(true);
-//     }
-//   }, [memoizedBuyerLocation, hasFetchedProducts]);
-
-//   const fetchRecommendations = useCallback(async (forceRefresh = false) => {
-//     if (!session?.user?.id || !memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setRecommendations([]);
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (hasFetchedRecommendationsRef.current && !forceRefresh) return;
-
-//     // Check if the request params are the same as the last fetch
-//     const fetchParams = `${session.user.id}-${memoizedBuyerLocation.lat}-${memoizedBuyerLocation.lon}`;
-//     if (!forceRefresh && lastFetchParamsRef.current === fetchParams) {
-//       return; // Skip fetch if params haven't changed
-//     }
-//     lastFetchParamsRef.current = fetchParams;
-
-//     setLoadingRecommendations(true);
-//     const controller = new AbortController();
-//     try {
-//       const timeoutId = setTimeout(() => controller.abort(), 10000);
-//       const url = `${process.env.REACT_APP_API_URL}/recommendations/${session.user.id}/${memoizedBuyerLocation.lat}/${memoizedBuyerLocation.lon}`;
-//       console.log('Fetching recommendations from:', url);
-//       const response = await fetch(url, { signal: controller.signal });
-//       clearTimeout(timeoutId);
-//       if (!response.ok) {
-//         throw new Error(`Failed to load recommendations: ${response.status} ${response.statusText}`);
-//       }
-//       const data = await response.json();
-//       setRecommendations(data);
-//       setError(null);
-//     } catch (err) {
-//       console.error("Error fetching recommendations:", err);
-//       setError("We couldn't fetch personalized recommendations right now. Showing popular products instead.");
-//       const popularProducts = products
-//         .sort((a, b) => b.stock - a.stock)
-//         .slice(0, 5);
-//       setRecommendations(popularProducts);
-//       toast.error("Couldn't load recommendations. Showing popular products.");
-//     } finally {
-//       setTimeout(() => setLoadingRecommendations(false), 300);
-//       hasFetchedRecommendationsRef.current = true;
-//     }
-//   }, [session, memoizedBuyerLocation, products]);
-
-//   // Debounced version of fetchRecommendations
-//   const debouncedFetchRecommendations = useCallback(
-//     debounce((forceRefresh) => fetchRecommendations(forceRefresh), 2000),
-//     [fetchRecommendations]
-//   );
-
-//   const fetchBannerImages = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingBanners(false);
-//       return;
-//     }
-//     setLoadingBanners(true);
-//     try {
-//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
-//       const banners = await Promise.all(
-//         data
-//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
-//           .map(async (file) => {
-//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
-//             return { url: publicUrl, name: file.name };
-//           })
-//       );
-//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } catch (err) {
-//       console.error('Error fetching banner images:', err);
-//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } finally {
-//       setLoadingBanners(false);
-//     }
-//   }, []);
-
-//   const validateVariant = async (variantId) => {
-//     if (!variantId) return true;
-//     const { data, error } = await supabase
-//       .from('product_variants')
-//       .select('id')
-//       .eq('id', variantId)
-//       .eq('status', 'active')
-//       .single();
-//     if (error || !data) {
-//       console.error('Variant validation failed:', error);
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const addToCart = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to add items to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//         toast.success(`${product.name} quantity updated in cart!`, { duration: 3000, position: 'top-center' });
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-//         toast.success(`${product.name} added to cart!`, { duration: 3000, position: 'top-center' });
-
-//         // Log cart interaction
-//         await fetch(`${process.env.REACT_APP_API_URL}/log_interaction/${session.user.id}/${product.id}`, {
-//           method: 'POST',
-//           headers: { 'Content-Type': 'application/json' },
-//           body: JSON.stringify({ interaction_type: 'cart' }),
-//         });
-//       }
-//     } catch (err) {
-//       console.error('Error adding to cart:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   const buyNow = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to proceed to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-
-//         // Log cart interaction
-//         await fetch(`${process.env.REACT_APP_API_URL}/log_interaction/${session.user.id}/${product.id}`, {
-//           method: 'POST',
-//           headers: { 'Content-Type': 'application/json' },
-//           body: JSON.stringify({ interaction_type: 'cart' }),
-//         });
-//       }
-
-//       toast.success('Added to cart! Redirecting...', { duration: 2000, position: 'top-center' });
-//       setTimeout(() => navigate('/cart'), 2000);
-//     } catch (err) {
-//       console.error('Error in Buy Now:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   useEffect(() => {
-//     if (!searchTerm || !isSearchFocused) {
-//       setSuggestions([]);
-//       return;
-//     }
-
-//     const filteredSuggestions = products
-//       .filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
-//       .slice(0, 5);
-//     setSuggestions(filteredSuggestions);
-//   }, [searchTerm, products, isSearchFocused]);
-
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (searchRef.current && !searchRef.current.contains(event.target)) {
-//         setIsSearchFocused(false);
-//         setSuggestions([]);
-//       }
-//     };
-
-//     document.addEventListener('mousedown', handleClickOutside);
-//     return () => {
-//       document.removeEventListener('mousedown', handleClickOutside);
-//     };
-//   }, []);
-
-//   // Detect navigation to refresh recommendations
-//   useEffect(() => {
-//     const currentTime = Date.now();
-//     if (location.pathname === '/' && currentTime - lastNavigationTimeRef.current > 5 * 60 * 1000) {
-//       hasFetchedRecommendationsRef.current = false;
-//       debouncedFetchRecommendations(true); // Use debounced version
-//       lastNavigationTimeRef.current = currentTime;
-//     }
-//   }, [location, debouncedFetchRecommendations]);
-
-//   // Initial data fetching
-//   useEffect(() => {
-//     fetchBannerImages();
-//     fetchCategories();
-//   }, [fetchBannerImages, fetchCategories]);
-
-//   // Consolidated useEffect for location, products, and recommendations
-//   useEffect(() => {
-//     let isMounted = true;
-
-//     const fetchData = async () => {
-//       if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//         if (navigator.geolocation) {
-//           try {
-//             const position = await new Promise((resolve, reject) => {
-//               navigator.geolocation.getCurrentPosition(
-//                 resolve,
-//                 reject,
-//                 { timeout: 10000 }
-//               );
-//             });
-//             if (isMounted) {
-//               const newLocation = {
-//                 lat: position.coords.latitude,
-//                 lon: position.coords.longitude,
-//               };
-//               setBuyerLocation(newLocation);
-//             }
-//           } catch (error) {
-//             console.error('Geolocation error:', error);
-//             if (isMounted) {
-//               setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//             }
-//           }
-//         } else {
-//           if (isMounted) {
-//             setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//           }
-//         }
-//       }
-
-//       if (memoizedBuyerLocation?.lat && memoizedBuyerLocation?.lon) {
-//         await fetchNearbyProducts();
-//         debouncedFetchRecommendations(); // Use debounced version
-//       }
-//     };
-
-//     fetchData();
-
-//     return () => {
-//       isMounted = false;
-//     };
-//   }, [memoizedBuyerLocation, fetchNearbyProducts, debouncedFetchRecommendations, setBuyerLocation]);
-
-//   const filteredProducts = useMemo(() => {
-//     if (!searchTerm) return products;
-//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-//   }, [products, searchTerm]);
-
-//   const sliderSettings = {
-//     dots: true,
-//     infinite: true,
-//     speed: 500,
-//     slidesToShow: 1,
-//     slidesToScroll: 1,
-//     autoplay: true,
-//     autoplaySpeed: 3000,
-//     arrows: true,
-//     accessibility: true,
-//     focusOnSelect: true,
-//   };
-
-//   if (loadingProducts && loadingBanners && loadingCategories && loadingRecommendations) return (
-//     <div className="td-loading-container">
-//       <div className="td-loading-animation">
-//         <div className="td-loading-box">
-//           <FaShoppingCart className="td-loading-icon" />
-//           <span>Finding the best deals for you...</span>
-//         </div>
-//         <div className="td-loading-dots">
-//           <span>.</span><span>.</span><span>.</span>
-//         </div>
-//       </div>
-//     </div>
-//   );
-
-//   return (
-//     <div className="td-home">
-//       <Helmet>
-//         <title>Markeet - Shop Electronics, Fashion, Jewellery & More</title>
-//         <meta
-//           name="description"
-//           content="Discover electronics, appliances, fashion, jewellery, gifts, and home decoration on Markeet. Fast delivery within 40km in India."
-//         />
-//         <meta
-//           name="keywords"
-//           content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, local shopping"
-//         />
-//         <meta name="robots" content="index, follow" />
-//         <link rel="canonical" href="https://www.markeet.com/" />
-//       </Helmet>
-//       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
-
-//       <div className="td-search-bar sticky" ref={searchRef}>
-//         <FaSearch className="td-search-icon" />
-//         <input
-//           type="text"
-//           placeholder="Search electronics, fashion, jewellery..."
-//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
-//           onFocus={() => setIsSearchFocused(true)}
-//           aria-label="Search products"
-//         />
-//         {suggestions.length > 0 && isSearchFocused && (
-//           <ul className="td-search-suggestions">
-//             {suggestions.map((suggestion) => (
-//               <li
-//                 key={suggestion.id}
-//                 className="td-suggestion-item"
-//                 onClick={() => {
-//                   setSearchTerm(suggestion.name);
-//                   setIsSearchFocused(false);
-//                   setSuggestions([]);
-//                 }}
-//                 role="button"
-//                 tabIndex={0}
-//                 onKeyPress={(e) => {
-//                   if (e.key === 'Enter') {
-//                     setSearchTerm(suggestion.name);
-//                     setIsSearchFocused(false);
-//                     setSuggestions([]);
-//                   }
-//                 }}
-//                 aria-label={`Select ${suggestion.name}`}
-//               >
-//                 {suggestion.name}
-//               </li>
-//             ))}
-//           </ul>
-//         )}
-//       </div>
-
-//       <div className="td-banner-slider">
-//         {loadingBanners ? (
-//           <div className="td-banner-skeleton" />
-//         ) : (
-//           <Slider {...sliderSettings}>
-//             {bannerImages.map((banner) => (
-//               <div key={banner.name} className="td-banner-wrapper">
-//                 <img src={banner.url} alt={`Markeet ${banner.name} Offer`} loading="lazy" />
-//                 <button
-//                   className="td-view-offers-btn"
-//                   onClick={() => navigate('/categories')}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate('/categories')}
-//                   aria-label="View Offers"
-//                 >
-//                   View Offers
-//                 </button>
-//               </div>
-//             ))}
-//           </Slider>
-//         )}
-//       </div>
-
-//       <section className="td-categories-section">
-//         <header className="td-cat-header">
-//           <h2 className="td-cat-title">Explore Categories</h2>
-//           <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
-//             View All
-//           </Link>
-//         </header>
-//         {error && <p className="td-cat-error">{error}</p>}
-//         {loadingCategories ? (
-//           <div className="td-cat-scroll">
-//             {[...Array(6)].map((_, i) => (
-//               <div key={i} className="td-cat-card-skeleton" />
-//             ))}
-//           </div>
-//         ) : categories.length === 0 ? (
-//           <p className="td-cat-no-categories">No categories available.</p>
-//         ) : (
-//           <div className="td-cat-scroll">
-//             {categories.map((category) => (
-//               <Link
-//                 to={`/products?category=${category.id}`}
-//                 key={category.id}
-//                 className="td-cat-card"
-//                 aria-label={`View ${category.name} products`}
-//               >
-//                 <img
-//                   src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
-//                   alt={category.image_url ? `${category.name} category` : 'No category image available'}
-//                   className="td-cat-image"
-//                   onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
-//                   loading="lazy"
-//                 />
-//                 <h3 className="td-cat-name">{category.name.trim()}</h3>
-//               </Link>
-//             ))}
-//           </div>
-//         )}
-//       </section>
-
-//       <section className="td-recommendations-section">
-//         <h2 className="td-section-title">Recommended for You</h2>
-//         {loadingRecommendations ? (
-//           <div className="td-product-grid" style={{ minHeight: '300px' }}>
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : recommendations.length === 0 ? (
-//           <p className="td-no-products">No recommendations available.</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${recommendations.length === 1 ? 'single-product' : ''}`}>
-//               {recommendations.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <section className="td-products-section">
-//         <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
-//         {loadingProducts ? (
-//           <div className="td-product-grid">
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : filteredProducts.length === 0 ? (
-//           <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
-//               {filteredProducts.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <Footer />
-//     </div>
-//   );
-// }
-
-// export default React.memo(Home);
-
-
-
-// import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
-// import { useNavigate, Link, useLocation } from 'react-router-dom';
-// import { supabase } from '../supabaseClient';
-// import { LocationContext } from '../App';
-// import { FaShoppingCart, FaSearch } from 'react-icons/fa';
-// import Slider from 'react-slick';
-// import 'slick-carousel/slick/slick-theme.css';
-// import 'slick-carousel/slick/slick.css';
-// import { Toaster, toast } from 'react-hot-toast';
-// import '../style/Home.css';
-// import Footer from './Footer';
-// import { Helmet } from 'react-helmet-async';
-// import ErrorBoundary from './ErrorBoundary';
-
-// // Utility to debounce a function
-// const debounce = (func, delay) => {
-//   let timeoutId;
-//   return (...args) => {
-//     clearTimeout(timeoutId);
-//     timeoutId = setTimeout(() => func(...args), delay);
-//   };
-// };
-
-// // Distance calculation using Haversine formula
-// function calculateDistance(userLoc, sellerLoc) {
-//   if (
-//     !userLoc ||
-//     !sellerLoc ||
-//     !sellerLoc.latitude ||
-//     !sellerLoc.longitude ||
-//     sellerLoc.latitude === 0 ||
-//     sellerLoc.longitude === 0
-//   ) {
-//     return null;
-//   }
-//   const R = 6371; // Earth's radius in km
-//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
-//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-//   const a =
-//     Math.sin(latDiff / 2) ** 2 +
-//     Math.cos(userLoc.lat * (Math.PI / 180)) *
-//       Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
-//       Math.sin(lonDiff / 2) ** 2;
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// }
-
-// function Home() {
-//   const { buyerLocation, setBuyerLocation, session, setCartCount } = useContext(LocationContext);
-//   const navigate = useNavigate();
-//   const location = useLocation();
-//   const [products, setProducts] = useState([]);
-//   const [recommendations, setRecommendations] = useState([]);
-//   const [bannerImages, setBannerImages] = useState([]);
-//   const [categories, setCategories] = useState([]);
-//   const [error, setError] = useState(null);
-//   const [loadingProducts, setLoadingProducts] = useState(true);
-//   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
-//   const [loadingBanners, setLoadingBanners] = useState(true);
-//   const [loadingCategories, setLoadingCategories] = useState(true);
-//   const [searchTerm, setSearchTerm] = useState('');
-//   const [isSearchFocused, setIsSearchFocused] = useState(false);
-//   const [suggestions, setSuggestions] = useState([]);
-//   const hasFetchedRecommendationsRef = useRef(false);
-//   const [hasFetchedProducts, setHasFetchedProducts] = useState(false);
-//   const searchRef = useRef(null);
-//   const lastNavigationTimeRef = useRef(0);
-//   const lastFetchParamsRef = useRef(null);
-
-//   const memoizedBuyerLocation = useMemo(() => buyerLocation, [buyerLocation]);
-
-//   const debouncedSetSearchTerm = debounce((value) => {
-//     setSearchTerm(value);
-//   }, 300);
-
-//   const checkNetworkStatus = () => {
-//     if (!navigator.onLine) {
-//       toast.error('No internet connection. Please check your network and try again.', {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const fetchCategories = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingCategories(false);
-//       return;
-//     }
-//     setLoadingCategories(true);
-//     try {
-//       const { data, error } = await supabase
-//         .from('categories')
-//         .select('*')
-//         .order('name')
-//         .limit(6);
-//       if (error) throw error;
-//       setCategories(data || []);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching categories:', err);
-//       setError('Failed to load categories. Please try again.');
-//       setCategories([]);
-//     } finally {
-//       setLoadingCategories(false);
-//     }
-//   }, []);
-
-//   const fetchNearbyProducts = useCallback(async () => {
-//     if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (hasFetchedProducts) return;
-//     setLoadingProducts(true);
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select(`
-//           id,
-//           title,
-//           price,
-//           original_price,
-//           discount_amount,
-//           images,
-//           seller_id,
-//           stock,
-//           category_id,
-//           sellers (
-//             id,
-//             latitude,
-//             longitude
-//           )
-//         `)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .not('sellers.latitude', 'is', null)
-//         .not('sellers.longitude', 'is', null);
-
-//       if (productError) throw productError;
-
-//       const nearbyProducts = productData.filter((product) => {
-//         const distance = calculateDistance(memoizedBuyerLocation, {
-//           latitude: product.sellers.latitude,
-//           longitude: product.sellers.longitude,
-//         });
-//         return distance !== null && distance <= 40;
-//       });
-
-//       const productIds = nearbyProducts.map((p) => p.id);
-//       const { data: variantData, error: variantError } = await supabase
-//         .from('product_variants')
-//         .select('id, product_id, price, original_price, stock, attributes, images')
-//         .eq('status', 'active')
-//         .in('product_id', productIds);
-//       if (variantError) throw variantError;
-
-//       const mappedProducts = nearbyProducts.map((product) => {
-//         const variants = variantData.filter((v) => v.product_id === product.id).map((v) => ({
-//           id: v.id,
-//           price: parseFloat(v.price) || 0,
-//           originalPrice: v.original_price ? parseFloat(v.original_price) : null,
-//           stock: v.stock || 0,
-//           attributes: v.attributes || {},
-//           images: v.images && v.images.length > 0 ? v.images : product.images,
-//         }));
-//         return {
-//           id: product.id,
-//           name: product.title || 'Unnamed Product',
-//           images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
-//           price: parseFloat(product.price) || 0,
-//           originalPrice: product.original_price ? parseFloat(product.original_price) : null,
-//           discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
-//           stock: product.stock || 0,
-//           categoryId: product.category_id,
-//           variants,
-//           displayPrice: variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : parseFloat(product.price),
-//           displayOriginalPrice:
-//             variants.length > 0
-//               ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
-//                 product.original_price
-//               : product.original_price,
-//         };
-//       });
-//       setProducts(mappedProducts);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching products:', err);
-//       setError('Failed to load products. Please try again.');
-//       setProducts([]);
-//     } finally {
-//       setTimeout(() => setLoadingProducts(false), 300);
-//       setHasFetchedProducts(true);
-//     }
-//   }, [memoizedBuyerLocation, hasFetchedProducts]);
-
-//   const fetchRecommendations = useCallback(async (forceRefresh = false) => {
-//     if (!session?.user?.id || !memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setRecommendations([]);
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (hasFetchedRecommendationsRef.current && !forceRefresh) return;
-
-//     const fetchParams = `${session.user.id}-${memoizedBuyerLocation.lat}-${memoizedBuyerLocation.lon}`;
-//     if (!forceRefresh && lastFetchParamsRef.current === fetchParams) {
-//       return;
-//     }
-//     lastFetchParamsRef.current = fetchParams;
-
-//     setLoadingRecommendations(true);
-//     const controller = new AbortController();
-//     try {
-//       const timeoutId = setTimeout(() => controller.abort(), 10000);
-//       const url = `${process.env.REACT_APP_API_URL}/recommendations/${session.user.id}/${memoizedBuyerLocation.lat}/${memoizedBuyerLocation.lon}`;
-//       console.log('Fetching recommendations from:', url);
-//       const response = await fetch(url, { signal: controller.signal });
-//       clearTimeout(timeoutId);
-//       if (!response.ok) {
-//         throw new Error(`Failed to load recommendations: ${response.status} ${response.statusText}`);
-//       }
-//       const data = await response.json();
-//       setRecommendations(data);
-//       setError(null);
-//     } catch (err) {
-//       console.error("Error fetching recommendations:", err);
-//       setError("We couldn't fetch personalized recommendations right now. Showing popular products instead.");
-//       const popularProducts = products
-//         .sort((a, b) => b.stock - a.stock)
-//         .slice(0, 5);
-//       setRecommendations(popularProducts);
-//       toast.error("Couldn't load recommendations. Showing popular products.");
-//     } finally {
-//       setTimeout(() => setLoadingRecommendations(false), 300);
-//       hasFetchedRecommendationsRef.current = true;
-//     }
-//   }, [session, memoizedBuyerLocation, products]);
-
-//   const debouncedFetchRecommendations = useCallback(
-//     debounce((forceRefresh) => fetchRecommendations(forceRefresh), 2000),
-//     [fetchRecommendations]
-//   );
-
-//   const fetchBannerImages = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingBanners(false);
-//       return;
-//     }
-//     setLoadingBanners(true);
-//     try {
-//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
-//       const banners = await Promise.all(
-//         data
-//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
-//           .map(async (file) => {
-//             const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
-//             return { url: publicUrl, name: file.name };
-//           })
-//       );
-//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } catch (err) {
-//       console.error('Error fetching banner images:', err);
-//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } finally {
-//       setLoadingBanners(false);
-//     }
-//   }, []);
-
-//   const validateVariant = async (variantId) => {
-//     if (!variantId) return true;
-//     const { data, error } = await supabase
-//       .from('product_variants')
-//       .select('id')
-//       .eq('id', variantId)
-//       .eq('status', 'active')
-//       .single();
-//     if (error || !data) {
-//       console.error('Variant validation failed:', error);
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const addToCart = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to add items to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants?.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//         toast.success(`${product.name} quantity updated in cart!`, { duration: 3000, position: 'top-center' });
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-//         toast.success(`${product.name} added to cart!`, { duration: 3000, position: 'top-center' });
-
-//         try {
-//           const response = await fetch(
-//             `${process.env.REACT_APP_API_URL}/log_interaction/${session.user.id}/${product.id}`,
-//             {
-//               method: 'POST',
-//               headers: { 'Content-Type': 'application/json' },
-//               body: JSON.stringify({ interaction_type: 'cart' }),
-//             }
-//           );
-//           if (!response.ok) {
-//             console.error('Failed to log cart interaction:', response.status, response.statusText);
-//             toast.error('Added to cart, but failed to log interaction.', {
-//               duration: 3000,
-//               position: 'top-center',
-//             });
-//           }
-//         } catch (err) {
-//           console.error('Error logging cart interaction:', err);
-//           toast.error('Added to cart, but failed to log interaction.', {
-//             duration: 3000,
-//             position: 'top-center',
-//           });
-//         }
-//       }
-//     } catch (err) {
-//       console.error('Error adding to cart:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   const buyNow = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to proceed to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants?.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-
-//         try {
-//           const response = await fetch(
-//             `${process.env.REACT_APP_API_URL}/log_interaction/${session.user.id}/${product.id}`,
-//             {
-//               method: 'POST',
-//               headers: { 'Content-Type': 'application/json' },
-//               body: JSON.stringify({ interaction_type: 'cart' }),
-//             }
-//           );
-//           if (!response.ok) {
-//             console.error('Failed to log cart interaction:', response.status, response.statusText);
-//             toast.error('Added to cart, but failed to log interaction.', {
-//               duration: 3000,
-//               position: 'top-center',
-//             });
-//           }
-//         } catch (err) {
-//           console.error('Error logging cart interaction:', err);
-//           toast.error('Added to cart, but failed to log interaction.', {
-//             duration: 3000,
-//             position: 'top-center',
-//           });
-//         }
-//       }
-
-//       toast.success('Added to cart! Redirecting...', { duration: 2000, position: 'top-center' });
-//       setTimeout(() => navigate('/cart'), 2000);
-//     } catch (err) {
-//       console.error('Error in Buy Now:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   useEffect(() => {
-//     if (!searchTerm || !isSearchFocused) {
-//       setSuggestions([]);
-//       return;
-//     }
-
-//     const filteredSuggestions = products
-//       .filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
-//       .slice(0, 5);
-//     setSuggestions(filteredSuggestions);
-//   }, [searchTerm, products, isSearchFocused]);
-
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (searchRef.current && !searchRef.current.contains(event.target)) {
-//         setIsSearchFocused(false);
-//         setSuggestions([]);
-//       }
-//     };
-
-//     document.addEventListener('mousedown', handleClickOutside);
-//     return () => {
-//       document.removeEventListener('mousedown', handleClickOutside);
-//     };
-//   }, []);
-
-//   useEffect(() => {
-//     const currentTime = Date.now();
-//     if (location.pathname === '/' && currentTime - lastNavigationTimeRef.current > 5 * 60 * 1000) {
-//       hasFetchedRecommendationsRef.current = false;
-//       debouncedFetchRecommendations(true);
-//       lastNavigationTimeRef.current = currentTime;
-//     }
-//   }, [location, debouncedFetchRecommendations]);
-
-//   useEffect(() => {
-//     fetchBannerImages();
-//     fetchCategories();
-//   }, [fetchBannerImages, fetchCategories]);
-
-//   useEffect(() => {
-//     let isMounted = true;
-
-//     const fetchData = async () => {
-//       if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//         if (navigator.geolocation) {
-//           try {
-//             const position = await new Promise((resolve, reject) => {
-//               navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-//             });
-//             if (isMounted) {
-//               const newLocation = {
-//                 lat: position.coords.latitude,
-//                 lon: position.coords.longitude,
-//               };
-//               setBuyerLocation(newLocation);
-//             }
-//           } catch (error) {
-//             console.error('Geolocation error:', error);
-//             if (isMounted) {
-//               setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//             }
-//           }
-//         } else {
-//           if (isMounted) {
-//             setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//           }
-//         }
-//       }
-
-//       if (memoizedBuyerLocation?.lat && memoizedBuyerLocation?.lon) {
-//         await fetchNearbyProducts();
-//         debouncedFetchRecommendations();
-//       }
-//     };
-
-//     fetchData();
-
-//     return () => {
-//       isMounted = false;
-//     };
-//   }, [memoizedBuyerLocation, fetchNearbyProducts, debouncedFetchRecommendations, setBuyerLocation]);
-
-//   const filteredProducts = useMemo(() => {
-//     if (!searchTerm) return products;
-//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-//   }, [products, searchTerm]);
-
-//   const sliderSettings = {
-//     dots: true,
-//     infinite: true,
-//     speed: 500,
-//     slidesToShow: 1,
-//     slidesToScroll: 1,
-//     autoplay: true,
-//     autoplaySpeed: 3000,
-//     arrows: true,
-//     accessibility: true,
-//     focusOnSelect: true,
-//   };
-
-//   if (loadingProducts && loadingBanners && loadingCategories && loadingRecommendations) {
-//     return (
-//       <div className="td-loading-container">
-//         <div className="td-loading-animation">
-//           <div className="td-loading-box">
-//             <FaShoppingCart className="td-loading-icon" />
-//             <span>Finding the best deals for you...</span>
-//           </div>
-//           <div className="td-loading-dots">
-//             <span>.</span>
-//             <span>.</span>
-//             <span>.</span>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="td-home">
-//       <Helmet>
-//         <title>Markeet - Shop Electronics, Fashion, Jewellery & More</title>
-//         <meta
-//           name="description"
-//           content="Discover electronics, appliances, fashion, jewellery, gifts, and home decoration on Markeet. Fast delivery within 40km in India."
-//         />
-//         <meta
-//           name="keywords"
-//           content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, local shopping"
-//         />
-//         <meta name="robots" content="index, follow" />
-//         <link rel="canonical" href="https://www.markeet.com/" />
-//       </Helmet>
-//       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
-
-//       <div className="td-search-bar sticky" ref={searchRef}>
-//         <FaSearch className="td-search-icon" />
-//         <input
-//           type="text"
-//           placeholder="Search electronics, fashion, jewellery..."
-//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
-//           onFocus={() => setIsSearchFocused(true)}
-//           aria-label="Search products"
-//         />
-//         {suggestions.length > 0 && isSearchFocused && (
-//           <ul className="td-search-suggestions">
-//             {suggestions.map((suggestion) => (
-//               <li
-//                 key={suggestion.id}
-//                 className="td-suggestion-item"
-//                 onClick={() => {
-//                   setSearchTerm(suggestion.name);
-//                   setIsSearchFocused(false);
-//                   setSuggestions([]);
-//                 }}
-//                 role="button"
-//                 tabIndex={0}
-//                 onKeyPress={(e) => {
-//                   if (e.key === 'Enter') {
-//                     setSearchTerm(suggestion.name);
-//                     setIsSearchFocused(false);
-//                     setSuggestions([]);
-//                   }
-//                 }}
-//                 aria-label={`Select ${suggestion.name}`}
-//               >
-//                 {suggestion.name}
-//               </li>
-//             ))}
-//           </ul>
-//         )}
-//       </div>
-
-//       <div className="td-banner-slider">
-//         {loadingBanners ? (
-//           <div className="td-banner-skeleton" />
-//         ) : (
-//           <Slider {...sliderSettings}>
-//             {bannerImages.map((banner) => (
-//               <div key={banner.name} className="td-banner-wrapper">
-//                 <img src={banner.url} alt={`Markeet ${banner.name} Offer`} loading="lazy" />
-//                 <button
-//                   className="td-view-offers-btn"
-//                   onClick={() => navigate('/categories')}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate('/categories')}
-//                   aria-label="View Offers"
-//                 >
-//                   View Offers
-//                 </button>
-//               </div>
-//             ))}
-//           </Slider>
-//         )}
-//       </div>
-
-//       <section className="td-categories-section">
-//         <header className="td-cat-header">
-//           <h2 className="td-cat-title">Explore Categories</h2>
-//           <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
-//             View All
-//           </Link>
-//         </header>
-//         {error && <p className="td-cat-error">{error}</p>}
-//         {loadingCategories ? (
-//           <div className="td-cat-scroll">
-//             {[...Array(6)].map((_, i) => (
-//               <div key={i} className="td-cat-card-skeleton" />
-//             ))}
-//           </div>
-//         ) : categories.length === 0 ? (
-//           <p className="td-cat-no-categories">No categories available.</p>
-//         ) : (
-//           <div className="td-cat-scroll">
-//             {categories.map((category) => (
-//               <Link
-//                 to={`/products?category=${category.id}`}
-//                 key={category.id}
-//                 className="td-cat-card"
-//                 aria-label={`View ${category.name} products`}
-//               >
-//                 <img
-//                   src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
-//                   alt={category.image_url ? `${category.name} category` : 'No category image available'}
-//                   className="td-cat-image"
-//                   onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
-//                   loading="lazy"
-//                 />
-//                 <h3 className="td-cat-name">{category.name.trim()}</h3>
-//               </Link>
-//             ))}
-//           </div>
-//         )}
-//       </section>
-
-//       <section className="td-recommendations-section">
-//         <h2 className="td-section-title">Recommended for You</h2>
-//         {loadingRecommendations ? (
-//           <div className="td-product-grid" style={{ minHeight: '300px' }}>
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : recommendations.length === 0 ? (
-//           <p className="td-no-products">No recommendations available.</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${recommendations.length === 1 ? 'single-product' : ''}`}>
-//               {recommendations.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', {
-//                           minimumFractionDigits: 2,
-//                           maximumFractionDigits: 2,
-//                         })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', {
-//                             minimumFractionDigits: 2,
-//                             maximumFractionDigits: 2,
-//                           })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <section className="td-products-section">
-//         <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
-//         {loadingProducts ? (
-//           <div className="td-product-grid">
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : filteredProducts.length === 0 ? (
-//           <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
-//               {filteredProducts.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', {
-//                           minimumFractionDigits: 2,
-//                           maximumFractionDigits: 2,
-//                         })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', {
-//                             minimumFractionDigits: 2,
-//                             maximumFractionDigits: 2,
-//                           })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <Footer />
-//     </div>
-//   );
-// }
-
-// export default React.memo(Home);
-
-
-// import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
-// import { useNavigate, Link, useLocation } from 'react-router-dom';
-// import { supabase } from '../supabaseClient';
-// import { LocationContext } from '../App';
-// import { FaShoppingCart, FaSearch } from 'react-icons/fa';
-// import Slider from 'react-slick';
-// import 'slick-carousel/slick/slick.css';
-// import 'slick-carousel/slick/slick-theme.css';
-// import { Toaster, toast } from 'react-hot-toast';
-// import '../style/Home.css';
-// import Footer from './Footer';
-// import { Helmet } from 'react-helmet-async';
-// import ErrorBoundary from './ErrorBoundary';
-
-// // Utility to debounce a function
-// const debounce = (func, delay) => {
-//   let timeoutId;
-//   return (...args) => {
-//     clearTimeout(timeoutId);
-//     timeoutId = setTimeout(() => func(...args), delay);
-//   };
-// };
-
-// // Distance calculation using Haversine formula
-// function calculateDistance(userLoc, sellerLoc) {
-//   if (
-//     !userLoc ||
-//     !sellerLoc ||
-//     !sellerLoc.latitude ||
-//     !sellerLoc.longitude ||
-//     sellerLoc.latitude === 0 ||
-//     sellerLoc.longitude === 0
-//   ) {
-//     return null;
-//   }
-//   const R = 6371; // Earth's radius in km
-//   const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
-//   const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-//   const a =
-//     Math.sin(latDiff / 2) ** 2 +
-//     Math.cos(userLoc.lat * (Math.PI / 180)) *
-//       Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
-//       Math.sin(lonDiff / 2) ** 2;
-//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-//   return R * c;
-// }
-
-// function Home() {
-//   const { buyerLocation, setBuyerLocation, session, setCartCount } = useContext(LocationContext);
-//   const navigate = useNavigate();
-//   const location = useLocation();
-//   const [products, setProducts] = useState([]);
-//   const [recommendations, setRecommendations] = useState([]);
-//   const [bannerImages, setBannerImages] = useState([]);
-//   const [categories, setCategories] = useState([]);
-//   const [error, setError] = useState(null);
-//   const [loadingProducts, setLoadingProducts] = useState(true);
-//   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
-//   const [loadingBanners, setLoadingBanners] = useState(true);
-//   const [loadingCategories, setLoadingCategories] = useState(true);
-//   const [searchTerm, setSearchTerm] = useState('');
-//   const [isSearchFocused, setIsSearchFocused] = useState(false);
-//   const [suggestions, setSuggestions] = useState([]);
-//   const hasFetchedRecommendationsRef = useRef(false);
-//   const [hasFetchedProducts, setHasFetchedProducts] = useState(false);
-//   const searchRef = useRef(null);
-//   const lastNavigationTimeRef = useRef(0);
-//   const lastFetchParamsRef = useRef(null);
-
-//   const memoizedBuyerLocation = useMemo(() => buyerLocation, [buyerLocation]);
-
-//   const debouncedSetSearchTerm = debounce((value) => {
-//     setSearchTerm(value);
-//   }, 300);
-
-//   const checkNetworkStatus = () => {
-//     if (!navigator.onLine) {
-//       toast.error('No internet connection. Please check your network and try again.', {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const fetchCategories = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingCategories(false);
-//       return;
-//     }
-//     setLoadingCategories(true);
-//     try {
-//       const { data, error } = await supabase
-//         .from('categories')
-//         .select('*')
-//         .order('name')
-//         .limit(6);
-//       if (error) throw error;
-//       setCategories(data || []);
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching categories:', err);
-//       setError('Failed to load categories. Please try again.');
-//       setCategories([]);
-//     } finally {
-//       setLoadingCategories(false);
-//     }
-//   }, []);
-
-//   const fetchNearbyProducts = useCallback(async () => {
-//     if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingProducts(false);
-//       return;
-//     }
-//     if (hasFetchedProducts) return;
-//     setLoadingProducts(true);
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select(`
-//           id,
-//           title,
-//           price,
-//           original_price,
-//           discount_amount,
-//           images,
-//           seller_id,
-//           stock,
-//           category_id,
-//           sellers (
-//             id,
-//             latitude,
-//             longitude
-//           )
-//         `)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .not('sellers.latitude', 'is', null)
-//         .not('sellers.longitude', 'is', null);
-
-//       if (productError) throw productError;
-
-//       const nearbyProducts = productData.filter((product) => {
-//         const distance = calculateDistance(memoizedBuyerLocation, {
-//           latitude: product.sellers.latitude,
-//           longitude: product.sellers.longitude,
-//         });
-//         return distance !== null && distance <= 40;
-//       });
-
-//       const productIds = nearbyProducts.map((p) => p.id);
-//       const { data: variantData, error: variantError } = await supabase
-//         .from('product_variants')
-//         .select('id, product_id, price, original_price, stock, attributes, images')
-//         .eq('status', 'active')
-//         .in('product_id', productIds);
-//       if (variantError) throw variantError;
-
-//       const mappedProducts = nearbyProducts.map((product) => {
-//         const variants = variantData.filter((v) => v.product_id === product.id).map((v) => ({
-//           id: v.id,
-//           price: parseFloat(v.price) || 0,
-//           originalPrice: v.original_price ? parseFloat(v.original_price) : null,
-//           stock: v.stock || 0,
-//           attributes: v.attributes || {},
-//           images: v.images && v.images.length > 0 ? v.images : product.images,
-//         }));
-//         return {
-//           id: product.id,
-//           name: product.title || 'Unnamed Product',
-//           images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
-//           price: parseFloat(product.price) || 0,
-//           originalPrice: product.original_price ? parseFloat(product.original_price) : null,
-//           discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
-//           stock: product.stock || 0,
-//           categoryId: product.category_id,
-//           variants,
-//           displayPrice: variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : parseFloat(product.price),
-//           displayOriginalPrice:
-//             variants.length > 0
-//               ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
-//                 product.original_price
-//               : product.original_price,
-//         };
-//       });
-//       setProducts(mappedProducts);
-//       console.log('Fetched nearby products:', mappedProducts.map((p) => p.id));
-//       setError(null);
-//     } catch (err) {
-//       console.error('Error fetching products:', err);
-//       setError('Failed to load products. Please try again.');
-//       setProducts([]);
-//     } finally {
-//       setLoadingProducts(false);
-//       setHasFetchedProducts(true);
-//     }
-//   }, [memoizedBuyerLocation, hasFetchedProducts]);
-
-//   const fetchRecommendations = useCallback(async (forceRefresh = false) => {
-//     if (!session?.user?.id || !memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//       setRecommendations([]);
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (!checkNetworkStatus()) {
-//       setLoadingRecommendations(false);
-//       return;
-//     }
-//     if (hasFetchedRecommendationsRef.current && !forceRefresh) return;
-
-//     const fetchParams = `${session.user.id}-${memoizedBuyerLocation.lat}-${memoizedBuyerLocation.lon}`;
-//     if (!forceRefresh && lastFetchParamsRef.current === fetchParams) {
-//       return;
-//     }
-//     lastFetchParamsRef.current = fetchParams;
-
-//     setLoadingRecommendations(true);
-//     const controller = new AbortController();
-//     try {
-//       const timeoutId = setTimeout(() => controller.abort(), 10000);
-//       const url = `${process.env.REACT_APP_API_URL}/recommendations/${session.user.id}/${memoizedBuyerLocation.lat}/${memoizedBuyerLocation.lon}`;
-//       console.log('Fetching recommendations from:', url);
-//       const response = await fetch(url, {
-//         signal: controller.signal,
-//         headers: {
-//           Authorization: `Bearer ${session.access_token}`,
-//         },
-//       });
-//       clearTimeout(timeoutId);
-//       if (!response.ok) {
-//         throw new Error(`Failed to load recommendations: ${response.status} ${response.statusText}`);
-//       }
-//       const data = await response.json();
-//       console.log('Recommendations data:', data);
-//       const sanitizedData = data.map((product) => ({
-//         ...product,
-//         images: Array.isArray(product.images) && product.images.length > 0
-//           ? product.images
-//           : ['https://dummyimage.com/150'],
-//       }));
-//       setRecommendations(sanitizedData);
-//       setError(null);
-//       if (sanitizedData.length === 0 && products.length > 0) {
-//         const fallbackRecommendations = products
-//           .sort((a, b) => b.stock - a.stock)
-//           .slice(0, 5);
-//         setRecommendations(fallbackRecommendations);
-//         console.log('Using fallback recommendations:', fallbackRecommendations.map((p) => p.id));
-//       }
-//     } catch (err) {
-//       console.error('Error fetching recommendations:', err);
-//       setError("We couldn't fetch personalized recommendations right now. Showing popular products instead.");
-//       const popularProducts = products
-//         .sort((a, b) => b.stock - a.stock)
-//         .slice(0, 5)
-//         .map((product) => ({
-//           ...product,
-//           images: Array.isArray(product.images) && product.images.length > 0
-//             ? product.images
-//             : ['https://dummyimage.com/150'],
-//         }));
-//       setRecommendations(popularProducts);
-//       console.log('Using fallback popular products:', popularProducts.map((p) => p.id));
-//       toast.error('Couldn’t load recommendations. Showing popular products.');
-//     } finally {
-//       setLoadingRecommendations(false);
-//       hasFetchedRecommendationsRef.current = true;
-//     }
-//   }, [session, memoizedBuyerLocation, products]);
-
-//   const debouncedFetchRecommendations = useCallback(
-//     debounce((forceRefresh) => fetchRecommendations(forceRefresh), 2000),
-//     [fetchRecommendations]
-//   );
-
-//   const fetchBannerImages = useCallback(async () => {
-//     if (!checkNetworkStatus()) {
-//       setLoadingBanners(false);
-//       return;
-//     }
-//     setLoadingBanners(true);
-//     try {
-//       const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
-//       const banners = await Promise.all(
-//         data
-//           .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
-//           .map(async (file) => {
-//             const { data: { publicUrl } } = supabase.storage.from('banner-images').getPublicUrl(file.name);
-//             return { url: publicUrl, name: file.name };
-//           })
-//       );
-//       setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } catch (err) {
-//       console.error('Error fetching banner images:', err);
-//       setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
-//     } finally {
-//       setLoadingBanners(false);
-//     }
-//   }, []);
-
-//   const validateVariant = async (variantId) => {
-//     if (!variantId) return true;
-//     const { data, error } = await supabase
-//       .from('product_variants')
-//       .select('id')
-//       .eq('id', variantId)
-//       .eq('status', 'active')
-//       .single();
-//     if (error || !data) {
-//       console.error('Variant validation failed:', error);
-//       return false;
-//     }
-//     return true;
-//   };
-
-//   const addToCart = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to add items to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants?.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//         toast.success(`${product.name} quantity updated in cart!`, { duration: 3000, position: 'top-center' });
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-//         toast.success(`${product.name} added to cart!`, { duration: 3000, position: 'top-center' });
-
-//         try {
-//           const response = await fetch(
-//             `${process.env.REACT_APP_API_URL}/log_interaction/${session.user.id}/${product.id}`,
-//             {
-//               method: 'POST',
-//               headers: {
-//                 'Content-Type': 'application/json',
-//                 Authorization: `Bearer ${session.access_token}`,
-//               },
-//               body: JSON.stringify({ interaction_type: 'cart' }),
-//             }
-//           );
-//           if (!response.ok) {
-//             console.error('Failed to log cart interaction:', response.status, response.statusText);
-//             toast.error('Added to cart, but failed to log interaction.', {
-//               duration: 3000,
-//               position: 'top-center',
-//             });
-//           } else {
-//             console.log('Cart interaction logged successfully');
-//           }
-//         } catch (err) {
-//           console.error('Error logging cart interaction:', err);
-//           toast.error('Added to cart, but failed to log interaction.', {
-//             duration: 3000,
-//             position: 'top-center',
-//           });
-//         }
-//       }
-//     } catch (err) {
-//       console.error('Error adding to cart:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   const buyNow = useCallback(async (product) => {
-//     if (!product || !product.id || !product.name || product.displayPrice === undefined) {
-//       toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (product.stock <= 0 || (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))) {
-//       toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
-//       return;
-//     }
-//     if (!session?.user) {
-//       toast.error('Please log in to proceed to cart.', { duration: 3000, position: 'top-center' });
-//       navigate('/auth');
-//       return;
-//     }
-//     if (!checkNetworkStatus()) return;
-
-//     try {
-//       const { data: productData, error: productError } = await supabase
-//         .from('products')
-//         .select('id, seller_id')
-//         .eq('id', product.id)
-//         .eq('is_approved', true)
-//         .eq('status', 'active')
-//         .single();
-//       if (productError || !productData) {
-//         toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       const { data: sellerData, error: sellerError } = await supabase
-//         .from('sellers')
-//         .select('id, latitude, longitude')
-//         .eq('id', productData.seller_id)
-//         .single();
-//       if (sellerError || !sellerData || calculateDistance(memoizedBuyerLocation, sellerData) > 40) {
-//         toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
-//         return;
-//       }
-
-//       let itemToAdd = product;
-//       let variantId = null;
-
-//       if (product.variants?.length > 0) {
-//         const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
-//         if (validVariants.length === 0) {
-//           toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         itemToAdd = validVariants.reduce((cheapest, variant) =>
-//           variant.price < cheapest.price ? variant : cheapest
-//         );
-//         variantId = itemToAdd.id;
-
-//         const isValidVariant = await validateVariant(variantId);
-//         if (!isValidVariant) {
-//           toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//       }
-
-//       let query = supabase
-//         .from('cart')
-//         .select('id, quantity, variant_id')
-//         .eq('user_id', session.user.id)
-//         .eq('product_id', product.id);
-
-//       if (variantId === null) {
-//         query = query.is('variant_id', null);
-//       } else {
-//         query = query.eq('variant_id', variantId);
-//       }
-
-//       const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-
-//       if (fetchError && fetchError.code !== 'PGRST116') {
-//         console.error('Fetch cart item error:', fetchError);
-//         throw new Error(fetchError.message || 'Failed to check cart');
-//       }
-
-//       if (existingCartItem) {
-//         const newQuantity = existingCartItem.quantity + 1;
-//         const stockLimit = itemToAdd.stock || product.stock;
-//         if (newQuantity > stockLimit) {
-//           toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
-//           return;
-//         }
-//         const { error: updateError } = await supabase
-//           .from('cart')
-//           .update({ quantity: newQuantity })
-//           .eq('id', existingCartItem.id);
-//         if (updateError) {
-//           console.error('Update cart error:', updateError);
-//           throw new Error(updateError.message || 'Failed to update cart');
-//         }
-//       } else {
-//         const { data, error: insertError } = await supabase
-//           .from('cart')
-//           .insert({
-//             user_id: session.user.id,
-//             product_id: product.id,
-//             variant_id: variantId,
-//             quantity: 1,
-//             price: itemToAdd.price || product.displayPrice,
-//             title: product.name,
-//           })
-//           .select('id')
-//           .single();
-//         if (insertError) {
-//           console.error('Insert cart error:', insertError);
-//           throw new Error(insertError.message || 'Failed to add to cart');
-//         }
-//         setCartCount((prev) => prev + 1);
-//         const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
-//         storedCart.push({
-//           id: product.id,
-//           cartId: data.id,
-//           quantity: 1,
-//           variantId,
-//           price: itemToAdd.price || product.displayPrice,
-//           title: product.name,
-//           images: product.images,
-//           uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-//         });
-//         localStorage.setItem('cart', JSON.stringify(storedCart));
-
-//         try {
-//           const response = await fetch(
-//             `${process.env.REACT_APP_API_URL}/log_interaction/${session.user.id}/${product.id}`,
-//             {
-//               method: 'POST',
-//               headers: {
-//                 'Content-Type': 'application/json',
-//                 Authorization: `Bearer ${session.access_token}`,
-//               },
-//               body: JSON.stringify({ interaction_type: 'cart' }),
-//             }
-//           );
-//           if (!response.ok) {
-//             console.error('Failed to log cart interaction:', response.status, response.statusText);
-//             toast.error('Added to cart, but failed to log interaction.', {
-//               duration: 3000,
-//               position: 'top-center',
-//             });
-//           } else {
-//             console.log('Cart interaction logged successfully');
-//           }
-//         } catch (err) {
-//           console.error('Error logging cart interaction:', err);
-//           toast.error('Added to cart, but failed to log interaction.', {
-//             duration: 3000,
-//             position: 'top-center',
-//           });
-//         }
-//       }
-
-//       toast.success('Added to cart! Redirecting...', { duration: 2000, position: 'top-center' });
-//       setTimeout(() => navigate('/cart'), 2000);
-//     } catch (err) {
-//       console.error('Error in Buy Now:', err);
-//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
-//         duration: 3000,
-//         position: 'top-center',
-//       });
-//     }
-//   }, [navigate, session, setCartCount, memoizedBuyerLocation]);
-
-//   useEffect(() => {
-//     if (!searchTerm || !isSearchFocused) {
-//       setSuggestions([]);
-//       return;
-//     }
-
-//     const filteredSuggestions = products
-//       .filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
-//       .slice(0, 5);
-//     setSuggestions(filteredSuggestions);
-//   }, [searchTerm, products, isSearchFocused]);
-
-//   useEffect(() => {
-//     const handleClickOutside = (event) => {
-//       if (searchRef.current && !searchRef.current.contains(event.target)) {
-//         setIsSearchFocused(false);
-//         setSuggestions([]);
-//       }
-//     };
-
-//     document.addEventListener('mousedown', handleClickOutside);
-//     return () => {
-//       document.removeEventListener('mousedown', handleClickOutside);
-//     };
-//   }, []);
-
-//   useEffect(() => {
-//     const currentTime = Date.now();
-//     if (location.pathname === '/' && currentTime - lastNavigationTimeRef.current > 5 * 60 * 1000) {
-//       hasFetchedRecommendationsRef.current = false;
-//       debouncedFetchRecommendations(true);
-//       lastNavigationTimeRef.current = currentTime;
-//     }
-//   }, [location, debouncedFetchRecommendations]);
-
-//   useEffect(() => {
-//     fetchBannerImages();
-//     fetchCategories();
-//   }, [fetchBannerImages, fetchCategories]);
-
-//   useEffect(() => {
-//     let isMounted = true;
-
-//     const fetchData = async () => {
-//       if (!memoizedBuyerLocation || !memoizedBuyerLocation.lat || !memoizedBuyerLocation.lon) {
-//         if (navigator.geolocation) {
-//           try {
-//             const position = await new Promise((resolve, reject) => {
-//               navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-//             });
-//             if (isMounted) {
-//               const newLocation = {
-//                 lat: position.coords.latitude,
-//                 lon: position.coords.longitude,
-//               };
-//               setBuyerLocation(newLocation);
-//             }
-//           } catch (error) {
-//             console.error('Geolocation error:', error);
-//             if (isMounted) {
-//               setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//             }
-//           }
-//         } else {
-//           if (isMounted) {
-//             setBuyerLocation({ lat: 12.9753, lon: 77.591 });
-//           }
-//         }
-//       }
-
-//       if (memoizedBuyerLocation?.lat && memoizedBuyerLocation?.lon) {
-//         await fetchNearbyProducts();
-//         debouncedFetchRecommendations();
-//       }
-//     };
-
-//     fetchData();
-
-//     return () => {
-//       isMounted = false;
-//     };
-//   }, [memoizedBuyerLocation, fetchNearbyProducts, debouncedFetchRecommendations, setBuyerLocation]);
-
-//   const filteredProducts = useMemo(() => {
-//     if (!searchTerm) return products;
-//     return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-//   }, [products, searchTerm]);
-
-//   const sliderSettings = {
-//     dots: true,
-//     infinite: true,
-//     speed: 500,
-//     slidesToShow: 1,
-//     slidesToScroll: 1,
-//     autoplay: true,
-//     autoplaySpeed: 3000,
-//     arrows: true,
-//     accessibility: true,
-//     focusOnSelect: true,
-//   };
-
-//   if (loadingProducts && loadingBanners && loadingCategories && loadingRecommendations) {
-//     return (
-//       <div className="td-loading-container">
-//         <div className="td-loading-animation">
-//           <div className="td-loading-box">
-//             <FaShoppingCart className="td-loading-icon" />
-//             <span>Finding the best deals for you...</span>
-//           </div>
-//           <div className="td-loading-dots">
-//             <span>.</span>
-//             <span>.</span>
-//             <span>.</span>
-//           </div>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   return (
-//     <div className="td-home">
-//       <Helmet>
-//         <title>Markeet - Shop Electronics, Fashion, Jewellery & More</title>
-//         <meta
-//           name="description"
-//           content="Discover electronics, appliances, fashion, jewellery, gifts, and home decoration on Markeet. Fast delivery within 40km in India."
-//         />
-//         <meta
-//           name="keywords"
-//           content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, local shopping"
-//         />
-//         <meta name="robots" content="index, follow" />
-//         <link rel="canonical" href="https://www.markeet.com/" />
-//       </Helmet>
-//       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
-
-//       <div className="td-search-bar sticky" ref={searchRef}>
-//         <FaSearch className="td-search-icon" />
-//         <input
-//           type="text"
-//           placeholder="Search electronics, fashion, jewellery..."
-//           onChange={(e) => debouncedSetSearchTerm(e.target.value)}
-//           onFocus={() => setIsSearchFocused(true)}
-//           aria-label="Search products"
-//         />
-//         {suggestions.length > 0 && isSearchFocused && (
-//           <ul className="td-search-suggestions">
-//             {suggestions.map((suggestion) => (
-//               <li
-//                 key={suggestion.id}
-//                 className="td-suggestion-item"
-//                 onClick={() => {
-//                   setSearchTerm(suggestion.name);
-//                   setIsSearchFocused(false);
-//                   setSuggestions([]);
-//                 }}
-//                 role="button"
-//                 tabIndex={0}
-//                 onKeyPress={(e) => {
-//                   if (e.key === 'Enter') {
-//                     setSearchTerm(suggestion.name);
-//                     setIsSearchFocused(false);
-//                     setSuggestions([]);
-//                   }
-//                 }}
-//                 aria-label={`Select ${suggestion.name}`}
-//               >
-//                 {suggestion.name}
-//               </li>
-//             ))}
-//           </ul>
-//         )}
-//       </div>
-
-//       <div className="td-banner-slider">
-//         {loadingBanners ? (
-//           <div className="td-banner-skeleton" />
-//         ) : (
-//           <Slider {...sliderSettings}>
-//             {bannerImages.map((banner) => (
-//               <div key={banner.name} className="td-banner-wrapper">
-//                 <img src={banner.url} alt={`Markeet ${banner.name} Offer`} loading="lazy" />
-//                 <button
-//                   className="td-view-offers-btn"
-//                   onClick={() => navigate('/categories')}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate('/categories')}
-//                   aria-label="View Offers"
-//                 >
-//                   View Offers
-//                 </button>
-//               </div>
-//             ))}
-//           </Slider>
-//         )}
-//       </div>
-
-//       <section className="td-categories-section">
-//         <header className="td-cat-header">
-//           <h2 className="td-cat-title">Explore Categories</h2>
-//           <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
-//             View All
-//           </Link>
-//         </header>
-//         {error && <p className="td-cat-error">{error}</p>}
-//         {loadingCategories ? (
-//           <div className="td-cat-scroll">
-//             {[...Array(6)].map((_, i) => (
-//               <div key={i} className="td-cat-card-skeleton" />
-//             ))}
-//           </div>
-//         ) : categories.length === 0 ? (
-//           <p className="td-cat-no-categories">No categories available.</p>
-//         ) : (
-//           <div className="td-cat-scroll">
-//             {categories.map((category) => (
-//               <Link
-//                 to={`/products?category=${category.id}`}
-//                 key={category.id}
-//                 className="td-cat-card"
-//                 aria-label={`View ${category.name} products`}
-//               >
-//                 <img
-//                   src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
-//                   alt={category.image_url ? `${category.name} category` : 'No category image available'}
-//                   className="td-cat-image"
-//                   onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
-//                   loading="lazy"
-//                 />
-//                 <h3 className="td-cat-name">{category.name.trim()}</h3>
-//               </Link>
-//             ))}
-//           </div>
-//         )}
-//       </section>
-
-//       <section className="td-recommendations-section">
-//         <h2 className="td-section-title">Recommended for You</h2>
-//         {loadingRecommendations ? (
-//           <div className="td-product-grid" style={{ minHeight: '300px' }}>
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : recommendations.length === 0 ? (
-//           <p className="td-no-products">No recommendations available.</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${recommendations.length === 1 ? 'single-product' : ''}`}>
-//               {recommendations.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', {
-//                           minimumFractionDigits: 2,
-//                           maximumFractionDigits: 2,
-//                         })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', {
-//                             minimumFractionDigits: 2,
-//                             maximumFractionDigits: 2,
-//                           })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <section className="td-products-section">
-//         <h2 className="td-section-title">Products</h2>
-//         {loadingProducts ? (
-//           <div className="td-product-grid">
-//             {[...Array(4)].map((_, i) => (
-//               <div key={i} className="td-product-card-skeleton">
-//                 <div className="td-skeleton-image" />
-//                 <div className="td-skeleton-text" />
-//                 <div className="td-skeleton-text short" />
-//                 <div className="td-skeleton-buttons">
-//                   <div className="td-skeleton-btn" />
-//                   <div className="td-skeleton-btn" />
-//                 </div>
-//               </div>
-//             ))}
-//           </div>
-//         ) : filteredProducts.length === 0 ? (
-//           <p className="td-no-products">{searchTerm ? 'No products found.' : 'No products nearby.'}</p>
-//         ) : (
-//           <ErrorBoundary>
-//             <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
-//               {filteredProducts.map((product) => (
-//                 <div
-//                   key={product.id}
-//                   className="td-product-card"
-//                   onClick={() => navigate(`/product/${product.id}`)}
-//                   role="button"
-//                   tabIndex={0}
-//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
-//                   aria-label={`View ${product.name}`}
-//                 >
-//                   <div className="td-product-image-wrapper">
-//                     {product.discountAmount > 0 && (
-//                       <span className="td-offer-badge">
-//                         <span className="td-offer-label">Offer!</span>
-//                         Save ₹{product.discountAmount.toFixed(2)}
-//                       </span>
-//                     )}
-//                     <img
-//                       src={product.images[0]}
-//                       alt={`${product.name} product`}
-//                       onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
-//                       loading="lazy"
-//                     />
-//                   </div>
-//                   <div className="td-product-info">
-//                     <h3 className="td-product-name">{product.name}</h3>
-//                     <div className="td-price-section">
-//                       <p className="td-product-price">
-//                         ₹{product.displayPrice.toLocaleString('en-IN', {
-//                           minimumFractionDigits: 2,
-//                           maximumFractionDigits: 2,
-//                         })}
-//                       </p>
-//                       {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
-//                         <p className="td-original-price">
-//                           ₹{product.displayOriginalPrice.toLocaleString('en-IN', {
-//                             minimumFractionDigits: 2,
-//                             maximumFractionDigits: 2,
-//                           })}
-//                         </p>
-//                       )}
-//                     </div>
-//                     <div className="td-product-buttons">
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           addToCart(product);
-//                         }}
-//                         className="td-cart-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Add ${product.name} to cart`}
-//                       >
-//                         <FaShoppingCart /> Add to Cart
-//                       </button>
-//                       <button
-//                         onClick={(e) => {
-//                           e.stopPropagation();
-//                           buyNow(product);
-//                         }}
-//                         className="td-buy-action-btn"
-//                         disabled={
-//                           product.stock <= 0 ||
-//                           (product.variants?.length > 0 && product.variants.every((v) => v.stock <= 0))
-//                         }
-//                         aria-label={`Buy ${product.name} now`}
-//                       >
-//                         Buy Now
-//                       </button>
-//                     </div>
-//                   </div>
-//                 </div>
-//               ))}
-//             </div>
-//           </ErrorBoundary>
-//         )}
-//       </section>
-
-//       <Footer />
-//     </div>
-//   );
-// }
-
-// export default React.memo(Home);
+import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
+import { LocationContext } from '../App';
+import { FaShoppingCart, FaSearch } from 'react-icons/fa';
+import Slider from 'react-slick';
+import 'slick-carousel/slick/slick-theme.css';
+import 'slick-carousel/slick/slick.css';
+import { Toaster, toast } from 'react-hot-toast';
+import '../style/Home.css';
+import Footer from './Footer';
+import { Helmet } from 'react-helmet-async';
+
+// Utility to debounce a function
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
+// Distance calculation using Haversine formula
+function calculateDistance(userLoc, sellerLoc) {
+  if (!userLoc || !sellerLoc || !sellerLoc.latitude || !sellerLoc.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) return null;
+  const R = 6371; // Earth's radius in km
+  const latDiff = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+  const lonDiff = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+  const a =
+    Math.sin(latDiff / 2) ** 2 +
+    Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(lonDiff / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function Home() {
+  const { buyerLocation, setBuyerLocation, session, cartCount, setCartCount } = useContext(LocationContext);
+  const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
+  const [bannerImages, setBannerImages] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [error, setError] = useState(null);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingBanners, setLoadingBanners] = useState(true);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSeller, setIsSeller] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const searchRef = useRef(null);
+
+  // Debounced search handler
+  const debouncedSetSearchTerm = useCallback(
+    debounce((value) => {
+      setSearchTerm(value);
+    }, 300),
+    []
+  );
+
+  // Check network connectivity
+  const checkNetworkStatus = () => {
+    if (!navigator.onLine) {
+      toast.error('No internet connection. Please check your network and try again.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+      return false;
+    }
+    return true;
+  };
+
+  // Fetch user role
+  const fetchUserRole = useCallback(async () => {
+    if (!session?.user) {
+      setIsSeller(false);
+      return;
+    }
+    if (!checkNetworkStatus()) return;
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('is_seller')
+        .eq('id', session.user.id)
+        .single();
+      if (profileError) throw profileError;
+      setIsSeller(profileData?.is_seller || false);
+    } catch (err) {
+      console.error('Error fetching user role:', err);
+      toast.error('Failed to fetch user role.', {
+        duration: 3000,
+        position: 'top-center',
+      });
+    }
+  }, [session]);
+
+  // Fetch categories
+  const fetchCategories = useCallback(async () => {
+    if (!checkNetworkStatus()) {
+      setLoadingCategories(false);
+      return;
+    }
+    setLoadingCategories(true);
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name')
+        .limit(6);
+      if (error) throw error;
+      setCategories(data || []);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      setError('Failed to load categories. Please try again.');
+      setCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, []);
+
+  // Fetch nearby products and their variants with radius filtering
+  const fetchNearbyProducts = useCallback(async () => {
+    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+      setLoadingProducts(false);
+      return;
+    }
+    if (!checkNetworkStatus()) {
+      setLoadingProducts(false);
+      return;
+    }
+    setLoadingProducts(true);
+    try {
+      // Fetch sellers with valid locations
+      const { data: allSellers, error: sellersError } = await supabase
+        .from('sellers')
+        .select('id, latitude, longitude')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+      if (sellersError) throw sellersError;
+
+      // Fetch products with category radius
+      const { data: productData, error: productError } = await supabase
+        .from('products')
+        .select(`
+          id,
+          title,
+          price,
+          original_price,
+          discount_amount,
+          images,
+          seller_id,
+          stock,
+          category_id,
+          delivery_radius_km,
+          categories (id, max_delivery_radius_km)
+        `)
+        .eq('is_approved', true)
+        .eq('status', 'active');
+      if (productError) throw productError;
+
+      // Filter products based on distance and radius
+      const filteredProducts = productData
+        .filter((product) => {
+          const seller = allSellers.find((s) => s.id === product.seller_id);
+          if (!seller) return false;
+          const distance = calculateDistance(buyerLocation, {
+            latitude: seller.latitude,
+            longitude: seller.longitude,
+          });
+          if (distance === null) return false;
+          // Use product-specific radius if set, otherwise use category radius
+          const effectiveRadius = product.delivery_radius_km || product.categories?.max_delivery_radius_km || 40;
+          return distance <= effectiveRadius;
+        })
+        .map((product) => product.id);
+
+      if (filteredProducts.length === 0) {
+        setProducts([]);
+        return;
+      }
+
+      // Fetch variants for filtered products
+      const { data: variantData, error: variantError } = await supabase
+        .from('product_variants')
+        .select('id, product_id, price, original_price, stock, attributes, images')
+        .eq('status', 'active')
+        .in('product_id', filteredProducts);
+      if (variantError) throw variantError;
+
+      // Map products with variants
+      const mappedProducts = productData
+        .filter((product) => filteredProducts.includes(product.id))
+        .map((product) => {
+          const variants = variantData
+            .filter((v) => v.product_id === product.id)
+            .map((v) => ({
+              id: v.id,
+              price: parseFloat(v.price) || 0,
+              originalPrice: v.original_price ? parseFloat(v.original_price) : null,
+              stock: v.stock || 0,
+              attributes: v.attributes || {},
+              images: v.images && v.images.length > 0 ? v.images : product.images,
+            }));
+          return {
+            id: product.id,
+            name: product.title || 'Unnamed Product',
+            images: product.images && product.images.length > 0 ? product.images : ['https://dummyimage.com/150'],
+            price: parseFloat(product.price) || 0,
+            originalPrice: product.original_price ? parseFloat(product.original_price) : null,
+            discountAmount: product.discount_amount ? parseFloat(product.discount_amount) : 0,
+            stock: product.stock || 0,
+            categoryId: product.category_id,
+            variants,
+            displayPrice: variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : parseFloat(product.price),
+            displayOriginalPrice:
+              variants.length > 0
+                ? variants.find((v) => v.price === Math.min(...variants.map((v) => v.price)))?.originalPrice ||
+                  product.original_price
+                : product.original_price,
+            distance: calculateDistance(
+              buyerLocation,
+              allSellers.find((s) => s.id === product.seller_id)
+            ),
+            deliveryRadius: product.delivery_radius_km || product.categories?.max_delivery_radius_km || 40,
+          };
+        })
+        .sort((a, b) => a.displayPrice - b.displayPrice); // Sort by price
+      setProducts(mappedProducts);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching products:', err);
+      const errorMessage = err.message.includes('Network')
+        ? 'Network error. Please check your connection.'
+        : 'Failed to load products. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage, { duration: 3000, position: 'top-center' });
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, [buyerLocation]);
+
+  // Fetch banner images
+  const fetchBannerImages = useCallback(async () => {
+    if (!checkNetworkStatus()) {
+      setLoadingBanners(false);
+      return;
+    }
+    setLoadingBanners(true);
+    try {
+      const { data } = await supabase.storage.from('banner-images').list('', { limit: 100 });
+      const banners = await Promise.all(
+        data
+          .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+          .map(async (file) => {
+            const { data: { publicUrl } } = await supabase.storage.from('banner-images').getPublicUrl(file.name);
+            return { url: publicUrl, name: file.name };
+          })
+      );
+      setBannerImages(banners.length > 0 ? banners : [{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+    } catch (err) {
+      console.error('Error fetching banner images:', err);
+      setBannerImages([{ url: 'https://dummyimage.com/1200x300', name: 'default' }]);
+    } finally {
+      setLoadingBanners(false);
+    }
+  }, []);
+
+  // Validate variant ID exists in product_variants table
+  const validateVariant = async (variantId) => {
+    if (!variantId) return true;
+    const { data, error } = await supabase
+      .from('product_variants')
+      .select('id')
+      .eq('id', variantId)
+      .eq('status', 'active')
+      .single();
+    if (error || !data) {
+      console.error('Variant validation failed:', error);
+      return false;
+    }
+    return true;
+  };
+
+  // Add to cart
+  const addToCart = useCallback(
+    async (product) => {
+      if (!product || !product.id || !product.name || product.displayPrice === undefined) {
+        toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
+        return;
+      }
+      if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
+        toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
+        return;
+      }
+      if (!session?.user) {
+        toast.error('Please log in to add items to cart.', { duration: 3000, position: 'top-center' });
+        navigate('/auth');
+        return;
+      }
+      if (!checkNetworkStatus()) return;
+
+      try {
+        // Validate product exists and is active
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('id, seller_id, delivery_radius_km, category_id')
+          .eq('id', product.id)
+          .eq('is_approved', true)
+          .eq('status', 'active')
+          .single();
+        if (productError || !productData) {
+          toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        // Validate seller distance
+        const { data: sellerData, error: sellerError } = await supabase
+          .from('sellers')
+          .select('id, latitude, longitude')
+          .eq('id', productData.seller_id)
+          .single();
+        if (sellerError || !sellerData) {
+          toast.error('Seller information not available.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        const distance = calculateDistance(buyerLocation, sellerData);
+        if (distance === null) {
+          toast.error('Unable to calculate distance to seller.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        // Fetch category radius if product radius is not set
+        let effectiveRadius = productData.delivery_radius_km;
+        if (!effectiveRadius) {
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select('max_delivery_radius_km')
+            .eq('id', productData.category_id)
+            .single();
+          if (categoryError) throw categoryError;
+          effectiveRadius = categoryData?.max_delivery_radius_km || 40;
+        }
+
+        if (distance > effectiveRadius) {
+          toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        // Select the cheapest variant with stock if variants exist
+        let itemToAdd = product;
+        let variantId = null;
+
+        if (product.variants.length > 0) {
+          const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
+          if (validVariants.length === 0) {
+            toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
+            return;
+          }
+          itemToAdd = validVariants.reduce((cheapest, variant) =>
+            variant.price < cheapest.price ? variant : cheapest
+          );
+          variantId = itemToAdd.id;
+
+          // Validate variant exists in database
+          const isValidVariant = await validateVariant(variantId);
+          if (!isValidVariant) {
+            toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
+            return;
+          }
+        }
+
+        // Build the query to check for existing cart item
+        let query = supabase
+          .from('cart')
+          .select('id, quantity, variant_id')
+          .eq('user_id', session.user.id)
+          .eq('product_id', product.id);
+
+        if (variantId === null) {
+          query = query.is('variant_id', null);
+        } else {
+          query = query.eq('variant_id', variantId);
+        }
+
+        const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Fetch cart item error:', fetchError);
+          throw new Error(fetchError.message || 'Failed to check cart');
+        }
+
+        if (existingCartItem) {
+          const newQuantity = existingCartItem.quantity + 1;
+          const stockLimit = itemToAdd.stock || product.stock;
+          if (newQuantity > stockLimit) {
+            toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
+            return;
+          }
+          const { error: updateError } = await supabase
+            .from('cart')
+            .update({ quantity: newQuantity })
+            .eq('id', existingCartItem.id);
+          if (updateError) {
+            console.error('Update cart error:', updateError);
+            throw new Error(updateError.message || 'Failed to update cart');
+          }
+          toast.success(`${product.name} quantity updated in cart!`, { duration: 3000, position: 'top-center' });
+        } else {
+          const { data, error: insertError } = await supabase
+            .from('cart')
+            .insert({
+              user_id: session.user.id,
+              product_id: product.id,
+              variant_id: variantId,
+              quantity: 1,
+              price: itemToAdd.price || product.displayPrice,
+              title: product.name,
+            })
+            .select('id')
+            .single();
+          if (insertError) {
+            console.error('Insert cart error:', insertError);
+            throw new Error(insertError.message || 'Failed to add to cart');
+          }
+          setCartCount((prev) => prev + 1);
+          const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+          storedCart.push({
+            id: product.id,
+            cartId: data.id,
+            quantity: 1,
+            variantId,
+            price: itemToAdd.price || product.displayPrice,
+            title: product.name,
+            images: product.images,
+            uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
+          });
+          localStorage.setItem('cart', JSON.stringify(storedCart));
+          toast.success(`${product.name} added to cart!`, { duration: 3000, position: 'top-center' });
+        }
+      } catch (err) {
+        console.error('Error adding to cart:', err);
+        toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
+      }
+    },
+    [navigate, session, setCartCount, buyerLocation]
+  );
+
+  // Buy now
+  const buyNow = useCallback(
+    async (product) => {
+      if (!product || !product.id || !product.name || product.displayPrice === undefined) {
+        toast.error('Invalid product.', { duration: 3000, position: 'top-center' });
+        return;
+      }
+      if (product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))) {
+        toast.error('Out of stock.', { duration: 3000, position: 'top-center' });
+        return;
+      }
+      if (!session?.user) {
+        toast.error('Please log in to proceed to cart.', { duration: 3000, position: 'top-center' });
+        navigate('/auth');
+        return;
+      }
+      if (!checkNetworkStatus()) return;
+
+      try {
+        // Validate product exists and is active
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('id, seller_id, delivery_radius_km, category_id')
+          .eq('id', product.id)
+          .eq('is_approved', true)
+          .eq('status', 'active')
+          .single();
+        if (productError || !productData) {
+          toast.error('Product is not available.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        // Validate seller distance
+        const { data: sellerData, error: sellerError } = await supabase
+          .from('sellers')
+          .select('id, latitude, longitude')
+          .eq('id', productData.seller_id)
+          .single();
+        if (sellerError || !sellerData) {
+          toast.error('Seller information not available.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        const distance = calculateDistance(buyerLocation, sellerData);
+        if (distance === null) {
+          toast.error('Unable to calculate distance to seller.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        // Fetch category radius if product radius is not set
+        let effectiveRadius = productData.delivery_radius_km;
+        if (!effectiveRadius) {
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select('max_delivery_radius_km')
+            .eq('id', productData.category_id)
+            .single();
+          if (categoryError) throw categoryError;
+          effectiveRadius = categoryData?.max_delivery_radius_km || 40;
+        }
+
+        if (distance > effectiveRadius) {
+          toast.error('Product is not available in your area.', { duration: 3000, position: 'top-center' });
+          return;
+        }
+
+        // Select the cheapest variant with stock if variants exist
+        let itemToAdd = product;
+        let variantId = null;
+
+        if (product.variants.length > 0) {
+          const validVariants = product.variants.filter((v) => v.stock > 0 && v.price !== null);
+          if (validVariants.length === 0) {
+            toast.error('No available variants in stock.', { duration: 3000, position: 'top-center' });
+            return;
+          }
+          itemToAdd = validVariants.reduce((cheapest, variant) =>
+            variant.price < cheapest.price ? variant : cheapest
+          );
+          variantId = itemToAdd.id;
+
+          // Validate variant exists in database
+          const isValidVariant = await validateVariant(variantId);
+          if (!isValidVariant) {
+            toast.error('Selected variant is not available.', { duration: 3000, position: 'top-center' });
+            return;
+          }
+        }
+
+        // Build the query to check for existing cart item
+        let query = supabase
+          .from('cart')
+          .select('id, quantity, variant_id')
+          .eq('user_id', session.user.id)
+          .eq('product_id', product.id);
+
+        if (variantId === null) {
+          query = query.is('variant_id', null);
+        } else {
+          query = query.eq('variant_id', variantId);
+        }
+
+        const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Fetch cart item error:', fetchError);
+          throw new Error(fetchError.message || 'Failed to check cart');
+        }
+
+        if (existingCartItem) {
+          const newQuantity = existingCartItem.quantity + 1;
+          const stockLimit = itemToAdd.stock || product.stock;
+          if (newQuantity > stockLimit) {
+            toast.error('Exceeds stock.', { duration: 3000, position: 'top-center' });
+            return;
+          }
+          const { error: updateError } = await supabase
+            .from('cart')
+            .update({ quantity: newQuantity })
+            .eq('id', existingCartItem.id);
+          if (updateError) {
+            console.error('Update cart error:', updateError);
+            throw new Error(updateError.message || 'Failed to update cart');
+          }
+        } else {
+          const { data, error: insertError } = await supabase
+            .from('cart')
+            .insert({
+              user_id: session.user.id,
+              product_id: product.id,
+              variant_id: variantId,
+              quantity: 1,
+              price: itemToAdd.price || product.displayPrice,
+              title: product.name,
+            })
+            .select('id')
+            .single();
+          if (insertError) {
+            console.error('Insert cart error:', insertError);
+            throw new Error(insertError.message || 'Failed to add to cart');
+          }
+          setCartCount((prev) => prev + 1);
+          const storedCart = JSON.parse(localStorage.getItem('cart')) || [];
+          storedCart.push({
+            id: product.id,
+            cartId: data.id,
+            quantity: 1,
+            variantId,
+            price: itemToAdd.price || product.displayPrice,
+            title: product.name,
+            images: product.images,
+            uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
+          });
+          localStorage.setItem('cart', JSON.stringify(storedCart));
+        }
+
+        toast.success('Added to cart! Redirecting...', { duration: 2000, position: 'top-center' });
+        setTimeout(() => navigate('/cart'), 2000);
+      } catch (err) {
+        console.error('Error in Buy Now:', err);
+        toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, { duration: 3000, position: 'top-center' });
+      }
+    },
+    [navigate, session, setCartCount, buyerLocation]
+  );
+
+  // Compute search suggestions
+  useEffect(() => {
+    if (!searchTerm || !isSearchFocused) {
+      setSuggestions([]);
+      return;
+    }
+
+    const filteredSuggestions = products
+      .filter((product) => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .slice(0, 5);
+    setSuggestions(filteredSuggestions);
+  }, [searchTerm, products, isSearchFocused]);
+
+  // Handle clicks outside the search bar
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchFocused(false);
+        setSuggestions([]);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Fetch data on mount and handle location
+  useEffect(() => {
+    fetchUserRole();
+    fetchBannerImages();
+    fetchCategories();
+
+    if (!buyerLocation || !buyerLocation.lat || !buyerLocation.lon) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const newLocation = {
+              lat: position.coords.latitude,
+              lon: position.coords.longitude,
+            };
+            setBuyerLocation(newLocation);
+            fetchNearbyProducts();
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            toast.error('Unable to fetch location. Using default location (Bangalore).', {
+              duration: 3000,
+              position: 'top-center',
+            });
+            setBuyerLocation({ lat: 12.9716, lon: 77.5946 }); // Bangalore coordinates
+            fetchNearbyProducts();
+          },
+          { timeout: 10000, enableHighAccuracy: true }
+        );
+      } else {
+        toast.error('Geolocation not supported. Using default location (Bangalore).', {
+          duration: 3000,
+          position: 'top-center',
+        });
+        setBuyerLocation({ lat: 12.9716, lon: 77.5946 }); // Bangalore coordinates
+        fetchNearbyProducts();
+      }
+    } else {
+      fetchNearbyProducts();
+    }
+  }, [fetchUserRole, fetchBannerImages, fetchCategories, buyerLocation, setBuyerLocation, fetchNearbyProducts]);
+
+  // Filter products
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return products;
+    return products.filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [products, searchTerm]);
+
+  // Slider settings
+  const sliderSettings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    autoplay: true,
+    autoplaySpeed: 3000,
+    arrows: true,
+  };
+
+  if (loadingProducts && loadingBanners && loadingCategories)
+    return (
+      <div className="td-loading-container">
+        <div className="td-loading-animation">
+          <div className="td-loading-box">
+            <FaShoppingCart className="td-loading-icon" />
+            <span>Finding the best deals for you...</span>
+          </div>
+          <div className="td-loading-dots">
+            <span>.</span>
+            <span>.</span>
+            <span>.</span>
+          </div>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="td-home">
+      <Helmet>
+        <title>Markeet - Shop Electronics, Fashion, Jewellery & More</title>
+        <meta
+          name="description"
+          content="Discover electronics, appliances, fashion, jewellery, gifts, and home decoration on Markeet. Fast delivery within your local area in India."
+        />
+        <meta
+          name="keywords"
+          content="ecommerce, electronics, appliances, fashion, jewellery, gift, home decoration, Markeet, local shopping"
+        />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://www.markeet.com/" />
+      </Helmet>
+      <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+
+      {/* Sticky Search Bar with Suggestions */}
+      <div className="td-search-bar sticky" ref={searchRef}>
+        <FaSearch className="td-search-icon" />
+        <input
+          type="text"
+          placeholder="Search electronics, fashion, jewellery..."
+          onChange={(e) => debouncedSetSearchTerm(e.target.value)}
+          onFocus={() => setIsSearchFocused(true)}
+          aria-label="Search products"
+        />
+        {suggestions.length > 0 && isSearchFocused && (
+          <ul className="td-search-suggestions">
+            {suggestions.map((suggestion) => (
+              <li
+                key={suggestion.id}
+                className="td-suggestion-item"
+                onClick={() => {
+                  setSearchTerm(suggestion.name);
+                  setIsSearchFocused(false);
+                  setSuggestions([]);
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) =>
+                  e.key === 'Enter' && setSearchTerm(suggestion.name) && setIsSearchFocused(false) && setSuggestions([])
+                }
+                aria-label={`Select ${suggestion.name}`}
+              >
+                {suggestion.name}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Banner Slider */}
+      <div className="td-banner-slider">
+        {loadingBanners ? (
+          <div className="td-banner-skeleton" />
+        ) : (
+          <Slider {...sliderSettings}>
+            {bannerImages.map((banner) => (
+              <div key={banner.name} className="td-banner-wrapper">
+                <img src={banner.url} alt={`Markeet ${banner.name} Offer`} loading="lazy" />
+                <button
+                  className="td-view-offers-btn"
+                  onClick={() => navigate('/categories')}
+                  aria-label="View Offers"
+                >
+                  View Offers
+                </button>
+              </div>
+            ))}
+          </Slider>
+        )}
+      </div>
+
+      {/* Featured Categories Section */}
+      <section className="td-categories-section">
+        <header className="td-cat-header">
+          <h2 className="td-cat-title">Explore Categories</h2>
+          <Link to="/categories" className="td-cat-view-all" aria-label="View All Categories">
+            View All
+          </Link>
+        </header>
+        {error && <p className="td-cat-error">{error}</p>}
+        {loadingCategories ? (
+          <div className="td-cat-scroll">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="td-cat-card-skeleton" />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
+          <p className="td-cat-no-categories">No categories available.</p>
+        ) : (
+          <div className="td-cat-scroll">
+            {categories.map((category) => (
+              <Link
+                to={`/products?category=${category.id}`}
+                key={category.id}
+                className="td-cat-card"
+                aria-label={`View ${category.name} products`}
+              >
+                <img
+                  src={category.image_url || 'https://dummyimage.com/150x150/ccc/fff&text=No+Image'}
+                  alt={`${category.name} category`}
+                  className="td-cat-image"
+                  onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/ccc/fff&text=No+Image')}
+                  loading="lazy"
+                />
+                <h3 className="td-cat-name">{category.name.trim()}</h3>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Products Section */}
+      <section className="td-products-section">
+        <h2 className="td-section-title">Shop Electronics, Fashion, Jewellery & More!</h2>
+        {loadingProducts ? (
+          <div className="td-product-grid">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="td-product-card-skeleton">
+                <div className="td-skeleton-image" />
+                <div className="td-skeleton-text" />
+                <div className="td-skeleton-text short" />
+                <div className="td-skeleton-buttons">
+                  <div className="td-skeleton-btn" />
+                  <div className="td-skeleton-btn" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <p className="td-no-products">
+            {searchTerm ? 'No products found.' : 'No products nearby. '}
+            {!searchTerm && (
+              <>
+                <Link to="/categories">Browse all categories</Link> or{' '}
+                <button
+                  onClick={() => {
+                    setBuyerLocation(null);
+                    toast.info('Please allow location access or enter a new location.', {
+                      duration: 3000,
+                      position: 'top-center',
+                    });
+                  }}
+                  className="td-change-location-btn"
+                  aria-label="Change location"
+                >
+                  Change Location
+                </button>
+              </>
+            )}
+          </p>
+        ) : (
+          <div className={`td-product-grid ${filteredProducts.length === 1 ? 'single-product' : ''}`}>
+            {filteredProducts.map((product) => (
+              <div
+                key={product.id}
+                className="td-product-card"
+                onClick={() => navigate(`/product/${product.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${product.id}`)}
+                aria-label={`View ${product.name}`}
+              >
+                <div className="td-product-image-wrapper">
+                  {product.discountAmount > 0 && (
+                    <span className="td-offer-badge">
+                      <span className="td-offer-label">Offer!</span>
+                      Save ₹{product.discountAmount.toFixed(2)}
+                    </span>
+                  )}
+                  <img
+                    src={product.images[0]}
+                    alt={`${product.name} product`}
+                    onError={(e) => (e.target.src = 'https://dummyimage.com/150')}
+                    loading="lazy"
+                  />
+                </div>
+                <div className="td-product-info">
+                  <h3 className="td-product-name">{product.name}</h3>
+                  <div className="td-price-section">
+                    <p className="td-product-price">
+                      ₹{product.displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    {product.displayOriginalPrice && product.displayOriginalPrice > product.displayPrice && (
+                      <p className="td-original-price">
+                        ₹{product.displayOriginalPrice.toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="td-product-buttons">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product);
+                      }}
+                      className="td-cart-action-btn"
+                      disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
+                      aria-label={`Add ${product.name} to cart`}
+                    >
+                      <FaShoppingCart /> Add to Cart
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        buyNow(product);
+                      }}
+                      className="td-buy-action-btn"
+                      disabled={product.stock <= 0 || (product.variants.length > 0 && product.variants.every((v) => v.stock <= 0))}
+                      aria-label={`Buy ${product.name} now`}
+                    >
+                      Buy Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Footer />
+    </div>
+  );
+}
+
+export default React.memo(Home);
