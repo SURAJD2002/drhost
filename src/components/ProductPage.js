@@ -10388,8 +10388,1054 @@
 // export default ProductPage;
 
 
+// import React, { useState, useEffect, useRef } from 'react';
+// import { useParams, Link, useNavigate } from 'react-router-dom';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+// import { supabase } from '../supabaseClient';
+// import { Toaster, toast } from 'react-hot-toast';
+// import '../style/ProductPage.css';
+// import { Helmet } from 'react-helmet-async';
+
+// const StarRatingDisplay = ({ rating }) => {
+//   const stars = [1, 2, 3, 4, 5];
+//   return (
+//     <div className="star-rating-display">
+//       {stars.map((star) => (
+//         <span
+//           key={star}
+//           className={`star ${star <= Math.round(rating) ? 'filled' : ''}`}
+//         >
+//           ★
+//         </span>
+//       ))}
+//     </div>
+//   );
+// };
+
+// function ProductPage() {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
+//   const [product, setProduct] = useState(null);
+//   const [variants, setVariants] = useState([]);
+//   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [reviews, setReviews] = useState([]);
+//   const [cart, setCart] = useState(JSON.parse(localStorage.getItem('cart')) || []);
+//   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+//   const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
+//   const [imageLoadingStates, setImageLoadingStates] = useState({});
+//   const fullScreenSliderRef = useRef(null);
+
+//   useEffect(() => {
+//     setReviews([]);
+//     fetchProductAndVariants();
+//   }, [id]);
+
+//   const fetchProductAndVariants = async () => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data: productData, error: productError } = await supabase
+//         .from('products')
+//         .select('*, sellers(latitude, longitude, store_name)')
+//         .eq('id', parseInt(id, 10))
+//         .eq('is_approved', true)
+//         .eq('status', 'active')
+//         .maybeSingle();
+//       if (productError) throw productError;
+//       if (!productData) {
+//         setError('Product not found.');
+//         setLoading(false);
+//         return;
+//       }
+//       setProduct({
+//         ...productData,
+//         price: parseFloat(productData.price) || 0,
+//         original_price: productData.original_price ? parseFloat(productData.original_price) : null,
+//         discount_amount: productData.discount_amount ? parseFloat(productData.discount_amount) : 0,
+//       });
+
+//       const { data: variantData, error: variantError } = await supabase
+//         .from('product_variants')
+//         .select('id, product_id, price, original_price, discount_amount, stock, attributes, images')
+//         .eq('product_id', parseInt(id, 10))
+//         .eq('status', 'active');
+//       if (variantError) throw variantError;
+
+//       const validVariants = variantData
+//         ?.filter((variant) => {
+//           const attributes = variant.attributes || {};
+//           const hasValidAttributes = Object.entries(attributes).some(
+//             ([key, value]) => value && value.trim() && key !== 'attribute1'
+//           );
+//           return hasValidAttributes && variant.price !== null && variant.stock !== null;
+//         })
+//         .map((variant) => ({
+//           ...variant,
+//           price: parseFloat(variant.price) || 0,
+//           original_price: variant.original_price ? parseFloat(variant.original_price) : null,
+//           discount_amount: variant.discount_amount ? parseFloat(variant.discount_amount) : 0,
+//           stock: variant.stock || 0,
+//           images: variant.images && variant.images.length > 0 ? variant.images : productData.images,
+//         })) || [];
+//       setVariants(validVariants);
+
+//       if (validVariants.length > 0 && selectedVariantIndex >= validVariants.length) {
+//         setSelectedVariantIndex(0);
+//       }
+
+//       const productReviews = await fetchProductReviews(parseInt(id, 10));
+//       setReviews(productReviews);
+//     } catch (err) {
+//       setError(`Error: ${err.message || 'Failed to load product.'}`);
+//       toast.error(`Failed to load product: ${err.message}`, {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const fetchProductReviews = async (productId) => {
+//     try {
+//       const { data: reviewsData, error: reviewsError } = await supabase
+//         .from('reviews')
+//         .select(`
+//           id,
+//           order_id,
+//           reviewer_id,
+//           reviewed_id,
+//           rating,
+//           review_text,
+//           reply_text,
+//           created_at,
+//           updated_at
+//         `)
+//         .eq('product_id', productId)
+//         .order('created_at', { ascending: false });
+
+//       if (reviewsError) throw reviewsError;
+//       if (!reviewsData || reviewsData.length === 0) {
+//         console.log('No reviews found for product ID:', productId);
+//         return [];
+//       }
+
+//       const reviewerIds = [...new Set(reviewsData.map((r) => r.reviewer_id))];
+//       const reviewedIds = [...new Set(reviewsData.map((r) => r.reviewed_id))];
+//       const allProfileIds = [...new Set([...reviewerIds, ...reviewedIds])];
+//       const { data: profilesData, error: profilesError } = await supabase
+//         .from('profiles')
+//         .select('id, name')
+//         .in('id', allProfileIds);
+//       if (profilesError) throw profilesError;
+
+//       const mappedReviews = reviewsData.map((review) => ({
+//         review_id: review.id,
+//         order_id: review.order_id,
+//         reviewer_id: review.reviewer_id,
+//         reviewed_id: review.reviewed_id,
+//         rating: review.rating,
+//         review_text: review.review_text,
+//         reply_text: review.reply_text,
+//         created_at: review.created_at,
+//         updated_at: review.updated_at,
+//         reviewer_name: profilesData?.find((p) => p.id === review.reviewer_id)?.name || 'Unknown User',
+//         reviewed_name: profilesData?.find((p) => p.id === review.reviewed_id)?.name || 'Unknown User',
+//       }));
+
+//       return mappedReviews;
+//     } catch (error) {
+//       console.error('Error fetching product reviews:', error);
+//       toast.error('Failed to load reviews.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       return [];
+//     }
+//   };
+
+//   const averageRating = reviews.length > 0
+//     ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+//     : 0;
+//   const totalReviewsCount = reviews.length;
+
+//   const getActiveVariant = () => {
+//     if (variants.length > 0 && selectedVariantIndex < variants.length) {
+//       return variants[selectedVariantIndex];
+//     }
+//     return null;
+//   };
+
+//   const getDisplayedImages = () => {
+//     const activeVariant = getActiveVariant();
+//     const productImages = product?.images || [];
+//     const variantImages = activeVariant?.images || [];
+//     const mergedImages = [...new Set([...productImages, ...variantImages])];
+//     return mergedImages.length > 0 ? mergedImages : ['https://dummyimage.com/300'];
+//   };
+
+//   const isOutOfStock = () => {
+//     const activeVariant = getActiveVariant();
+//     const stock = activeVariant?.stock !== undefined ? activeVariant.stock : product?.stock;
+//     return stock === 0 || stock === undefined;
+//   };
+
+//   const isLowStock = () => {
+//     const activeVariant = getActiveVariant();
+//     const stock = activeVariant?.stock !== undefined ? activeVariant.stock : product?.stock;
+//     return stock > 0 && stock < 5;
+//   };
+
+//   const sliderSettings = {
+//     dots: true,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     arrows: true,
+//     autoplay: false,
+//   };
+
+//   const fullScreenSliderSettings = {
+//     dots: false,
+//     infinite: true,
+//     speed: 500,
+//     slidesToShow: 1,
+//     slidesToScroll: 1,
+//     arrows: false,
+//     swipe: true,
+//     draggable: true,
+//     afterChange: (current) => setFullScreenImageIndex(current),
+//     initialSlide: fullScreenImageIndex,
+//   };
+
+//   const handleImageClick = (index) => {
+//     setFullScreenImageIndex(index);
+//     setIsFullScreenOpen(true);
+//     setImageLoadingStates((prev) => ({ ...prev, [index]: true }));
+//     const images = getDisplayedImages();
+//     const preloadIndices = [
+//       index,
+//       index === 0 ? images.length - 1 : index - 1,
+//       index === images.length - 1 ? 0 : index + 1,
+//     ];
+//     preloadIndices.forEach((i) => {
+//       const img = new Image();
+//       img.src = images[i];
+//     });
+//   };
+
+//   const handleCloseFullScreen = () => {
+//     setIsFullScreenOpen(false);
+//     setImageLoadingStates({});
+//   };
+
+//   const handlePrevImage = () => {
+//     if (fullScreenSliderRef.current) {
+//       fullScreenSliderRef.current.slickPrev();
+//     }
+//   };
+
+//   const handleNextImage = () => {
+//     if (fullScreenSliderRef.current) {
+//       fullScreenSliderRef.current.slickNext();
+//     }
+//   };
+
+//   const handleImageLoad = (index) => {
+//     setImageLoadingStates((prev) => ({ ...prev, [index]: false }));
+//   };
+
+//   const handleKeyDown = (e) => {
+//     if (!isFullScreenOpen) return;
+//     if (e.key === 'Escape') {
+//       handleCloseFullScreen();
+//     } else if (e.key === 'ArrowLeft') {
+//       handlePrevImage();
+//     } else if (e.key === 'ArrowRight') {
+//       handleNextImage();
+//     }
+//   };
+
+//   useEffect(() => {
+//     if (isFullScreenOpen) {
+//       document.addEventListener('keydown', handleKeyDown);
+//       document.body.style.overflow = 'hidden';
+//     } else {
+//       document.removeEventListener('keydown', handleKeyDown);
+//       document.body.style.overflow = 'auto';
+//     }
+//     return () => {
+//       document.removeEventListener('keydown', handleKeyDown);
+//       document.body.style.overflow = 'auto';
+//     };
+//   }, [isFullScreenOpen]);
+
+//   const addToCart = async (redirectToCart = false) => {
+//     if (!product) {
+//       toast.error('Product not available.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       return;
+//     }
+//     if (isOutOfStock()) {
+//       toast.error('This item is out of stock.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       return;
+//     }
+
+//     const activeVariant = getActiveVariant();
+//     const cartItem = {
+//       id: product.id,
+//       cartId: null,
+//       title: product.title || product.name || 'Product',
+//       selectedVariant: activeVariant ? { ...activeVariant, attributes: activeVariant.attributes || {} } : null,
+//       variantId: activeVariant?.id || null,
+//       price: activeVariant?.price || product.price || 0,
+//       original_price: activeVariant?.original_price || product.original_price || null,
+//       discount_amount: activeVariant?.discount_amount || product.discount_amount || 0,
+//       images: activeVariant?.images && activeVariant.images.length > 0 ? activeVariant.images : product.images,
+//       stock: activeVariant?.stock !== undefined ? activeVariant.stock : product.stock,
+//       quantity: 1,
+//       uniqueKey: `${product.id}-${activeVariant?.id || 'no-variant'}`
+//     };
+
+//     if (cartItem.price === 0) {
+//       toast.error('Invalid product price.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//       return;
+//     }
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (session) {
+//         const userId = session.user.id;
+//         const productId = product.id;
+//         const variantId = activeVariant?.id || null;
+
+//         let query = supabase
+//           .from('cart')
+//           .select('id, quantity, variant_id')
+//           .eq('user_id', userId)
+//           .eq('product_id', productId);
+
+//         if (variantId === null) {
+//           query = query.is('variant_id', null);
+//         } else {
+//           query = query.eq('variant_id', variantId);
+//         }
+
+//         const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
+
+//         if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
+
+//         const stockLimit = activeVariant?.stock !== undefined ? activeVariant.stock : product.stock;
+
+//         if (existingCartItem) {
+//           const newQuantity = existingCartItem.quantity + 1;
+//           if (newQuantity > stockLimit) {
+//             toast.error('Exceeds available stock.', {
+//               duration: 4000,
+//               position: 'top-center',
+//               style: {
+//                 background: '#ff4d4f',
+//                 color: '#fff',
+//                 fontWeight: 'bold',
+//                 borderRadius: '8px',
+//                 padding: '16px',
+//                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//               },
+//             });
+//             return;
+//           }
+
+//           const { data, error: upsertError } = await supabase
+//             .from('cart')
+//             .update({
+//               quantity: newQuantity,
+//             })
+//             .eq('id', existingCartItem.id)
+//             .select()
+//             .single();
+
+//           if (upsertError) throw upsertError;
+
+//           cartItem.cartId = data.id;
+//           toast.success(`${cartItem.title} (${activeVariant?.attributes ? Object.values(activeVariant.attributes).join(', ') : 'No Variant'}) quantity updated in cart!`, {
+//             duration: 4000,
+//             position: 'top-center',
+//             style: {
+//               background: '#52c41a',
+//               color: '#fff',
+//               fontWeight: 'bold',
+//               borderRadius: '8px',
+//               padding: '16px',
+//               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             },
+//           });
+//         } else {
+//           if (stockLimit < 1) {
+//             toast.error('Item out of stock.', {
+//               duration: 4000,
+//               position: 'top-center',
+//               style: {
+//                 background: '#ff4d4f',
+//                 color: '#fff',
+//                 fontWeight: 'bold',
+//                 borderRadius: '8px',
+//                 padding: '16px',
+//                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//               },
+//             });
+//             return;
+//           }
+
+//           const { data, error: insertError } = await supabase
+//             .from('cart')
+//             .insert({
+//               user_id: userId,
+//               product_id: productId,
+//               variant_id: variantId,
+//               quantity: 1,
+//               price: cartItem.price,
+//               title: cartItem.title,
+//             })
+//             .select()
+//             .single();
+
+//           if (insertError) throw insertError;
+
+//           cartItem.cartId = data.id;
+//           toast.success(`${cartItem.title} (${activeVariant?.attributes ? Object.values(activeVariant.attributes).join(', ') : 'No Variant'}) added to cart!`, {
+//             duration: 4000,
+//             position: 'top-center',
+//             style: {
+//               background: '#52c41a',
+//               color: '#fff',
+//               fontWeight: 'bold',
+//               borderRadius: '8px',
+//               padding: '16px',
+//               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             },
+//           });
+//         }
+
+//         const existingLocalItemIndex = cart.findIndex(
+//           (item) => item.uniqueKey === cartItem.uniqueKey
+//         );
+//         let updatedCart;
+//         if (existingLocalItemIndex !== -1) {
+//           updatedCart = cart.map((item, index) =>
+//             index === existingLocalItemIndex
+//               ? { ...item, quantity: item.quantity + 1, cartId: cartItem.cartId }
+//               : item
+//           );
+//         } else {
+//           updatedCart = [...cart, cartItem];
+//         }
+//         setCart(updatedCart);
+//         localStorage.setItem('cart', JSON.stringify(updatedCart));
+//       } else {
+//         const existingLocalItemIndex = cart.findIndex(
+//           (item) => item.uniqueKey === cartItem.uniqueKey
+//         );
+
+//         let updatedCart;
+//         if (existingLocalItemIndex !== -1) {
+//           const newQuantity = cart[existingLocalItemIndex].quantity + 1;
+//           if (newQuantity > cartItem.stock) {
+//             toast.error('Exceeds available stock.', {
+//               duration: 4000,
+//               position: 'top-center',
+//               style: {
+//                 background: '#ff4d4f',
+//                 color: '#fff',
+//                 fontWeight: 'bold',
+//                 borderRadius: '8px',
+//                 padding: '16px',
+//                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//               },
+//             });
+//             return;
+//           }
+//           updatedCart = cart.map((item, index) =>
+//             index === existingLocalItemIndex ? { ...item, quantity: newQuantity } : item
+//           );
+//           toast.success(`${cartItem.title} (${activeVariant?.attributes ? Object.values(activeVariant.attributes).join(', ') : 'No Variant'}) quantity updated in cart!`, {
+//             duration: 4000,
+//             position: 'top-center',
+//             style: {
+//               background: '#52c41a',
+//               color: '#fff',
+//               fontWeight: 'bold',
+//               borderRadius: '8px',
+//               padding: '16px',
+//               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             },
+//           });
+//         } else {
+//           if (cartItem.stock < 1) {
+//             toast.error('Item out of stock.', {
+//               duration: 4000,
+//               position: 'top-center',
+//               style: {
+//                 background: '#ff4d4f',
+//                 color: '#fff',
+//                 fontWeight: 'bold',
+//                 borderRadius: '8px',
+//                 padding: '16px',
+//                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//               },
+//             });
+//             return;
+//           }
+//           updatedCart = [...cart, cartItem];
+//           toast.success(`${cartItem.title} (${activeVariant?.attributes ? Object.values(activeVariant.attributes).join(', ') : 'No Variant'}) added to cart!`, {
+//             duration: 4000,
+//             position: 'top-center',
+//             style: {
+//               background: '#52c41a',
+//               color: '#fff',
+//               fontWeight: 'bold',
+//               borderRadius: '8px',
+//               padding: '16px',
+//               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             },
+//           });
+//         }
+
+//         setCart(updatedCart);
+//         localStorage.setItem('cart', JSON.stringify(updatedCart));
+//       }
+
+//       if (redirectToCart) {
+//         toast.loading('Redirecting to cart...', {
+//           duration: 2000,
+//           position: 'top-center',
+//           style: {
+//             background: '#1890ff',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//           },
+//         });
+//         setTimeout(() => navigate('/cart'), 2000);
+//       }
+//     } catch (err) {
+//       setError(`Failed to add to cart: ${err.message || 'Unknown error'}`);
+//       toast.error(`Failed to add to cart: ${err.message || 'Unknown error'}`, {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//         },
+//       });
+//     }
+//   };
+
+//   const handleBuyNow = async () => {
+//     await addToCart(true);
+//   };
+
+//   const renderPriceSection = () => {
+//     const activeVariant = getActiveVariant();
+//     const mainPrice = activeVariant?.price || product?.price || 0;
+//     const originalPrice = activeVariant?.original_price || product?.original_price || null;
+//     const discountAmount = activeVariant?.discount_amount || product?.discount_amount || 0;
+
+//     return (
+//       <div className={`price-section ${originalPrice && originalPrice > mainPrice ? 'offer-highlight' : ''}`}>
+//         {originalPrice && originalPrice > mainPrice && discountAmount > 0 && (
+//           <span className="deal-label">Deal of the Day</span>
+//         )}
+//         <div className="price-details">
+//           <span className="current-price">₹{mainPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+//           {originalPrice && originalPrice > mainPrice && (
+//             <span className="original-price">₹{originalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+//           )}
+//           {discountAmount > 0 && (
+//             <span className="discount">Save ₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+//           )}
+//         </div>
+//         {variants.length > 1 && (
+//           <p className="variant-price-info">
+//             Starting at ₹{Math.min(...variants.map((v) => v.price)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+//           </p>
+//         )}
+//       </div>
+//     );
+//   };
+
+//   if (loading)
+//     return (
+//       <div className="loading">
+//         <svg className="spinner" viewBox="0 0 50 50">
+//           <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//         </svg>
+//         Loading...
+//       </div>
+//     );
+
+//   if (error)
+//     return (
+//       <div className="error">
+//         {error}
+//         <div className="error-actions">
+//           <button onClick={fetchProductAndVariants} className="retry-btn">
+//             Retry
+//           </button>
+//           <button onClick={() => navigate('/')} className="back-btn">
+//             Back to Products
+//           </button>
+//         </div>
+//       </div>
+//     );
+
+//   if (!product)
+//     return (
+//       <div className="error">
+//         Product not found
+//         <button onClick={() => navigate('/')} className="back-btn">
+//           Back to Products
+//         </button>
+//       </div>
+//     );
+
+//   const displayedImages = getDisplayedImages();
+//   const productName = product.title || product.name || 'Product';
+//   const productDescription = product.description?.split(';')[0]?.trim() || `Buy ${productName} on Markeet with fast delivery.`;
+//   const productPrice = getActiveVariant()?.price || product.price || 0;
+//   const productImage = displayedImages[0] || 'https://dummyimage.com/300';
+//   const productUrl = `https://www.markeet.com/product/${id}`;
+//   const availability = isOutOfStock() ? 'http://schema.org/OutOfStock' : 'http://schema.org/InStock';
+//   const reviewData = reviews.length > 0
+//     ? reviews.map((review) => ({
+//         '@type': 'Review',
+//         author: { '@type': 'Person', name: review.reviewer_name },
+//         reviewRating: { '@type': 'Rating', ratingValue: review.rating },
+//         reviewBody: review.review_text,
+//         datePublished: review.created_at,
+//       }))
+//     : [];
+
+//   const variantAttributes = variants.map((v) => ({
+//     id: v.id,
+//     index: variants.indexOf(v),
+//     attributes: Object.entries(v.attributes || {})
+//       .filter(([key, val]) => val && val.trim() && key !== 'attribute1')
+//       .map(([key, val]) => `${key}: ${val}`)
+//       .join(', '),
+//   }));
+
+//   const hasValidVariants = variantAttributes.some((v) => v.attributes);
+
+//   return (
+//     <div className="product-page-container">
+//       <Helmet>
+//         <title>{productName} - Markeet</title>
+//         <meta name="description" content={productDescription} />
+//         <meta
+//           name="keywords"
+//           content={`${productName}, ${product.category_id ? 'electronics, appliances, fashion, jewellery, gift, home decoration' : 'ecommerce'}, Markeet, buy online`}
+//         />
+//         <meta name="robots" content="index, follow" />
+//         <link rel="canonical" href={productUrl} />
+//         <meta property="og:title" content={`${productName} - Markeet`} />
+//         <meta property="og:description" content={productDescription} />
+//         <meta property="og:image" content={productImage} />
+//         <meta property="og:url" content={productUrl} />
+//         <meta property="og:type" content="product" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content={`${productName} - Markeet`} />
+//         <meta name="twitter:description" content={productDescription} />
+//         <meta name="twitter:image" content={productImage} />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             '@context': 'https://schema.org',
+//             '@type': 'Product',
+//             name: productName,
+//             description: productDescription,
+//             image: displayedImages,
+//             offers: {
+//               '@type': 'Offer',
+//               price: productPrice,
+//               priceCurrency: 'INR',
+//               availability: availability,
+//               seller: {
+//                 '@type': 'Organization',
+//                 name: product.sellers?.store_name || 'Markeet Seller',
+//               },
+//             },
+//             aggregateRating:
+//               reviews.length > 0
+//                 ? {
+//                     '@type': 'AggregateRating',
+//                     ratingValue: averageRating.toFixed(1),
+//                     reviewCount: totalReviewsCount,
+//                   }
+//                 : null,
+//             review: reviewData,
+//           })}
+//         </script>
+//       </Helmet>
+//       <Toaster
+//         position="top-center"
+//         toastOptions={{
+//           duration: 4000,
+//           style: {
+//             borderRadius: '8px',
+//             padding: '16px',
+//             fontWeight: 'bold',
+//             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//             fontSize: '16px',
+//             transition: 'all 0.3s ease-in-out',
+//           },
+//           success: {
+//             style: {
+//               background: '#52c41a',
+//               color: '#fff',
+//             },
+//             iconTheme: {
+//               primary: '#fff',
+//               secondary: '#52c41a',
+//             },
+//           },
+//           error: {
+//             style: {
+//               background: '#ff4d4f',
+//               color: '#fff',
+//             },
+//             iconTheme: {
+//               primary: '#fff',
+//               secondary: '#ff4d4f',
+//             },
+//           },
+//           loading: {
+//             style: {
+//               background: '#1890ff',
+//               color: '#fff',
+//             },
+//             iconTheme: {
+//               primary: '#fff',
+//               secondary: '#1890ff',
+//             },
+//           },
+//         }}
+//       />
+
+//       <button onClick={() => navigate('/')} className="enhanced-back-btn">
+//         ← Back to Products
+//       </button>
+
+//       <div className="main-content">
+//         <div className="product-image-section">
+//           <div className="image-slider-container">
+//             {displayedImages.length > 1 ? (
+//               <Slider {...sliderSettings}>
+//                 {displayedImages.map((imgUrl, i) => (
+//                   <div key={i} className="slider-image-wrapper">
+//                     <img
+//                       src={imgUrl}
+//                       alt={`${productName} Image ${i + 1}`}
+//                       onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                       onClick={() => handleImageClick(i)}
+//                       className="clickable-image"
+//                       role="button"
+//                       tabIndex={0}
+//                       aria-label={`View ${productName} image ${i + 1} in full screen`}
+//                       onKeyPress={(e) => e.key === 'Enter' && handleImageClick(i)}
+//                     />
+//                   </div>
+//                 ))}
+//               </Slider>
+//             ) : (
+//               <div className="single-image-wrapper">
+//                 <img
+//                   src={displayedImages[0]}
+//                   alt={`${productName}`}
+//                   onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
+//                   onClick={() => handleImageClick(0)}
+//                   className="clickable-image"
+//                   role="button"
+//                   tabIndex={0}
+//                   aria-label={`View ${productName} image in full screen`}
+//                   onKeyPress={(e) => e.key === 'Enter' && handleImageClick(0)}
+//                 />
+//               </div>
+//             )}
+//           </div>
+//         </div>
+
+//         <div className="product-details-section">
+//           <h1 className="product-title">{productName}</h1>
+//           {renderPriceSection()}
+//           {isLowStock() && (
+//             <p className="low-stock-warning">
+//               Hurry! Only {getActiveVariant()?.stock || product?.stock} left in stock!
+//             </p>
+//           )}
+//           <ul className="product-highlights">
+//             {product.description?.split(';').filter((point) => point.trim()).map((point, idx) => (
+//               <li key={idx}>{point.trim()}</li>
+//             )) || <li>No description available</li>}
+//           </ul>
+//           {hasValidVariants && (
+//             <div className="variant-section">
+//               <h4>Select Variant:</h4>
+//               <div className="variant-options">
+//                 {variantAttributes.map(
+//                   (v) =>
+//                     v.attributes && (
+//                       <button
+//                         key={v.id}
+//                         className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
+//                         onClick={() => {
+//                           setSelectedVariantIndex(v.index);
+//                           toast.success(`Selected variant: ${v.attributes}`, {
+//                             duration: 4000,
+//                             position: 'top-center',
+//                             style: {
+//                               background: '#52c41a',
+//                               color: '#fff',
+//                               fontWeight: 'bold',
+//                               borderRadius: '8px',
+//                               padding: '16px',
+//                               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+//                             },
+//                           });
+//                         }}
+//                       >
+//                         {v.attributes || `Variant #${v.index + 1}`}
+//                       </button>
+//                     )
+//                 )}
+//               </div>
+//             </div>
+//           )}
+//           <div className="action-buttons">
+//             <button
+//               onClick={() => addToCart(false)}
+//               className="add-to-cart-button"
+//               disabled={isOutOfStock()}
+//             >
+//               {isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}
+//             </button>
+//             <button
+//               className="buy-now-button"
+//               onClick={handleBuyNow}
+//               disabled={isOutOfStock()}
+//             >
+//               Buy Now
+//             </button>
+//           </div>
+//           <div className="seller-info">
+//             <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+//             <Link to={`/seller/${product.seller_id}`} className="seller-link">
+//               View Seller Profile
+//             </Link>
+//           </div>
+//         </div>
+//       </div>
+
+//       {isFullScreenOpen && (
+//         <div
+//           className="full-screen-image"
+//           role="dialog"
+//           aria-label="Full screen image viewer"
+//           onClick={handleCloseFullScreen}
+//         >
+//           <div className="full-screen-slider-container" onClick={(e) => e.stopPropagation()}>
+//             <Slider {...fullScreenSliderSettings} ref={fullScreenSliderRef}>
+//               {displayedImages.map((imgUrl, i) => (
+//                 <div key={i} className="full-screen-slide">
+//                   <TransformWrapper
+//                     initialScale={1}
+//                     minScale={1}
+//                     maxScale={3}
+//                     wheel={{ disabled: false }}
+//                     panning={{ disabled: false }}
+//                     doubleClick={{ mode: 'reset' }}
+//                     onZoom={(ref) => {
+//                       const slide = ref.instance.wrapperComponent;
+//                       if (ref.state.scale > 1) {
+//                         slide.style.cursor = 'grab';
+//                       } else {
+//                         slide.style.cursor = 'default';
+//                       }
+//                     }}
+//                   >
+//                     <TransformComponent>
+//                       {imageLoadingStates[i] && (
+//                         <div className="image-loading-spinner">
+//                           <svg className="spinner" viewBox="0 0 50 50">
+//                             <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//                           </svg>
+//                         </div>
+//                       )}
+//                       <img
+//                         src={imgUrl || 'https://dummyimage.com/600'}
+//                         alt={`${productName} Image ${i + 1}`}
+//                         onError={(e) => (e.target.src = 'https://dummyimage.com/600')}
+//                         onLoad={() => handleImageLoad(i)}
+//                         className="full-screen-image-content"
+//                       />
+//                     </TransformComponent>
+//                   </TransformWrapper>
+//                 </div>
+//               ))}
+//             </Slider>
+//             {displayedImages.length > 1 && (
+//               <div className="full-screen-dots">
+//                 {displayedImages.map((_, i) => (
+//                   <span
+//                     key={i}
+//                     className={`full-screen-dot ${i === fullScreenImageIndex ? 'active' : ''}`}
+//                     onClick={(e) => {
+//                       e.stopPropagation();
+//                       fullScreenSliderRef.current.slickGoTo(i);
+//                       setImageLoadingStates((prev) => ({ ...prev, [i]: true }));
+//                     }}
+//                     role="button"
+//                     aria-label={`View image ${i + 1}`}
+//                     tabIndex={0}
+//                     onKeyPress={(e) => {
+//                       if (e.key === 'Enter') {
+//                         fullScreenSliderRef.current.slickGoTo(i);
+//                         setImageLoadingStates((prev) => ({ ...prev, [i]: true }));
+//                       }
+//                     }}
+//                   />
+//                 ))}
+//               </div>
+//             )}
+//           </div>
+//           <button
+//             className="full-screen-close-btn"
+//             onClick={handleCloseFullScreen}
+//             aria-label="Close full screen image"
+//           >
+//             ×
+//           </button>
+//         </div>
+//       )}
+
+//       <div className="ratings-reviews-section">
+//         <h3>Ratings & Reviews</h3>
+//         <p className="by-verified">By verified customers</p>
+//         <div className="rating-score">
+//           <StarRatingDisplay rating={averageRating} />
+//           <span className="rating-count">
+//             ({totalReviewsCount} {totalReviewsCount === 1 ? 'review' : 'reviews'})
+//           </span>
+//         </div>
+//         {reviews.length > 0 ? (
+//           reviews.map((review, index) => (
+//             <div key={index} className="review-item">
+//               <div className="review-header">
+//                 <strong className="review-author">{review.reviewer_name}</strong>
+//                 <StarRatingDisplay rating={review.rating} />
+//               </div>
+//               <p className="review-text">{review.review_text}</p>
+//               {review.reply_text && (
+//                 <div className="review-reply">
+//                   <strong>Seller Reply:</strong> {review.reply_text}
+//                 </div>
+//               )}
+//               <small className="review-date">
+//                 {new Date(review.created_at).toLocaleDateString('en-IN', {
+//                   year: 'numeric',
+//                   month: 'long',
+//                   day: 'numeric',
+//                 })}
+//               </small>
+//             </div>
+//           ))
+//         ) : (
+//           <p className="no-reviews">No reviews yet.</p>
+//         )}
+//       </div>
+
+//       <div className="specifications-section">
+//         <h3>Specifications</h3>
+//         {product.specifications && Object.keys(product.specifications).length > 0 ? (
+//           <div className="specifications-list">
+//             {Object.entries(product.specifications).map(([key, value], idx) => (
+//               <div key={idx} className="spec-item">
+//                 <span className="spec-key">{key}</span>
+//                 <span className="spec-value">{value}</span>
+//               </div>
+//             ))}
+//           </div>
+//         ) : (
+//           <p className="no-specs">No specifications available.</p>
+//         )}
+//       </div>
+//     </div>
+//   );
+// }
+
+// export default ProductPage;
+
+
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
@@ -10418,6 +11464,7 @@ const StarRatingDisplay = ({ rating }) => {
 function ProductPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState(null);
   const [variants, setVariants] = useState([]);
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
@@ -10428,7 +11475,27 @@ function ProductPage() {
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
   const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
   const [imageLoadingStates, setImageLoadingStates] = useState({});
+  const [isRestricted, setIsRestricted] = useState(false);
   const fullScreenSliderRef = useRef(null);
+
+  const checkNetworkStatus = () => {
+    if (!navigator.onLine) {
+      toast.error('No internet connection. Please check your network and try again.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
+      });
+      return false;
+    }
+    return true;
+  };
 
   useEffect(() => {
     setReviews([]);
@@ -10436,12 +11503,21 @@ function ProductPage() {
   }, [id]);
 
   const fetchProductAndVariants = async () => {
+    if (!checkNetworkStatus()) {
+      setLoading(false);
+      setError('No internet connection.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const { data: productData, error: productError } = await supabase
         .from('products')
-        .select('*, sellers(latitude, longitude, store_name)')
+        .select(`
+          *,
+          sellers(latitude, longitude, store_name),
+          categories(id, name, is_restricted)
+        `)
         .eq('id', parseInt(id, 10))
         .eq('is_approved', true)
         .eq('status', 'active')
@@ -10452,11 +11528,31 @@ function ProductPage() {
         setLoading(false);
         return;
       }
+
+      if (productData.categories?.is_restricted && !location.state?.fromCategories) {
+        toast.error('Please select this category from the categories page.', {
+          duration: 4000,
+          position: 'top-center',
+          style: {
+            background: '#ff4d4f',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          },
+        });
+        navigate('/categories');
+        return;
+      }
+
+      setIsRestricted(productData.categories?.is_restricted || false);
       setProduct({
         ...productData,
         price: parseFloat(productData.price) || 0,
         original_price: productData.original_price ? parseFloat(productData.original_price) : null,
         discount_amount: productData.discount_amount ? parseFloat(productData.discount_amount) : 0,
+        category_name: productData.categories?.name || 'Unknown Category',
       });
 
       const { data: variantData, error: variantError } = await supabase
@@ -10723,6 +11819,22 @@ function ProductPage() {
       });
       return;
     }
+    if (isRestricted && !location.state?.fromCategories) {
+      toast.error('Please select this category from the categories page to add to cart.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
+      });
+      navigate('/categories');
+      return;
+    }
 
     const activeVariant = getActiveVariant();
     const cartItem = {
@@ -10737,7 +11849,7 @@ function ProductPage() {
       images: activeVariant?.images && activeVariant.images.length > 0 ? activeVariant.images : product.images,
       stock: activeVariant?.stock !== undefined ? activeVariant.stock : product.stock,
       quantity: 1,
-      uniqueKey: `${product.id}-${activeVariant?.id || 'no-variant'}`
+      uniqueKey: `${product.id}-${activeVariant?.id || 'no-variant'}`,
     };
 
     if (cartItem.price === 0) {
@@ -10991,6 +12103,22 @@ function ProductPage() {
   };
 
   const handleBuyNow = async () => {
+    if (isRestricted && !location.state?.fromCategories) {
+      toast.error('Please select this category from the categories page to proceed to checkout.', {
+        duration: 4000,
+        position: 'top-center',
+        style: {
+          background: '#ff4d4f',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+        },
+      });
+      navigate('/categories');
+      return;
+    }
     await addToCart(true);
   };
 
@@ -11086,15 +12214,16 @@ function ProductPage() {
 
   const hasValidVariants = variantAttributes.some((v) => v.attributes);
 
+  const seoKeywords = isRestricted && !location.state?.fromCategories
+    ? 'ecommerce, Markeet, buy online'
+    : `${productName}, ${product.category_name === 'Grocery' ? 'groceries' : 'electronics, appliances, fashion, jewellery, gift, home decoration'}, ecommerce, Markeet, buy online`;
+
   return (
     <div className="product-page-container">
       <Helmet>
         <title>{productName} - Markeet</title>
         <meta name="description" content={productDescription} />
-        <meta
-          name="keywords"
-          content={`${productName}, ${product.category_id ? 'electronics, appliances, fashion, jewellery, gift, home decoration' : 'ecommerce'}, Markeet, buy online`}
-        />
+        <meta name="keywords" content={seoKeywords} />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href={productUrl} />
         <meta property="og:title" content={`${productName} - Markeet`} />
@@ -11135,52 +12264,9 @@ function ProductPage() {
           })}
         </script>
       </Helmet>
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            borderRadius: '8px',
-            padding: '16px',
-            fontWeight: 'bold',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-            fontSize: '16px',
-            transition: 'all 0.3s ease-in-out',
-          },
-          success: {
-            style: {
-              background: '#52c41a',
-              color: '#fff',
-            },
-            iconTheme: {
-              primary: '#fff',
-              secondary: '#52c41a',
-            },
-          },
-          error: {
-            style: {
-              background: '#ff4d4f',
-              color: '#fff',
-            },
-            iconTheme: {
-              primary: '#fff',
-              secondary: '#ff4d4f',
-            },
-          },
-          loading: {
-            style: {
-              background: '#1890ff',
-              color: '#fff',
-            },
-            iconTheme: {
-              primary: '#fff',
-              secondary: '#1890ff',
-            },
-          },
-        }}
-      />
+      <Toaster />
 
-      <button onClick={() => navigate('/')} className="enhanced-back-btn">
+      <button onClick={() => navigate('/products')} className="enhanced-back-btn">
         ← Back to Products
       </button>
 
@@ -11193,7 +12279,7 @@ function ProductPage() {
                   <div key={i} className="slider-image-wrapper">
                     <img
                       src={imgUrl}
-                      alt={`${productName} Image ${i + 1}`}
+                      alt={productName}
                       onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
                       onClick={() => handleImageClick(i)}
                       className="clickable-image"
@@ -11209,7 +12295,7 @@ function ProductPage() {
               <div className="single-image-wrapper">
                 <img
                   src={displayedImages[0]}
-                  alt={`${productName}`}
+                  alt={productName}
                   onError={(e) => (e.target.src = 'https://dummyimage.com/300')}
                   onClick={() => handleImageClick(0)}
                   className="clickable-image"
@@ -11228,12 +12314,12 @@ function ProductPage() {
           {renderPriceSection()}
           {isLowStock() && (
             <p className="low-stock-warning">
-              Hurry! Only {getActiveVariant()?.stock || product?.stock} left in stock!
+              Hurry! Only {getActiveVariant()?.stock || product.stock} left in stock!
             </p>
           )}
           <ul className="product-highlights">
             {product.description?.split(';').filter((point) => point.trim()).map((point, idx) => (
-              <li key={idx}>{point.trim()}</li>
+              <li key={idx} data-testid={`product-highlight-${idx}`}>{point.trim()}</li>
             )) || <li>No description available</li>}
           </ul>
           {hasValidVariants && (
@@ -11274,6 +12360,7 @@ function ProductPage() {
               onClick={() => addToCart(false)}
               className="add-to-cart-button"
               disabled={isOutOfStock()}
+              aria-label={`Add ${productName} to cart`}
             >
               {isOutOfStock() ? 'Out of Stock' : 'Add to Cart'}
             </button>
@@ -11281,6 +12368,7 @@ function ProductPage() {
               className="buy-now-button"
               onClick={handleBuyNow}
               disabled={isOutOfStock()}
+              aria-label={`Buy ${productName} now`}
             >
               Buy Now
             </button>
@@ -11331,7 +12419,7 @@ function ProductPage() {
                       )}
                       <img
                         src={imgUrl || 'https://dummyimage.com/600'}
-                        alt={`${productName} Image ${i + 1}`}
+                        alt={productName}
                         onError={(e) => (e.target.src = 'https://dummyimage.com/600')}
                         onLoad={() => handleImageLoad(i)}
                         className="full-screen-image-content"
