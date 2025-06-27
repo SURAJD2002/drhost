@@ -1,291 +1,346 @@
-/* Container */
+/* Main container for the Seller Dashboard */
 .seller-dashboard {
-  max-width: 1200px;
-  margin: 10px auto;
-  padding: 0 10px;
-  font-family: Arial, sans-serif;
-  color: #333;
+  max-width: 1200px; /* Maximum width for large screens */
+  margin: 16px auto; /* Center with top/bottom margin */
+  padding: 0 12px; /* Side padding */
+  font-family: Arial, sans-serif; /* Simple, reliable font */
+  color: #333; /* Dark text color */
+  background-color: #f9fafb; /* Light gray background */
+  border-radius: 8px; /* Rounded corners */
 }
 
-/* Headings */
+/* Page title */
 .seller-dashboard-title {
-  font-size: 1.5rem;
-  margin-bottom: 15px;
-  text-align: center;
-  color: #007bff;
+  font-size: 1.75rem; /* Large title */
+  font-weight: bold; /* Bold text */
+  margin-bottom: 16px; /* Space below */
+  text-align: center; /* Centered */
+  color: #1e40af; /* Blue for branding */
 }
 
+/* Section headings (e.g., Store Details, My Products) */
 .seller-dashboard-heading {
-  font-size: 1.1rem;
-  margin-bottom: 8px;
-  color: #007bff;
-  display: flex;
+  font-size: 1.25rem; /* Slightly smaller than title */
+  font-weight: bold;
+  margin-bottom: 12px;
+  color: #1e40af; /* Blue to match title */
+  display: flex; /* Aligns icon and text */
   align-items: center;
-  gap: 6px;
+  gap: 8px; /* Space between icon and text */
 }
 
-/* Messages */
+/* Success and error messages */
+.seller-dashboard-message {
+  padding: 10px; /* Inner spacing */
+  border-radius: 6px; /* Rounded corners */
+  margin-bottom: 12px; /* Space below */
+  text-align: center; /* Centered text */
+  font-size: 0.9rem; /* Smaller text */
+}
+
 .seller-dashboard-message.success {
-  color: #28a745;
-  margin-bottom: 8px;
-  text-align: center;
-  font-size: 0.9rem;
+  background-color: #d1fae5; /* Light green */
+  color: #065f46; /* Dark green text */
 }
 
 .seller-dashboard-message.error {
-  color: #dc3545;
-  margin-bottom: 8px;
-  text-align: center;
-  font-size: 0.9rem;
+  background-color: #fee2e2; /* Light red */
+  color: #991b1b; /* Dark red text */
 }
 
+/* Location-specific messages */
 .seller-dashboard-text.location-message {
-  margin-top: 4px;
-  font-size: 0.85rem;
+  margin-top: 8px;
+  font-size: 0.9rem;
 }
 
 .seller-dashboard-text.location-message.error {
-  color: #dc3545;
+  color: #991b1b; /* Red for errors */
 }
 
 .seller-dashboard-text.location-message.success {
-  color: #28a745;
+  color: #065f46; /* Green for success */
 }
 
-/* Loading / Error */
+/* Loading spinner */
 .seller-dashboard-loading-spinner {
-  position: fixed;
+  position: fixed; /* Center on screen */
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 20px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  border-radius: 4px;
-  z-index: 1000;
+  transform: translate(-50%, -50%); /* Center alignment */
+  padding: 12px 20px;
+  background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
+  color: #fff; /* White text */
+  border-radius: 6px;
   font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between spinner and text */
 }
 
+.seller-dashboard-loading-spinner .spinner {
+  border: 3px solid #fff; /* White border */
+  border-top: 3px solid #1e40af; /* Blue spinning part */
+  border-radius: 50%; /* Circular */
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite; /* Spinning animation */
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error message for the whole page */
 .seller-dashboard-error {
   text-align: center;
-  margin: 15px 0;
-  font-size: 0.9rem;
-  color: #dc3545;
-}
-
-/* Sections */
-.seller-dashboard-section {
-  background-color: #f9f9f9;
-  border: 1px solid #eee;
+  margin: 16px 0;
+  font-size: 0.95rem;
+  color: #991b1b; /* Red text */
+  background-color: #fee2e2; /* Light red background */
+  padding: 12px;
   border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 15px;
 }
 
-/* Seller Info */
+/* Section containers (Store Details, Products, Orders) */
+.seller-dashboard-section {
+  background-color: #fff; /* White background */
+  border: 1px solid #e5e7eb; /* Light gray border */
+  border-radius: 8px; /* Rounded corners */
+  padding: 16px; /* Inner spacing */
+  margin-bottom: 16px; /* Space between sections */
+}
+
+/* Text for store details */
 .seller-dashboard-text {
-  margin: 4px 0;
-  color: #666;
-  font-size: 0.9rem;
+  margin: 6px 0; /* Vertical spacing */
+  font-size: 0.95rem; /* Readable size */
+  color: #4b5563; /* Gray text */
 }
 
 .seller-dashboard-text span {
-  color: #333;
-  font-weight: 500;
+  color: #333; /* Darker text for emphasis */
+  font-weight: bold;
 }
 
-/* Buttons */
+/* Buttons (Location, Add, View, Edit, Delete) */
 .seller-dashboard-btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  color: #fff;
-  font-size: 0.9rem;
-  transition: background-color 0.2s;
+  padding: 8px 16px; /* Comfortable padding */
+  border: none; /* No border */
+  border-radius: 6px; /* Rounded corners */
+  cursor: pointer; /* Pointer on hover */
+  font-size: 0.9rem; /* Readable text */
+  color: #fff; /* White text */
+  display: inline-flex; /* Aligns icon and text */
+  align-items: center;
+  gap: 6px; /* Space between icon and text */
+}
+
+.seller-dashboard-btn:hover {
+  filter: brightness(90%); /* Darken on hover */
+}
+
+.seller-dashboard-btn:disabled {
+  background-color: #d1d5db; /* Gray for disabled */
+  cursor: not-allowed;
 }
 
 .btn-location {
-  background-color: #28a745;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-}
-
-.btn-location:hover {
-  background-color: #218838;
+  background-color: #10b981; /* Green */
 }
 
 .btn-add {
-  background-color: #007bff;
-  margin-bottom: 8px;
-}
-
-.btn-add:hover {
-  background-color: #0056b3;
+  background-color: #1e40af; /* Blue */
+  margin-bottom: 12px;
 }
 
 .btn-view {
-  background-color: #17a2b8;
-  text-decoration: none;
-  display: inline-block;
-  margin-left: 8px;
+  background-color: #0ea5e9; /* Cyan */
+  text-decoration: none; /* No underline for links */
 }
 
-.btn-view:hover {
-  background-color: #138496;
+.btn-edit {
+  background-color: #3b82f6; /* Light blue */
 }
 
 .btn-delete {
-  background-color: #dc3545;
-  margin-left: 8px;
+  background-color: #ef4444; /* Red */
 }
 
-.btn-delete:hover {
-  background-color: #c82333;
-}
-
-/* Product List */
+/* Product list */
 .seller-dashboard-product-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid; /* Grid layout */
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Responsive columns */
+  gap: 12px; /* Space between items */
 }
 
+/* Individual product card */
 .seller-dashboard-product-item {
-  background-color: #fff;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  background-color: #fff; /* White background */
+  border: 1px solid #e5e7eb; /* Light border */
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.seller-dashboard-product-item.deleting {
+  opacity: 0.5; /* Fade when deleting */
+  pointer-events: none; /* Disable interactions */
 }
 
 .seller-dashboard-product-title {
-  margin: 0 0 4px 0;
-  font-size: 0.9rem;
+  font-size: 1rem; /* Readable title */
+  font-weight: bold;
+  margin: 0 0 8px; /* Space below */
   color: #333;
 }
 
+.seller-dashboard-product-title .deleting-indicator {
+  font-size: 0.85rem;
+  color: #ef4444; /* Red for deleting */
+  font-style: italic;
+}
+
+/* Product images */
 .seller-dashboard-product-images {
   display: flex;
-  gap: 5px;
-  margin: 4px 0;
+  gap: 8px; /* Space between images */
+  margin: 8px 0;
 }
 
 .seller-dashboard-product-image {
-  width: 60px;
-  height: 60px;
-  object-fit: cover;
-  border-radius: 4px;
+  width: 70px; /* Fixed size */
+  height: 70px;
+  object-fit: cover; /* Fit image nicely */
+  border-radius: 6px;
 }
 
-/* Variant List */
+/* Variant list */
 .seller-dashboard-variant-list {
   margin-top: 8px;
   padding: 8px;
-  background: #f0f0f0;
-  border-radius: 4px;
-  width: 100%;
+  background: #f3f4f6; /* Light gray */
+  border-radius: 6px;
 }
 
 .seller-dashboard-variant-title {
-  margin: 0 0 4px 0;
-  font-size: 0.85rem;
-  color: #007bff;
+  font-size: 0.9rem;
+  font-weight: bold;
+  margin: 0 0 8px;
+  color: #1e40af; /* Blue */
 }
 
 .seller-dashboard-variant-item {
-  margin: 4px 0;
-  font-size: 0.8rem;
+  margin: 6px 0;
+  font-size: 0.85rem;
 }
 
 .seller-dashboard-variant-item p {
-  margin: 2px 0;
-  color: #666;
+  margin: 4px 0;
+  color: #4b5563; /* Gray text */
 }
 
-/* Order List */
+/* Order and EMI order lists */
 .seller-dashboard-order-list,
 .seller-dashboard-emi-order-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); /* Responsive columns */
+  gap: 12px;
 }
 
+/* Individual order card */
 .seller-dashboard-order-item,
 .seller-dashboard-emi-order-item {
   background-color: #fff;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
   cursor: pointer;
 }
 
 .seller-dashboard-order-item:hover,
 .seller-dashboard-emi-order-item:hover {
-  background-color: #f1f1f1;
+  background-color: #f3f4f6; /* Light gray on hover */
 }
 
+.seller-dashboard-order-item:focus,
+.seller-dashboard-emi-order-item:focus {
+  outline: 2px solid #1e40af; /* Blue outline for focus */
+}
+
+/* Order title */
 .seller-dashboard-order-title {
-  margin: 0 0 4px 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-weight: bold;
+  margin: 0 0 8px;
   color: #333;
 }
 
+/* Order items section */
 .seller-dashboard-order-items {
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .seller-dashboard-items-title {
-  margin: 0 0 4px 0;
-  font-size: 0.85rem;
-  color: #007bff;
+  font-size: 0.9rem;
+  font-weight: bold;
+  margin: 0 0 8px;
+  color: #1e40af;
 }
 
+/* Error text (e.g., cancellation reason) */
 .seller-dashboard-text-error {
-  color: #dc3545;
+  color: #991b1b; /* Red */
 }
 
-/* Responsive Design */
+/* Variant image in orders */
+.seller-dashboard-variant-image {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+/* Responsive design for tablets */
 @media (max-width: 768px) {
   .seller-dashboard {
-    padding: 0 5px;
-    margin: 5px auto;
+    padding: 0 8px;
+    margin: 8px auto;
   }
 
   .seller-dashboard-title {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
+  }
+
+  .seller-dashboard-heading {
+    font-size: 1.15rem;
+  }
+
+  .seller-dashboard-product-image {
+    width: 60px;
+    height: 60px;
+  }
+
+  .seller-dashboard-product-list,
+  .seller-dashboard-order-list,
+  .seller-dashboard-emi-order-list {
+    grid-template-columns: 1fr; /* Single column */
+  }
+}
+
+/* Responsive design for small phones */
+@media (max-width: 480px) {
+  .seller-dashboard-title {
+    font-size: 1.25rem;
   }
 
   .seller-dashboard-heading {
     font-size: 1rem;
   }
 
-  .seller-dashboard-product-image {
-    width: 50px;
-    height: 50px;
-  }
-
   .seller-dashboard-btn {
-    padding: 5px 10px;
-    font-size: 0.85rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .seller-dashboard-title {
-    font-size: 1.3rem;
-  }
-
-  .seller-dashboard-heading {
-    font-size: 0.95rem;
-  }
-
-  .seller-dashboard-btn {
-    width: 100%;
+    width: 100%; /* Full-width buttons */
     padding: 8px;
     margin: 4px 0;
   }
@@ -293,8 +348,7 @@
   .seller-dashboard-product-item,
   .seller-dashboard-order-item,
   .seller-dashboard-emi-order-item {
-    padding: 6px;
-    text-align: center;
+    padding: 10px;
   }
 
   .seller-dashboard-product-images {
@@ -303,32 +357,12 @@
 
   .seller-dashboard-product-actions {
     display: flex;
-    flex-direction: column;
-    gap: 5px;
+    flex-direction: column; /* Stack buttons vertically */
+    gap: 8px;
     width: 100%;
   }
 
   .seller-dashboard-text {
     font-size: 0.85rem;
   }
-}.seller-dashboard-btn.btn-edit {
-  background-color: #1890ff;
-  color: #fff;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-right: 8px;
-}
-
-.seller-dashboard-btn.btn-edit:hover {
-  background-color: #40a9ff;
-}
-
-.seller-dashboard-btn.btn-edit:disabled {
-  background-color: #bfbfbf;
-  cursor: not-allowed;
 }

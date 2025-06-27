@@ -1181,3 +1181,42 @@ body {
     width: 48px;
   }
 }
+.related-product-image {
+  width: 100%;
+  height: 160px;
+  object-fit: contain; /* Show full image */
+  border-bottom: 1px solid var(--border);
+  background-color: var(--background-section); /* Matches card background */
+}
+
+@media (min-width: 768px) {
+  .related-product-image {
+    height: 200px;
+    object-fit: contain;
+    background-color: var(--background-section);
+  }
+}
+
+@media (min-width: 1024px) {
+  .related-product-image {
+    height: 220px;
+    object-fit: contain;
+    background-color: var(--background-section);
+  }
+}
+
+@media (min-width: 1280px) {
+  .related-product-image {
+    height: 240px;
+    object-fit: contain;
+    background-color: var(--background-section);
+  }
+}
+
+@media (max-width: 480px) {
+  .related-product-image {
+    height: 140px;
+    object-fit: contain;
+    background-color: var(--background-section);
+  }
+}
