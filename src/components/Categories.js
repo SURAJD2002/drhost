@@ -1500,14 +1500,188 @@
 
 
 
+// import React, { useState, useEffect, useCallback, useRef } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { Toaster, toast } from 'react-hot-toast';
+// import { FaSearch } from 'react-icons/fa';
+// import '../style/Categories.css';
+// import Footer from './Footer';
+// import { Helmet } from 'react-helmet-async';
+
+// const checkNetworkStatus = () => {
+//   if (!navigator.onLine) {
+//     toast.error('No internet connection. Please check your network.', {
+//       duration: 4000,
+//       position: 'top-center',
+//       style: { background: '#ff4d4f', color: '#fff', fontWeight: 'bold', borderRadius: '8px', padding: '16px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)' },
+//     });
+//     return false;
+//   }
+//   return true;
+// };
+
+// function Categories() {
+//   const [categories, setCategories] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+//   const [searchTerm, setSearchTerm] = useState('');
+//   const [isSearchFocused, setIsSearchFocused] = useState(false);
+//   const [suggestions, setSuggestions] = useState([]);
+//   const navigate = useNavigate();
+//   const searchRef = useRef(null);
+
+//   const fetchCategories = useCallback(async () => {
+//     if (!checkNetworkStatus()) {
+//       setLoading(false);
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const { data, error } = await supabase.from('categories').select('id, name, image_url, is_restricted').order('name');
+//       if (error) throw error;
+//       console.log('Fetched categories:', data);
+//       setCategories(data || []);
+//       setError(null);
+//     } catch (err) {
+//       console.error('Error fetching categories:', err);
+//       setError('Failed to load categories.');
+//       setCategories([]);
+//       toast.error('Failed to load categories.', {
+//         duration: 4000,
+//         position: 'top-center',
+//         style: { background: '#ff4d4f', color: '#fff', fontWeight: 'bold', borderRadius: '8px', padding: '16px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)' },
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     fetchCategories();
+//   }, [fetchCategories]);
+
+//   useEffect(() => {
+//     if (!searchTerm || !isSearchFocused) {
+//       setSuggestions([]);
+//       return;
+//     }
+//     const filteredSuggestions = categories
+//       .filter((category) => category.name.toLowerCase().includes(searchTerm.toLowerCase()))
+//       .slice(0, 5);
+//     setSuggestions(filteredSuggestions);
+//   }, [searchTerm, isSearchFocused, categories]);
+
+//   const handleSearchChange = (e) => {
+//     setSearchTerm(e.target.value);
+//   };
+
+//   const handleSuggestionClick = (category) => {
+//     setSearchTerm('');
+//     setIsSearchFocused(false);
+//     setSuggestions([]);
+//     navigate(`/products?category=${category.id}`, { state: { fromCategories: true } });
+//   };
+
+//   useEffect(() => {
+//     const handleClickOutside = (event) => {
+//       if (searchRef.current && !searchRef.current.contains(event.target)) {
+//         setIsSearchFocused(false);
+//         setSuggestions([]);
+//       }
+//     };
+//     document.addEventListener('mousedown', handleClickOutside);
+//     return () => document.removeEventListener('mousedown', handleClickOutside);
+//   }, []);
+
+//   if (loading) return <div className="cat-loading-container">Loading...</div>;
+
+//   if (error) return <div className="cat-error">{error} <button onClick={fetchCategories}>Retry</button></div>;
+
+//   const filteredCategories = searchTerm
+//     ? categories.filter((category) => category.name.toLowerCase().includes(searchTerm.toLowerCase()))
+//     : categories;
+
+//   return (
+//     <div className="cat-page">
+//       <Helmet>
+//         <title>Categories - Markeet</title>
+//         <meta name="description" content="Explore categories like electronics, fashion, groceries, and more on Markeet." />
+//         <meta name="keywords" content="categories, electronics, fashion, groceries, Markeet" />
+//         <meta name="robots" content="index, follow" />
+//         <link rel="canonical" href="https://www.markeet.com/categories" />
+//       </Helmet>
+//       <Toaster position="top-center" />
+//       <div className="cat-search-bar" ref={searchRef}>
+//         <FaSearch className="cat-search-icon" />
+//         <input
+//           type="text"
+//           placeholder="Search categories..."
+//           value={searchTerm}
+//           onChange={handleSearchChange}
+//           onFocus={() => setIsSearchFocused(true)}
+//           aria-label="Search categories"
+//         />
+//         {suggestions.length > 0 && isSearchFocused && (
+//           <ul className="cat-search-suggestions">
+//             {suggestions.map((category) => (
+//               <li
+//                 key={category.id}
+//                 className="cat-suggestion-item"
+//                 onClick={() => handleSuggestionClick(category)}
+//                 role="button"
+//                 tabIndex={0}
+//                 onKeyPress={(e) => e.key === 'Enter' && handleSuggestionClick(category)}
+//                 aria-label={`Select ${category.name}`}
+//               >
+//                 {category.name}
+//               </li>
+//             ))}
+//           </ul>
+//         )}
+//       </div>
+//       <h1 className="cat-title">All Categories</h1>
+//       {filteredCategories.length === 0 ? (
+//         <p className="no-categories">No categories found.</p>
+//       ) : (
+//         <div className="cat-grid">
+//           {filteredCategories.map((category) => (
+//             <Link
+//               to={`/products?category=${category.id}`}
+//               key={category.id}
+//               state={{ fromCategories: true }}
+//               className="cat-card"
+//               aria-label={`View ${category.name} products`}
+//             >
+//               <img
+//                 src={category.image_url || 'https://dummyimage.com/150x150/image.jpg'}
+//                 alt={category.name}
+//                 className="cat-image"
+//                 onError={(e) => (e.target.src = 'https://dummyimage.com/150x150/image.jpg')}
+//                 loading="lazy"
+//               />
+//               <h3 className="cat-name">{category.name}</h3>
+//             </Link>
+//           ))}
+//         </div>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// export default React.memo(Categories);
+
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { Toaster, toast } from 'react-hot-toast';
 import { FaSearch } from 'react-icons/fa';
+import { Helmet } from 'react-helmet-async';
+import icon from '../assets/icon.png';
 import '../style/Categories.css';
 import Footer from './Footer';
-import { Helmet } from 'react-helmet-async';
 
 const checkNetworkStatus = () => {
   if (!navigator.onLine) {
@@ -1540,11 +1714,9 @@ function Categories() {
     try {
       const { data, error } = await supabase.from('categories').select('id, name, image_url, is_restricted').order('name');
       if (error) throw error;
-      console.log('Fetched categories:', data);
       setCategories(data || []);
       setError(null);
     } catch (err) {
-      console.error('Error fetching categories:', err);
       setError('Failed to load categories.');
       setCategories([]);
       toast.error('Failed to load categories.', {
@@ -1596,7 +1768,11 @@ function Categories() {
 
   if (loading) return <div className="cat-loading-container">Loading...</div>;
 
-  if (error) return <div className="cat-error">{error} <button onClick={fetchCategories}>Retry</button></div>;
+  if (error) return (
+    <div className="cat-error">
+      {error} <button onClick={fetchCategories}>Retry</button>
+    </div>
+  );
 
   const filteredCategories = searchTerm
     ? categories.filter((category) => category.name.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -1610,6 +1786,28 @@ function Categories() {
         <meta name="keywords" content="categories, electronics, fashion, groceries, Markeet" />
         <meta name="robots" content="index, follow" />
         <link rel="canonical" href="https://www.markeet.com/categories" />
+        <meta property="og:title" content="Categories - Markeet" />
+        <meta property="og:description" content="Explore categories like electronics, fashion, groceries, and more on Markeet." />
+        <meta property="og:image" content={categories[0]?.image_url || 'https://dummyimage.com/150x150/image.jpg'} />
+        <meta property="og:url" content="https://www.markeet.com/categories" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Categories - Markeet" />
+        <meta name="twitter:description" content="Explore categories like electronics, fashion, groceries, and more on Markeet." />
+        <meta name="twitter:image" content={categories[0]?.image_url || 'https://dummyimage.com/150x150/image.jpg'} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: 'Categories - Markeet',
+            description: 'Explore categories like electronics, fashion, groceries, and more on Markeet.',
+            url: 'https://www.markeet.com/categories',
+            publisher: {
+              '@type': 'Organization',
+              name: 'Markeet',
+            },
+          })}
+        </script>
       </Helmet>
       <Toaster position="top-center" />
       <div className="cat-search-bar" ref={searchRef}>
@@ -1665,6 +1863,11 @@ function Categories() {
           ))}
         </div>
       )}
+      <img
+        src={icon}
+        alt="Markeet Logo"
+        className="cat-icon"
+      />
       <Footer />
     </div>
   );
