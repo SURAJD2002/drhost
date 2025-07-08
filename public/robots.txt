@@ -1,3 +1,10 @@
 # https://www.robotstxt.org/robotstxt.html
+
 User-agent: *
-Disallow:
+Allow: /
+
+# Allow Google to crawl the favicon
+Allow: /favicon.ico
+
+# Sitemap file (optional, but recommended)
+Sitemap: https://www.markeet.in/sitemap.xml

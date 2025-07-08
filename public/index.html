@@ -44,11 +44,11 @@
     <!-- Theme color for browser -->
     <meta name="theme-color" content="#F8A044" />
 
-    <!-- Redirect HTTP → HTTPS and non-www → www -->
+    <!-- Redirect HTTP → HTTPS and non-www → www (Disabled for local testing) -->
     <script>
       (function () {
         const host = window.location.hostname;
-        if (host !== "localhost" && host !== "127.0.0.1") {
+        if (host !== "localhost" && host !== "127.0.0.1") { // Only apply in production
           if (location.protocol !== "https:") {
             location.href = "https:" + window.location.href.substring(location.protocol.length);
             return;
