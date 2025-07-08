@@ -356,7 +356,7 @@ body {
   transition: all 0.3s ease;
   width: 100%;
   max-width: 300px;
-  min-height: 300px;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 3px 8px var(--shadow);
@@ -463,7 +463,7 @@ body {
 
 .td-product-buttons {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: space-between;
   margin-top: auto;
   flex-shrink: 0;
@@ -473,8 +473,8 @@ body {
 .td-cart-action-btn,
 .td-buy-action-btn {
   flex: 1;
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 6px 8px;
+  font-size: 11px;
   font-weight: 600;
   border-radius: 6px;
   border: none;
@@ -487,11 +487,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 32px;
 }
 
 .td-cart-action-btn svg {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .td-cart-action-btn:hover {
@@ -521,7 +521,7 @@ body {
   background-color: var(--skeleton);
   border-radius: 10px;
   padding: 15px;
-  height: 300px;
+  height: 280px;
   animation: pulse 1.5s infinite;
 }
 
@@ -547,13 +547,13 @@ body {
 
 .td-skeleton-buttons {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-top: 10px;
 }
 
 .td-skeleton-btn {
   flex: 1;
-  height: 36px;
+  height: 32px;
   background-color: var(--skeleton-dark);
   border-radius: 6px;
 }
@@ -811,7 +811,6 @@ body {
 .Toastify__close-button {
   color: white;
   opacity: 0.7;
-  font-size: 16px;
 }
 
 .Toastify__close-button:hover {

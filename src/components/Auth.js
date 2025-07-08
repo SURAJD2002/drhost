@@ -1431,299 +1431,299 @@
 
 
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
-import '../style/Auth.css';
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import '../style/Auth.css';
 
-export default function Auth() {
-  const navigate = useNavigate();
-  const [mode, setMode] = useState('login'); // 'login' or 'signup'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [isSeller, setIsSeller] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
+// export default function Auth() {
+//   const navigate = useNavigate();
+//   const [mode, setMode] = useState('login'); // 'login' or 'signup'
+//   const [email, setEmail] = useState('');
+//   const [password, setPassword] = useState('');
+//   const [fullName, setFullName] = useState('');
+//   const [isSeller, setIsSeller] = useState(false);
+//   const [phone, setPhone] = useState('');
+//   const [otp, setOtp] = useState('');
+//   const [otpSent, setOtpSent] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [message, setMessage] = useState('');
+//   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Redirect if already authenticated and subscribe to auth events
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate('/account', { replace: true });
-    });
+//   // Redirect if already authenticated and subscribe to auth events
+//   useEffect(() => {
+//     supabase.auth.getSession().then(({ data: { session } }) => {
+//       if (session) navigate('/account', { replace: true });
+//     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') navigate('/account', { replace: true });
-      if (event === 'SIGNED_OUT') navigate('/auth', { replace: true });
-    });
+//     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+//       if (event === 'SIGNED_IN') navigate('/account', { replace: true });
+//       if (event === 'SIGNED_OUT') navigate('/auth', { replace: true });
+//     });
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+//     return () => subscription.unsubscribe();
+//   }, [navigate]);
 
-  // Handle resend OTP cooldown
-  useEffect(() => {
-    if (resendCooldown > 0) {
-      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [resendCooldown]);
+//   // Handle resend OTP cooldown
+//   useEffect(() => {
+//     if (resendCooldown > 0) {
+//       const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [resendCooldown]);
 
-  // Google OAuth
-  const handleGoogle = async () => {
-    setLoading(true);
-    setMessage('');
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-      if (error) throw error;
-    } catch (err) {
-      console.error('Google sign-in error:', err);
-      setMessage('Google sign-in failed. Please try again or use another method.');
-    } finally {
-      setLoading(false);
-    }
-  };
+//   // Google OAuth
+//   const handleGoogle = async () => {
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+//       if (error) throw error;
+//     } catch (err) {
+//       console.error('Google sign-in error:', err);
+//       setMessage('Google sign-in failed. Please try again or use another method.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 
-  // Send OTP
-  const sendOtp = useCallback(async () => {
-    if (!/^\+?[0-9]{10,13}$/.test(phone)) {
-      setMessage('Enter a valid phone number (e.g., +919876543210)');
-      return;
-    }
-    setLoading(true);
-    setMessage('');
-    try {
-      const { error } = await supabase.auth.signInWithOtp({ phone });
-      if (error) throw error;
-      setOtpSent(true);
-      setResendCooldown(30); // 30-second cooldown for resend
-      setMessage('OTP sent to your phone. Please check.');
-    } catch (err) {
-      console.error('Send OTP error:', err);
-      setMessage('Failed to send OTP. Please try again or use email.');
-    } finally {
-      setLoading(false);
-    }
-  }, [phone]);
+//   // Send OTP
+//   const sendOtp = useCallback(async () => {
+//     if (!/^\+?[0-9]{10,13}$/.test(phone)) {
+//       setMessage('Enter a valid phone number (e.g., +919876543210)');
+//       return;
+//     }
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.signInWithOtp({ phone });
+//       if (error) throw error;
+//       setOtpSent(true);
+//       setResendCooldown(30); // 30-second cooldown for resend
+//       setMessage('OTP sent to your phone. Please check.');
+//     } catch (err) {
+//       console.error('Send OTP error:', err);
+//       setMessage('Failed to send OTP. Please try again or use email.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [phone]);
 
-  // Verify OTP
-  const verifyOtp = async () => {
-    if (!otp) {
-      setMessage('Please enter the OTP received on your phone.');
-      return;
-    }
-    setLoading(true);
-    setMessage('');
-    try {
-      const { error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
-      if (error) throw error;
-      setMessage('Phone verified successfully.');
-      if (mode === 'signup') await handleEmailAuth();
-    } catch (err) {
-      console.error('Verify OTP error:', err);
-      setMessage('Invalid OTP. Please try again or request a new one.');
-    } finally {
-      setLoading(false);
-    }
-  };
+//   // Verify OTP
+//   const verifyOtp = async () => {
+//     if (!otp) {
+//       setMessage('Please enter the OTP received on your phone.');
+//       return;
+//     }
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       const { error } = await supabase.auth.verifyOtp({ phone, token: otp, type: 'sms' });
+//       if (error) throw error;
+//       setMessage('Phone verified successfully.');
+//       if (mode === 'signup') await handleEmailAuth();
+//     } catch (err) {
+//       console.error('Verify OTP error:', err);
+//       setMessage('Invalid OTP. Please try again or request a new one.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 
-  // Email/password auth
-  const handleEmailAuth = async (e) => {
-    if (e?.preventDefault) e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    try {
-      if (mode === 'signup') {
-        if (!email && !phone) {
-          setMessage('Please provide an email or phone number.');
-          return;
-        }
-        if (phone && !otpSent) {
-          setMessage('Please verify your phone number first.');
-          return;
-        }
-        const { data: { user }, error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        await supabase.from('profiles').upsert({
-          id: user.id,
-          full_name: fullName || user.email?.split('@')[0],
-          is_seller: isSeller,
-          phone_number: phone || null,
-        });
-        if (isSeller) {
-          await supabase.from('sellers').upsert({ id: user.id, store_name: `${fullName || user.email.split('@')[0]} Store` });
-        }
-        setMessage('Sign-up successful. Please check your email to confirm your account.');
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        // onAuthStateChange will handle redirect
-      }
-    } catch (err) {
-      console.error('Email auth error:', err);
-      setMessage(err.message || 'Authentication failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
+//   // Email/password auth
+//   const handleEmailAuth = async (e) => {
+//     if (e?.preventDefault) e.preventDefault();
+//     setLoading(true);
+//     setMessage('');
+//     try {
+//       if (mode === 'signup') {
+//         if (!email && !phone) {
+//           setMessage('Please provide an email or phone number.');
+//           return;
+//         }
+//         if (phone && !otpSent) {
+//           setMessage('Please verify your phone number first.');
+//           return;
+//         }
+//         const { data: { user }, error } = await supabase.auth.signUp({ email, password });
+//         if (error) throw error;
+//         await supabase.from('profiles').upsert({
+//           id: user.id,
+//           full_name: fullName || user.email?.split('@')[0],
+//           is_seller: isSeller,
+//           phone_number: phone || null,
+//         });
+//         if (isSeller) {
+//           await supabase.from('sellers').upsert({ id: user.id, store_name: `${fullName || user.email.split('@')[0]} Store` });
+//         }
+//         setMessage('Sign-up successful. Please check your email to confirm your account.');
+//       } else {
+//         const { error } = await supabase.auth.signInWithPassword({ email, password });
+//         if (error) throw error;
+//         // onAuthStateChange will handle redirect
+//       }
+//     } catch (err) {
+//       console.error('Email auth error:', err);
+//       setMessage(err.message || 'Authentication failed. Please check your credentials.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
 
-  // Reset form fields on mode toggle
-  const handleModeToggle = () => {
-    setMode(mode === 'signup' ? 'login' : 'signup');
-    setEmail('');
-    setPassword('');
-    setFullName('');
-    setIsSeller(false);
-    setPhone('');
-    setOtp('');
-    setOtpSent(false);
-    setMessage('');
-    setResendCooldown(0);
-  };
+//   // Reset form fields on mode toggle
+//   const handleModeToggle = () => {
+//     setMode(mode === 'signup' ? 'login' : 'signup');
+//     setEmail('');
+//     setPassword('');
+//     setFullName('');
+//     setIsSeller(false);
+//     setPhone('');
+//     setOtp('');
+//     setOtpSent(false);
+//     setMessage('');
+//     setResendCooldown(0);
+//   };
 
-  return (
-    <div className="auth-container">
-      <h1 className="auth-title">{mode === 'signup' ? 'Think & Deliver Sign Up' : 'Think & Deliver Login'}</h1>
-      <button
-        onClick={handleGoogle}
-        disabled={loading}
-        className="google-btn"
-        aria-label="Sign in with Google"
-      >
-        {loading ? 'Please wait...' : 'Sign in with Google'}
-      </button>
-      <hr />
-      <form onSubmit={handleEmailAuth} className="auth-form">
-        {mode === 'signup' && (
-          <>
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              disabled={loading}
-              required={!email}
-              className="auth-input"
-              aria-label="Full Name"
-            />
-            <label className="seller-checkbox">
-              <input
-                type="checkbox"
-                checked={isSeller}
-                onChange={() => setIsSeller(!isSeller)}
-                disabled={loading}
-                aria-label="Register as a Seller"
-              />
-              Are you a Seller?
-            </label>
-          </>
-        )}
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading || phone}
-          required={!phone}
-          className="auth-input"
-          aria-label="Email Address"
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={loading}
-          required={mode === 'signup'}
-          className="auth-input"
-          aria-label="Password"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="auth-button"
-          aria-label={mode === 'signup' ? 'Sign Up' : 'Login'}
-        >
-          {loading ? 'Processing...' : mode === 'signup' ? 'Sign Up' : 'Login'}
-        </button>
-      </form>
-      <hr />
-      <div className="otp-section">
-        <input
-          type="tel"
-          placeholder="+91 Phone (e.g., +919876543210)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          disabled={loading || otpSent}
-          required={!email}
-          className="auth-input"
-          aria-label="Phone Number"
-        />
-        {!otpSent ? (
-          <button
-            onClick={sendOtp}
-            disabled={loading}
-            className="otp-btn"
-            aria-label="Send OTP"
-          >
-            {loading ? 'Sending...' : 'Send OTP'}
-          </button>
-        ) : (
-          <>
-            <input
-              type="text"
-              placeholder="Enter OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              disabled={loading}
-              className="auth-input"
-              aria-label="OTP Code"
-            />
-            <button
-              onClick={verifyOtp}
-              disabled={loading}
-              className="otp-btn"
-              aria-label="Verify OTP"
-            >
-              {loading ? 'Verifying...' : 'Verify OTP'}
-            </button>
-            <button
-              onClick={sendOtp}
-              disabled={loading || resendCooldown > 0}
-              className="otp-btn resend-btn"
-              aria-label="Resend OTP"
-            >
-              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
-            </button>
-          </>
-        )}
-      </div>
-      {message && <p className="auth-message">{message}</p>}
-      <button
-        onClick={handleModeToggle}
-        disabled={loading}
-        className="auth-toggle"
-        aria-label={mode === 'signup' ? 'Switch to Login' : 'Switch to Sign Up'}
-      >
-        {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
-      </button>
-      <div className="auth-footer">
-        <Link to="/policy" className="footer-link" aria-label="View Policies">
-          Policies
-        </Link>
-        <Link to="/privacy" className="footer-link" aria-label="View Privacy Policy">
-          Privacy Policy
-        </Link>
-      </div>
-      <Link to="/" className="back-link" aria-label="Back to Home">
-        Back to Home
-      </Link>
-    </div>
-  );
-}
+//   return (
+//     <div className="auth-container">
+//       <h1 className="auth-title">{mode === 'signup' ? 'Think & Deliver Sign Up' : 'Think & Deliver Login'}</h1>
+//       <button
+//         onClick={handleGoogle}
+//         disabled={loading}
+//         className="google-btn"
+//         aria-label="Sign in with Google"
+//       >
+//         {loading ? 'Please wait...' : 'Sign in with Google'}
+//       </button>
+//       <hr />
+//       <form onSubmit={handleEmailAuth} className="auth-form">
+//         {mode === 'signup' && (
+//           <>
+//             <input
+//               type="text"
+//               placeholder="Full Name"
+//               value={fullName}
+//               onChange={(e) => setFullName(e.target.value)}
+//               disabled={loading}
+//               required={!email}
+//               className="auth-input"
+//               aria-label="Full Name"
+//             />
+//             <label className="seller-checkbox">
+//               <input
+//                 type="checkbox"
+//                 checked={isSeller}
+//                 onChange={() => setIsSeller(!isSeller)}
+//                 disabled={loading}
+//                 aria-label="Register as a Seller"
+//               />
+//               Are you a Seller?
+//             </label>
+//           </>
+//         )}
+//         <input
+//           type="email"
+//           placeholder="Email"
+//           value={email}
+//           onChange={(e) => setEmail(e.target.value)}
+//           disabled={loading || phone}
+//           required={!phone}
+//           className="auth-input"
+//           aria-label="Email Address"
+//         />
+//         <input
+//           type="password"
+//           placeholder="Password"
+//           value={password}
+//           onChange={(e) => setPassword(e.target.value)}
+//           disabled={loading}
+//           required={mode === 'signup'}
+//           className="auth-input"
+//           aria-label="Password"
+//         />
+//         <button
+//           type="submit"
+//           disabled={loading}
+//           className="auth-button"
+//           aria-label={mode === 'signup' ? 'Sign Up' : 'Login'}
+//         >
+//           {loading ? 'Processing...' : mode === 'signup' ? 'Sign Up' : 'Login'}
+//         </button>
+//       </form>
+//       <hr />
+//       <div className="otp-section">
+//         <input
+//           type="tel"
+//           placeholder="+91 Phone (e.g., +919876543210)"
+//           value={phone}
+//           onChange={(e) => setPhone(e.target.value)}
+//           disabled={loading || otpSent}
+//           required={!email}
+//           className="auth-input"
+//           aria-label="Phone Number"
+//         />
+//         {!otpSent ? (
+//           <button
+//             onClick={sendOtp}
+//             disabled={loading}
+//             className="otp-btn"
+//             aria-label="Send OTP"
+//           >
+//             {loading ? 'Sending...' : 'Send OTP'}
+//           </button>
+//         ) : (
+//           <>
+//             <input
+//               type="text"
+//               placeholder="Enter OTP"
+//               value={otp}
+//               onChange={(e) => setOtp(e.target.value)}
+//               disabled={loading}
+//               className="auth-input"
+//               aria-label="OTP Code"
+//             />
+//             <button
+//               onClick={verifyOtp}
+//               disabled={loading}
+//               className="otp-btn"
+//               aria-label="Verify OTP"
+//             >
+//               {loading ? 'Verifying...' : 'Verify OTP'}
+//             </button>
+//             <button
+//               onClick={sendOtp}
+//               disabled={loading || resendCooldown > 0}
+//               className="otp-btn resend-btn"
+//               aria-label="Resend OTP"
+//             >
+//               {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+//             </button>
+//           </>
+//         )}
+//       </div>
+//       {message && <p className="auth-message">{message}</p>}
+//       <button
+//         onClick={handleModeToggle}
+//         disabled={loading}
+//         className="auth-toggle"
+//         aria-label={mode === 'signup' ? 'Switch to Login' : 'Switch to Sign Up'}
+//       >
+//         {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
+//       </button>
+//       <div className="auth-footer">
+//         <Link to="/policy" className="footer-link" aria-label="View Policies">
+//           Policies
+//         </Link>
+//         <Link to="/privacy" className="footer-link" aria-label="View Privacy Policy">
+//           Privacy Policy
+//         </Link>
+//       </div>
+//       <Link to="/" className="back-link" aria-label="Back to Home">
+//         Back to Home
+//       </Link>
+//     </div>
+//   );
+// }
 
 
 
@@ -1917,3 +1917,600 @@ export default function Auth() {
 //     </div>
 //   );
 // }
+
+
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { useNavigate, Link } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { Toaster, toast } from 'react-hot-toast';
+// import '../style/Auth.css';
+
+// export default function Auth() {
+//   const navigate = useNavigate();
+//   const [mode, setMode] = useState('signup'); // Default to signup
+//   const [fullName, setFullName] = useState('');
+//   const [phone, setPhone] = useState('');
+//   const [otp, setOtp] = useState('');
+//   const [otpSent, setOtpSent] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [resendCooldown, setResendCooldown] = useState(0);
+
+//   // Redirect if already authenticated and subscribe to auth events
+//   useEffect(() => {
+//     supabase.auth.getSession().then(({ data: { session } }) => {
+//       if (session) navigate('/account', { replace: true });
+//     });
+
+//     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+//       if (event === 'SIGNED_IN') navigate('/account', { replace: true });
+//       if (event === 'SIGNED_OUT') navigate('/auth', { replace: true });
+//     });
+
+//     return () => subscription.unsubscribe();
+//   }, [navigate]);
+
+//   // Handle resend OTP cooldown
+//   useEffect(() => {
+//     if (resendCooldown > 0) {
+//       const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [resendCooldown]);
+
+//   // Send OTP
+//   const sendOtp = useCallback(async () => {
+//     if (!/^[0-9]{10}$/.test(phone)) {
+//       toast.error('Enter a valid 10-digit phone number (e.g., 9876543210)', {
+//         duration: 3000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ef4444',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//         },
+//       });
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const fullPhone = `+91${phone}`;
+//       const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
+//       if (error) throw error;
+//       setOtpSent(true);
+//       setResendCooldown(30); // 30-second cooldown for resend
+//       toast.success('OTP sent to your phone. Please check.', {
+//         duration: 3000,
+//         position: 'top-center',
+//         style: {
+//           background: '#2ecc71',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//         },
+//       });
+//     } catch (err) {
+//       toast.error('Failed to send OTP. Please try again.', {
+//         duration: 3000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ef4444',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//         },
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [phone]);
+
+//   // Verify OTP and handle auth
+//   const handleAuth = async (e) => {
+//     if (e?.preventDefault) e.preventDefault();
+//     if (!otpSent || !otp) {
+//       toast.error('Please request and enter the OTP.', {
+//         duration: 3000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ef4444',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//         },
+//       });
+//       return;
+//     }
+//     if (mode === 'signup' && !fullName.trim()) {
+//       toast.error('Full name is required for sign-up.', {
+//         duration: 3000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ef4444',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//         },
+//       });
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const fullPhone = `+91${phone}`;
+//       const { error } = await supabase.auth.verifyOtp({ phone: fullPhone, token: otp, type: 'sms' });
+//       if (error) throw error;
+//       if (mode === 'signup') {
+//         const { data: { user }, error: signUpError } = await supabase.auth.signUp({ phone: fullPhone });
+//         if (signUpError) throw signUpError;
+//         await supabase.from('profiles').upsert({
+//           id: user.id,
+//           full_name: fullName,
+//           phone_number: fullPhone,
+//         });
+//         toast.success('Sign-up successful. You are now logged in.', {
+//           duration: 3000,
+//           position: 'top-center',
+//           style: {
+//             background: '#2ecc71',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//           },
+//         });
+//       } else {
+//         toast.success('Login successful.', {
+//           duration: 3000,
+//           position: 'top-center',
+//           style: {
+//             background: '#2ecc71',
+//             color: '#fff',
+//             fontWeight: 'bold',
+//             borderRadius: '8px',
+//             padding: '16px',
+//             boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//           },
+//         });
+//       }
+//     } catch (err) {
+//       toast.error('Invalid OTP or authentication failed. Please try again.', {
+//         duration: 3000,
+//         position: 'top-center',
+//         style: {
+//           background: '#ef4444',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//           boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//         },
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Reset form fields on mode toggle
+//   const handleModeToggle = () => {
+//     setMode(mode === 'signup' ? 'login' : 'signup');
+//     setFullName('');
+//     setPhone('');
+//     setOtp('');
+//     setOtpSent(false);
+//     setResendCooldown(0);
+//   };
+
+//   return (
+//     <div className="auth-container">
+//       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+//       <h1 className="auth-title">{mode === 'signup' ? 'Think & Deliver Sign Up' : 'Think & Deliver Login'}</h1>
+//       <form onSubmit={handleAuth} className="auth-form">
+//         {mode === 'signup' && (
+//           <input
+//             type="text"
+//             placeholder="Full Name"
+//             value={fullName}
+//             onChange={(e) => setFullName(e.target.value)}
+//             disabled={loading}
+//             required
+//             className="auth-input"
+//             aria-label="Full Name"
+//           />
+//         )}
+//         <div className="phone-input-wrapper">
+//           <span className="phone-prefix">+91</span>
+//           <input
+//             type="tel"
+//             placeholder="9876543210"
+//             value={phone}
+//             onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+//             disabled={loading || otpSent}
+//             required
+//             className="auth-input phone-input"
+//             aria-label="Phone Number"
+//           />
+//         </div>
+//         {!otpSent ? (
+//           <button
+//             onClick={sendOtp}
+//             disabled={loading}
+//             className="otp-btn"
+//             aria-label="Send OTP"
+//           >
+//             {loading ? (
+//               <span className="loading-spinner">Sending...</span>
+//             ) : (
+//               'Send OTP'
+//             )}
+//           </button>
+//         ) : (
+//           <>
+//             <input
+//               type="text"
+//               placeholder="Enter OTP"
+//               value={otp}
+//               onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+//               disabled={loading}
+//               required
+//               className="auth-input"
+//               aria-label="OTP Code"
+//             />
+//             <button
+//               type="submit"
+//               disabled={loading}
+//               className="auth-button"
+//               aria-label={mode === 'signup' ? 'Sign Up with OTP' : 'Login with OTP'}
+//             >
+//               {loading ? (
+//                 <span className="loading-spinner">Processing...</span>
+//               ) : mode === 'signup' ? (
+//                 'Sign Up'
+//               ) : (
+//                 'Login'
+//               )}
+//             </button>
+//             <button
+//               onClick={sendOtp}
+//               disabled={loading || resendCooldown > 0}
+//               className="otp-btn resend-btn"
+//               aria-label="Resend OTP"
+//             >
+//               {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+//             </button>
+//           </>
+//         )}
+//       </form>
+//       <button
+//         onClick={handleModeToggle}
+//         disabled={loading}
+//         className="auth-toggle"
+//         aria-label={mode === 'signup' ? 'Switch to Login' : 'Switch to Sign Up'}
+//       >
+//         {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
+//       </button>
+//       <div className="auth-footer">
+//         <Link to="/policy" className="footer-link" aria-label="View Policies">
+//           Policies
+//         </Link>
+//         <Link to="/privacy" className="footer-link" aria-label="View Privacy Policy">
+//           Privacy Policy
+//         </Link>
+//       </div>
+//       <Link to="/" className="back-link" aria-label="Back to Home">
+//         Back to Home
+//       </Link>
+//     </div>
+//   );
+// }
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
+import { Toaster, toast } from 'react-hot-toast';
+import icon from '../assets/icon.png';
+import '../style/Auth.css';
+
+export default function Auth() {
+  const navigate = useNavigate();
+  const [mode, setMode] = useState('signup'); // Default to signup
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Redirect if already authenticated and subscribe to auth events
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate('/account', { replace: true });
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') navigate('/account', { replace: true });
+      if (event === 'SIGNED_OUT') navigate('/auth', { replace: true });
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  // Handle resend OTP cooldown
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  // Send OTP
+  const sendOtp = useCallback(async () => {
+    if (!/^[0-9]{10}$/.test(phone)) {
+      toast.error('Enter a valid 10-digit phone number (e.g., 9876543210)', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        },
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const fullPhone = `+91${phone}`;
+      const { error } = await supabase.auth.signInWithOtp({ phone: fullPhone });
+      if (error) throw error;
+      setOtpSent(true);
+      setResendCooldown(30); // 30-second cooldown for resend
+      toast.success('OTP sent to your phone. Please check.', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#2ecc71',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        },
+      });
+    } catch (err) {
+      toast.error('Failed to send OTP. Please try again.', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        },
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [phone]);
+
+  // Verify OTP and handle auth
+  const handleAuth = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!otpSent || !otp) {
+      toast.error('Please request and enter the OTP.', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        },
+      });
+      return;
+    }
+    if (mode === 'signup' && !fullName.trim()) {
+      toast.error('Full name is required for sign-up.', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        },
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const fullPhone = `+91${phone}`;
+      const { error } = await supabase.auth.verifyOtp({ phone: fullPhone, token: otp, type: 'sms' });
+      if (error) throw error;
+      if (mode === 'signup') {
+        const { data: { user }, error: signUpError } = await supabase.auth.signUp({ phone: fullPhone });
+        if (signUpError) throw signUpError;
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          full_name: fullName,
+          phone_number: fullPhone,
+        });
+        toast.success('Sign-up successful. You are now logged in.', {
+          duration: 3000,
+          position: 'top-center',
+          style: {
+            background: '#2ecc71',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+          },
+        });
+      } else {
+        toast.success('Login successful.', {
+          duration: 3000,
+          position: 'top-center',
+          style: {
+            background: '#2ecc71',
+            color: '#fff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            padding: '16px',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+          },
+        });
+      }
+    } catch (err) {
+      toast.error('Invalid OTP or authentication failed. Please try again.', {
+        duration: 3000,
+        position: 'top-center',
+        style: {
+          background: '#ef4444',
+          color: '#fff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          padding: '16px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reset form fields on mode toggle
+  const handleModeToggle = () => {
+    setMode(mode === 'signup' ? 'login' : 'signup');
+    setFullName('');
+    setPhone('');
+    setOtp('');
+    setOtpSent(false);
+    setResendCooldown(0);
+  };
+
+  return (
+    <div className="auth-container">
+      <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+      <h1 className="auth-title">{mode === 'signup' ? 'Think & Deliver Sign Up' : 'Think & Deliver Login'}</h1>
+      <form onSubmit={handleAuth} className="auth-form">
+        {mode === 'signup' && (
+          <input
+            type="text"
+            placeholder="Full Name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            disabled={loading}
+            required
+            className="auth-input"
+            aria-label="Full Name"
+          />
+        )}
+        <div className="phone-input-wrapper">
+          <span className="phone-prefix">+91</span>
+          <input
+            type="tel"
+            placeholder="9876543210"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+            disabled={loading || otpSent}
+            required
+            className="auth-input phone-input"
+            aria-label="Phone Number"
+          />
+        </div>
+        {!otpSent ? (
+          <button
+            onClick={sendOtp}
+            disabled={loading}
+            className="otp-btn"
+            aria-label="Send OTP"
+          >
+            {loading ? (
+              <span className="loading-spinner">Sending...</span>
+            ) : (
+              'Send OTP'
+            )}
+          </button>
+        ) : (
+          <>
+            <input
+              type="text"
+              placeholder="Enter OTP"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+              disabled={loading}
+              required
+              className="auth-input"
+              aria-label="OTP Code"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="auth-button"
+              aria-label={mode === 'signup' ? 'Sign Up with OTP' : 'Login with OTP'}
+            >
+              {loading ? (
+                <span className="loading-spinner">Processing...</span>
+              ) : mode === 'signup' ? (
+                'Sign Up'
+              ) : (
+                'Login'
+              )}
+            </button>
+            <button
+              onClick={sendOtp}
+              disabled={loading || resendCooldown > 0}
+              className="otp-btn resend-btn"
+              aria-label="Resend OTP"
+            >
+              {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+            </button>
+          </>
+        )}
+      </form>
+      <img
+        src={icon}
+        alt="Think & Deliver Logo"
+        className="auth-icon"
+      />
+      <button
+        onClick={handleModeToggle}
+        disabled={loading}
+        className="auth-toggle"
+        aria-label={mode === 'signup' ? 'Switch to Login' : 'Switch to Sign Up'}
+      >
+        {mode === 'signup' ? 'Have an account? Login' : 'Need an account? Sign Up'}
+      </button>
+      <div className="auth-footer">
+        <Link to="/policy" className="footer-link" aria-label="View Policies">
+          Policies
+        </Link>
+        <Link to="/privacy" className="footer-link" aria-label="View Privacy Policy">
+          Privacy Policy
+        </Link>
+      </div>
+      <Link to="/" className="back-link" aria-label="Back to Home">
+        Back to Home
+      </Link>
+    </div>
+  );
+}

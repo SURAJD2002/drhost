@@ -38,11 +38,13 @@
   font-size: 28px;
   font-weight: 800;
   background: linear-gradient(90deg, var(--primary-dark), var(--accent-gold));
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 25px;
   position: relative;
 }
+
 
 .auth-title::after {
   content: '';
@@ -285,7 +287,7 @@ hr {
   .auth-button,
   .otp-btn,
   .auth-toggle {
-    font-size: 14px;
+    font-size: 18px;
     padding: 10px;
   }
 
@@ -293,5 +295,42 @@ hr {
   .footer-link,
   .back-link {
     font-size: 13px;
+  }
+}
+/* Premium color palette (for consistency with Auth.css) */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.15); /* Glassmorphism background */
+  --glass-border: rgba(255, 255, 255, 0.25); /* Glassmorphism border */
+}
+
+/* Icon */
+.auth-icon {
+  display: block;
+  max-width: 100px;
+  height: auto;
+  margin: 20px auto;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: fadeInUp 0.8s ease forwards;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .auth-icon {
+    max-width: 110px;
+    margin: 15px auto;
   }
 }

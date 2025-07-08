@@ -7,14 +7,14 @@
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-primitive": "^2.1.0",
     "@radix-ui/react-slot": "^1.2.0",
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/supabase-js": "^2.50.2",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^13.5.0",
     "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "mapbox-gl": "^3.11.1",
     "react": "^18.3.1",
     "react-confetti": "^6.4.0",
@@ -57,7 +57,15 @@
     ]
   },
   "devDependencies": {
+    "@babel/plugin-transform-runtime": "^7.28.0",
+    "@babel/preset-typescript": "^7.27.1",
+    "@types/node": "^20.16.11",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
     "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.3"
+    "postcss": "^8.5.3",
+    "typescript": "^4.9.5"
   }
 }
