@@ -40,14 +40,47 @@
 // //   },
 // // });
 
+// import { createClient } from '@supabase/supabase-js';
+
+// const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+// const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
+
+// export const supabase = createClient(supabaseUrl, supabaseKey);
+
+
+// src/lib/supabaseClient.ts (or .js if you’re not using TS)
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
+/* ------------------------------------------------------------------ */
+/* 1.  Read the env vars – works in BOTH Vite and CRA                 */
+/* ------------------------------------------------------------------ */
+const supabaseUrl =
+  // Vite style
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
+  // CRA / Webpack style
+  process.env.REACT_APP_SUPABASE_URL;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseKey =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_KEY) ||
+  process.env.REACT_APP_SUPABASE_KEY;
 
+/* Guard-rail: throw a helpful error during dev/build  */
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    '[supabaseClient] Missing env variables. ' +
+    'Add VITE_SUPABASE_URL / VITE_SUPABASE_KEY (Vite) or ' +
+    'REACT_APP_SUPABASE_URL / REACT_APP_SUPABASE_KEY (CRA) to your .env file.'
+  );
+}
 
+/* ------------------------------------------------------------------ */
+/* 2.  Create the client – add a global Accept header to stop 406s    */
+/* ------------------------------------------------------------------ */
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  global: {
+    headers: { Accept: 'application/json' }   // ← PostgREST always returns JSON
+  }
+});
 
 
 // import { createClient } from '@supabase/supabase-js';
