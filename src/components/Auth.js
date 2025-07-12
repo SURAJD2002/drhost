@@ -4846,6 +4846,722 @@
 // }
 
 
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { Link, useNavigate } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { Toaster, toast } from 'react-hot-toast';
+// import '../style/Auth.css';
+
+// const INDIAN_PHONE = /^\+91\d{10}$/;
+// const MIN_NAME_LENGTH = 2;
+// const MIN_PASSWORD_LENGTH = 6;
+
+// export default function Auth() {
+//   const nav = useNavigate();
+
+//   /* State */
+//   const [mode, setMode] = useState('login'); // login | signup | forgot | edit
+//   const [fullName, setFullName] = useState('');
+//   const [phone, setPhone] = useState('+91');
+//   const [password, setPassword] = useState('');
+//   const [confirmPassword, setConfirmPwd] = useState('');
+//   const [otp, setOtp] = useState('');
+//   const [otpSent, setOtpSent] = useState(false);
+//   const [otpVerified, setOtpVerified] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [cooldown, setCooldown] = useState(0);
+//   const [showPwd, setShowPwd] = useState(false);
+//   const [showConfirm, setShowConfirm] = useState(false);
+
+//   /* Helpers */
+//   const resetUI = () => {
+//     setOtp('');
+//     setOtpSent(false);
+//     setOtpVerified(false);
+//     setCooldown(0);
+//   };
+
+//   const switchMode = (m) => {
+//     setMode(m);
+//     setPassword('');
+//     setConfirmPwd('');
+//     setFullName('');
+//     setPhone('+91');
+//     resetUI();
+//   };
+
+//   const validPhone = (p) => INDIAN_PHONE.test(p);
+//   const validName = (n) =>
+//     n.trim() &&
+//     n.trim().toLowerCase() !== 'user' &&
+//     n.trim().length >= MIN_NAME_LENGTH;
+
+//   const showError = (message) =>
+//     toast.error(message, {
+//       duration: 3000,
+//       position: 'top-center',
+//       style: {
+//         background: '#ef4444',
+//         color: '#fff',
+//         fontWeight: 'bold',
+//         borderRadius: '8px',
+//         padding: '16px',
+//         boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//       },
+//     });
+
+//   const showSuccess = (message) =>
+//     toast.success(message, {
+//       duration: 3000,
+//       position: 'top-center',
+//       style: {
+//         background: '#2ecc71',
+//         color: '#fff',
+//         fontWeight: 'bold',
+//         borderRadius: '8px',
+//         padding: '16px',
+//         boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+//       },
+//     });
+
+//   /* Supabase Session Watch */
+//   useEffect(() => {
+//     const fetchSession = async () => {
+//       const { data: { session }, error } = await supabase.auth.getSession();
+//       if (error) {
+//         console.error('Session fetch error:', error);
+//         showError('Failed to fetch session. Please try again.');
+//         return;
+//       }
+//       if (session) {
+//         if (mode === 'edit') {
+//           const { data, error } = await supabase
+//             .from('profiles')
+//             .select('full_name, phone_number')
+//             .eq('id', session.user.id)
+//             .single();
+//           if (error) {
+//             console.error('Profile fetch error:', error);
+//             showError('Failed to load profile. Please try again.');
+//             return;
+//           }
+//           setFullName(data.full_name || '');
+//           setPhone(data.phone_number || '+91');
+//         } else {
+//           nav('/account', { replace: true });
+//         }
+//       }
+//     };
+//     fetchSession();
+
+//     const { data: { subscription } } = supabase.auth.onAuthStateChange(
+//       (event, sess) => {
+//         if (event === 'SIGNED_IN' && mode !== 'edit') {
+//           nav('/account', { replace: true });
+//         }
+//         if (event === 'SIGNED_OUT') {
+//           nav('/auth', { replace: true });
+//         }
+//       }
+//     );
+//     return () => subscription.unsubscribe();
+//   }, [nav, mode]);
+
+//   /* Resend Timer */
+//   useEffect(() => {
+//     if (cooldown === 0) return;
+//     const id = setTimeout(() => setCooldown(cooldown - 1), 1000);
+//     return () => clearTimeout(id);
+//   }, [cooldown]);
+
+//   /* DB Util */
+//   const phoneExists = useCallback(async (ph) => {
+//     const { data, error } = await supabase
+//       .from('profiles')
+//       .select('id')
+//       .eq('phone_number', ph)
+//       .maybeSingle();
+//     if (error && error.code !== 'PGRST116') {
+//       console.error('Phone check error:', error);
+//       throw new Error('Database error while checking phone');
+//     }
+//     return !!data;
+//   }, []);
+
+//   /* OTP Handlers */
+//   const sendOtp = useCallback(async () => {
+//     if (!validPhone(phone)) {
+//       showError('Enter a valid +91 phone number (e.g., +919876543210)');
+//       return;
+//     }
+//     if (cooldown) {
+//       showError(`Please wait ${cooldown}s to resend OTP`);
+//       return;
+//     }
+//     if (mode === 'signup') {
+//       if (!validName(fullName)) {
+//         showError('Full name must be at least 2 characters and not "User"');
+//         return;
+//       }
+//       if (password.length < MIN_PASSWORD_LENGTH) {
+//         showError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+//         return;
+//       }
+//       if (password !== confirmPassword) {
+//         showError('Passwords do not match');
+//         return;
+//       }
+//     }
+//     setLoading(true);
+//     try {
+//       const { error } = await supabase.auth.signInWithOtp({
+//         phone,
+//         options: { data: mode === 'signup' ? { full_name: fullName } : undefined },
+//       });
+//       if (error) {
+//         console.error('OTP send error:', error);
+//         if (error.message.includes('already registered')) {
+//           showError(
+//             'This phone number is already registered. Please log in or use a different number.'
+//           );
+//         } else {
+//           showError(error.message || 'Failed to send OTP');
+//         }
+//         return;
+//       }
+//       setOtpSent(true);
+//       setCooldown(30);
+//       showSuccess('OTP sent to your phone');
+//     } catch (err) {
+//       console.error('OTP send error:', err);
+//       showError(err.message || 'Failed to send OTP');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [phone, fullName, password, confirmPassword, mode, cooldown]);
+
+//   const verifyOtp = async () => {
+//     if (!otp) {
+//       showError('Please enter the OTP');
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const { data, error } = await supabase.auth.verifyOtp({
+//         phone,
+//         token: otp,
+//         type: 'sms',
+//       });
+//       if (error) {
+//         console.error('OTP verify error:', error);
+//         showError('Invalid OTP');
+//         return;
+//       }
+//       setOtpVerified(true);
+//       setOtp('');
+//       setOtpSent(false);
+//       showSuccess('Phone number verified');
+//       if (mode === 'signup') {
+//         await finishSignup(data.user);
+//       } else if (mode === 'forgot') {
+//         // Wait for password reset
+//       } else {
+//         nav('/account', { replace: true });
+//       }
+//     } catch (err) {
+//       console.error('OTP verify error:', err);
+//       showError(err.message || 'Invalid OTP');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   /* Signup Flow */
+//   const finishSignup = async (user) => {
+//     try {
+//       const { error: profErr } = await supabase.from('profiles').upsert({
+//         id: user.id,
+//         full_name: fullName.trim(),
+//         phone_number: phone,
+//         is_seller: false,
+//         created_at: new Date().toISOString(),
+//         updated_at: new Date().toISOString(),
+//       });
+//       if (profErr) {
+//         console.error('Profile upsert error:', profErr);
+//         showError('Could not save profile');
+//         return;
+//       }
+
+//       const { error: pwErr } = await supabase.auth.updateUser({ password });
+//       if (pwErr) {
+//         console.error('Password update error:', pwErr);
+//         showError(pwErr.message || 'Could not set password');
+//         return;
+//       }
+
+//       const { data: profile, error: fetchErr } = await supabase
+//         .from('profiles')
+//         .select('full_name, phone_number')
+//         .eq('id', user.id)
+//         .single();
+//       if (fetchErr) {
+//         console.error('Profile fetch error:', fetchErr);
+//         showError('Failed to verify profile');
+//         return;
+//       }
+//       if (!profile.full_name || !profile.phone_number) {
+//         showError('Please complete your profile details');
+//         setMode('edit');
+//       } else {
+//         showSuccess('Signed up successfully');
+//         nav('/account', { replace: true });
+//       }
+//     } catch (err) {
+//       console.error('Signup finish error:', err);
+//       showError(err.message || 'Signup failed');
+//     }
+//   };
+
+//   const handleSignup = async (e) => {
+//     e.preventDefault();
+//     if (!validName(fullName)) {
+//       showError('Full name must be at least 2 characters and not "User"');
+//       return;
+//     }
+//     if (!validPhone(phone)) {
+//       showError('Enter a valid +91 phone number');
+//       return;
+//     }
+//     if (password.length < MIN_PASSWORD_LENGTH) {
+//       showError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+//       return;
+//     }
+//     if (password !== confirmPassword) {
+//       showError('Passwords do not match');
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       if (await phoneExists(phone)) {
+//         /* 🔔 already registered ─ switch to Login view */
+//         setLoading(false);
+//         setMode('login'); // keep the phone filled so they can just enter pwd
+//         setOtpSent(false);
+//         showError('You already have an account – please log in.');
+//         return;
+//       }
+
+//       /* brand-new user → normal OTP flow */
+//       showSuccess('Sending OTP…');
+//       await sendOtp();
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   /* Login & Reset */
+//   const handleLogin = async (e) => {
+//     e.preventDefault();
+//     if (!validPhone(phone)) {
+//       showError('Enter a valid +91 phone number');
+//       return;
+//     }
+//     if (!password) {
+//       showError('Password is required');
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const { error } = await supabase.auth.signInWithPassword({
+//         phone,
+//         password,
+//       });
+//       if (error) {
+//         console.error('Login error:', error);
+//         showError('Invalid credentials');
+//         return;
+//       }
+//       showSuccess('Login successful');
+//       nav('/account', { replace: true });
+//     } catch (err) {
+//       console.error('Login error:', err);
+//       showError(err.message || 'Login failed');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const forgotStart = async (e) => {
+//     e.preventDefault();
+//     if (!validPhone(phone)) {
+//       showError('Enter a valid +91 phone number');
+//       return;
+//     }
+//     if (!(await phoneExists(phone))) {
+//       showError('No account found for this phone number');
+//       return;
+//     }
+//     await sendOtp();
+//   };
+
+//   const resetPw = async (e) => {
+//     e.preventDefault();
+//     if (!otpVerified) {
+//       showError('Please verify OTP first');
+//       return;
+//     }
+//     if (password !== confirmPassword) {
+//       showError('Passwords do not match');
+//       return;
+//     }
+//     if (password.length < MIN_PASSWORD_LENGTH) {
+//       showError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const { error } = await supabase.auth.updateUser({ password });
+//       if (error) {
+//         console.error('Password update error:', error);
+//         showError(error.message || 'Password reset failed');
+//         return;
+//       }
+//       const { data: { user } } = await supabase.auth.getUser();
+//       const { data: profile, error: profileErr } = await supabase
+//         .from('profiles')
+//         .select('phone_number')
+//         .eq('id', user.id)
+//         .single();
+//       if (profileErr) {
+//         console.error('Profile fetch error:', profileErr);
+//         showError('Failed to verify profile');
+//         return;
+//       }
+//       if (!profile.phone_number) {
+//         const { error: upsertErr } = await supabase.from('profiles').upsert({
+//           id: user.id,
+//           phone_number: phone,
+//           is_seller: false,
+//           updated_at: new Date().toISOString(),
+//         });
+//         if (upsertErr) {
+//           console.error('Profile upsert error:', upsertErr);
+//           showError('Failed to update profile');
+//           return;
+//         }
+//       }
+//       showSuccess('Password reset successful. Please log in.');
+//       switchMode('login');
+//     } catch (err) {
+//       console.error('Password reset error:', err);
+//       showError(err.message || 'Password reset failed');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   /* Profile Update */
+//   const handleProfileUpdate = async (e) => {
+//     e.preventDefault();
+//     if (!validName(fullName)) {
+//       showError('Full name must be at least 2 characters and not "User"');
+//       return;
+//     }
+//     if (!validPhone(phone)) {
+//       showError('Enter a valid +91 phone number');
+//       return;
+//     }
+//     setLoading(true);
+//     try {
+//       const { data: { user }, error: userErr } = await supabase.auth.getUser();
+//       if (userErr) {
+//         console.error('User fetch error:', userErr);
+//         showError('Failed to fetch user');
+//         return;
+//       }
+//       const { error } = await supabase.from('profiles').upsert({
+//         id: user.id,
+//         full_name: fullName.trim(),
+//         phone_number: phone,
+//         is_seller: false,
+//         updated_at: new Date().toISOString(),
+//       });
+//       if (error) {
+//         console.error('Profile update error:', error);
+//         showError('Failed to update profile');
+//         return;
+//       }
+//       showSuccess('Profile updated successfully');
+//       nav('/account', { replace: true });
+//     } catch (err) {
+//       console.error('Profile update error:', err);
+//       showError(err.message || 'Failed to update profile');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   /* UI */
+//   return (
+//     <div className="auth-container">
+//       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
+//       <h1 className="auth-title">
+//         {mode === 'signup'
+//           ? 'Sign Up'
+//           : mode === 'forgot'
+//           ? 'Reset Password'
+//           : mode === 'edit'
+//           ? 'Update Profile'
+//           : 'Login'}
+//       </h1>
+//       <form
+//         onSubmit={
+//           mode === 'signup'
+//             ? otpSent
+//               ? verifyOtp
+//               : handleSignup
+//             : mode === 'forgot'
+//             ? otpVerified
+//               ? resetPw
+//               : forgotStart
+//             : mode === 'edit'
+//             ? handleProfileUpdate
+//             : handleLogin
+//         }
+//         className="auth-form"
+//       >
+//         {(mode === 'signup' || mode === 'edit') && (
+//           <div className="input-wrapper">
+//             <input
+//               type="text"
+//               value={fullName}
+//               onChange={(e) => setFullName(e.target.value)}
+//               placeholder="Full name (e.g., Suraj Kumar)"
+//               required
+//               disabled={loading || (mode === 'signup' && otpVerified)}
+//               minLength={MIN_NAME_LENGTH}
+//               pattern="^(?!User$|user$).*$"
+//               title="Full name cannot be 'User' and must be at least 2 characters"
+//               className="auth-input"
+//               aria-label="Full Name"
+//             />
+//           </div>
+//         )}
+//         <div className="input-wrapper phone-input-wrapper">
+//           <input
+//             type="tel"
+//             value={phone}
+//             onChange={(e) =>
+//               setPhone(
+//                 e.target.value.startsWith('+91')
+//                   ? e.target.value.replace(/[^0-9+]/g, '').slice(0, 13)
+//                   : '+91'
+//               )
+//             }
+//             maxLength={13}
+//             placeholder="+919876543210"
+//             required
+//             disabled={loading || (mode === 'signup' && otpVerified) || (mode === 'forgot' && otpSent)}
+//             className="auth-input phone-input"
+//             aria-label="Phone Number"
+//           />
+//         </div>
+//         {(mode === 'signup' || mode === 'login') && !otpSent && (
+//           <>
+//             <PasswordField
+//               val={password}
+//               setVal={setPassword}
+//               show={showPwd}
+//               setShow={setShowPwd}
+//               placeholder="Password (minimum 6 characters)"
+//               disabled={loading}
+//               ariaLabel="Password"
+//             />
+//             {mode === 'signup' && (
+//               <PasswordField
+//                 val={confirmPassword}
+//                 setVal={setConfirmPwd}
+//                 show={showConfirm}
+//                 setShow={setShowConfirm}
+//                 placeholder="Confirm password"
+//                 disabled={loading}
+//                 ariaLabel="Confirm Password"
+//               />
+//             )}
+//           </>
+//         )}
+//         {otpSent && (!otpVerified || mode !== 'forgot') && (
+//           <>
+//             <div className="input-wrapper">
+//               <input
+//                 type="text"
+//                 value={otp}
+//                 onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+//                 placeholder="Enter OTP"
+//                 required
+//                 disabled={loading}
+//                 className="auth-input"
+//                 aria-label="OTP Code"
+//               />
+//             </div>
+//             <button
+//               type="button"
+//               onClick={verifyOtp}
+//               disabled={loading}
+//               className="auth-button"
+//               aria-label="Verify OTP"
+//             >
+//               {loading ? <span className="loading-spinner">Verifying...</span> : 'Verify OTP'}
+//             </button>
+//             <button
+//               type="button"
+//               onClick={sendOtp}
+//               disabled={loading || cooldown}
+//               className="otp-btn resend-btn"
+//               aria-label="Resend OTP"
+//             >
+//               {cooldown ? `Resend in ${cooldown}s` : 'Resend OTP'}
+//             </button>
+//           </>
+//         )}
+//         {mode === 'forgot' && otpVerified && (
+//           <>
+//             <PasswordField
+//               val={password}
+//               setVal={setPassword}
+//               show={showPwd}
+//               setShow={setShowPwd}
+//               placeholder="New password (minimum 6 characters)"
+//               disabled={loading}
+//               ariaLabel="New Password"
+//             />
+//             <PasswordField
+//               val={confirmPassword}
+//               setVal={setConfirmPwd}
+//               show={showConfirm}
+//               setShow={setShowConfirm}
+//               placeholder="Confirm new password"
+//               disabled={loading}
+//               ariaLabel="Confirm New Password"
+//             />
+//           </>
+//         )}
+//         {(!otpSent || (mode === 'forgot' && otpVerified) || mode === 'edit') && (
+//           <button
+//             type="submit"
+//             disabled={loading}
+//             className="auth-button"
+//             aria-label={
+//               mode === 'signup'
+//                 ? 'Sign Up'
+//                 : mode === 'forgot'
+//                 ? 'Save Password'
+//                 : mode === 'edit'
+//                 ? 'Update Profile'
+//                 : 'Login'
+//             }
+//           >
+//             {loading ? (
+//               <span className="loading-spinner">Processing...</span>
+//             ) : mode === 'signup' ? (
+//               'Sign Up'
+//             ) : mode === 'forgot' ? (
+//               'Save Password'
+//             ) : mode === 'edit' ? (
+//               'Update Profile'
+//             ) : (
+//               'Login'
+//             )}
+//           </button>
+//         )}
+//       </form>
+//       <div className="toggle auth-toggle-buttons">
+//         {mode !== 'signup' && mode !== 'edit' && (
+//           <button
+//             onClick={() => switchMode('signup')}
+//             disabled={loading}
+//             className="auth-toggle"
+//             aria-label="Switch to Sign Up"
+//           >
+//             Need an account? Sign Up
+//           </button>
+//         )}
+//         {mode !== 'login' && mode !== 'edit' && (
+//           <button
+//             onClick={() => switchMode('login')}
+//             disabled={loading}
+//             className="auth-toggle"
+//             aria-label="Switch to Login"
+//           >
+//             Have an account? Login
+//           </button>
+//         )}
+//         {mode !== 'forgot' && mode !== 'edit' && (
+//           <button
+//             onClick={() => switchMode('forgot')}
+//             disabled={loading}
+//             className="auth-toggle"
+//             aria-label="Forgot Password"
+//           >
+//             Forgot Password?
+//           </button>
+//         )}
+//         {mode === 'edit' && (
+//           <button
+//             onClick={() => nav('/account', { replace: true })}
+//             disabled={loading}
+//             className="auth-toggle"
+//             aria-label="Back to Account"
+//           >
+//             Back to Account
+//           </button>
+//         )}
+//       </div>
+//       <footer className="auth-footer">
+//         <Link to="/policy" className="footer-link" aria-label="View Policies">
+//           Policy
+//         </Link>{' '}
+//         ·{' '}
+//         <Link to="/privacy" className="footer-link" aria-label="View Privacy Policy">
+//           Privacy
+//         </Link>
+//       </footer>
+//       <Link to="/" className="back-link" aria-label="Back to Home">
+//         Back to Home
+//       </Link>
+//     </div>
+//   );
+// }
+
+// /* Reusable Password Field */
+// function PasswordField({ val, setVal, show, setShow, placeholder, disabled, ariaLabel }) {
+//   return (
+//     <div className="pwd-grp input-wrapper password-input-wrapper">
+//       <input
+//         type={show ? 'text' : 'password'}
+//         value={val}
+//         onChange={(e) => setVal(e.target.value)}
+//         placeholder={placeholder}
+//         required
+//         disabled={disabled}
+//         minLength={MIN_PASSWORD_LENGTH}
+//         className="auth-input"
+//         aria-label={ariaLabel}
+//       />
+//       <button
+//         type="button"
+//         onClick={() => setShow(!show)}
+//         className="password-toggle"
+//         aria-label={show ? `Hide ${ariaLabel.toLowerCase()}` : `Show ${ariaLabel.toLowerCase()}`}
+//       >
+//         {show ? '🙈' : '👁️'}
+//       </button>
+//     </div>
+//   );
+// }
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -4948,7 +5664,7 @@ export default function Auth() {
           setFullName(data.full_name || '');
           setPhone(data.phone_number || '+91');
         } else {
-          nav('/account', { replace: true });
+          nav('/', { replace: true }); // Changed to /
         }
       }
     };
@@ -4957,7 +5673,7 @@ export default function Auth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, sess) => {
         if (event === 'SIGNED_IN' && mode !== 'edit') {
-          nav('/account', { replace: true });
+          nav('/', { replace: true }); // Changed to /
         }
         if (event === 'SIGNED_OUT') {
           nav('/auth', { replace: true });
@@ -5066,7 +5782,7 @@ export default function Auth() {
       } else if (mode === 'forgot') {
         // Wait for password reset
       } else {
-        nav('/account', { replace: true });
+        nav('/', { replace: true }); // Changed to /
       }
     } catch (err) {
       console.error('OTP verify error:', err);
@@ -5115,7 +5831,7 @@ export default function Auth() {
         setMode('edit');
       } else {
         showSuccess('Signed up successfully');
-        nav('/account', { replace: true });
+        nav('/', { replace: true }); // Changed to /
       }
     } catch (err) {
       console.error('Signup finish error:', err);
@@ -5183,7 +5899,7 @@ export default function Auth() {
         return;
       }
       showSuccess('Login successful');
-      nav('/account', { replace: true });
+      nav('/', { replace: true }); // Changed to /
     } catch (err) {
       console.error('Login error:', err);
       showError(err.message || 'Login failed');
@@ -5293,7 +6009,7 @@ export default function Auth() {
         return;
       }
       showSuccess('Profile updated successfully');
-      nav('/account', { replace: true });
+      nav('/', { replace: true }); // Changed to /
     } catch (err) {
       console.error('Profile update error:', err);
       showError(err.message || 'Failed to update profile');

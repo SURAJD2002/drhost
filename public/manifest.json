@@ -1,27 +1,14 @@
 {
+  "name": "Markeet – Local E-Commerce within 40 km",
   "short_name": "Markeet",
-  "name": "Markeet – Local E-Commerce within 40km",
-  "icons": [
-    {
-      "src": "icon.png",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/png"
-    },
-    {
-      "src": "icon.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ],
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#F8A044",
-  "description": "Markeet connects local buyers and sellers within a 40 km radius for fast, hyperlocal delivery."
+  "description": "Markeet connects local buyers and sellers within a 40 km radius for fast, hyperlocal delivery.",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png" }
+  ]
 }
