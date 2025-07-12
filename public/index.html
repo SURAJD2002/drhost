@@ -4,49 +4,49 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- ===== FAVICONS ===== -->
-  <link rel="icon" href="/favicon.png"    sizes="any" type="image/png">
-  <!-- tiny fallback for legacy browsers – optional -->
-  <link rel="icon" href="/favicon.ico"    sizes="32x32 48x48">
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!-- ===== FAVICONS & APP ICONS ===== -->
+  <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/logo192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/logo192.png" />
+  <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" type="image/x-icon" />
 
   <!-- ===== WEB APP MANIFEST ===== -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
   <!-- ===== BASIC SEO ===== -->
   <title>Markeet – Local E-Commerce within 40 km</title>
-  <meta name="description"
-        content="Markeet connects local sellers and buyers within a 40 km radius for fast, hyperlocal delivery.">
+  <meta name="title" content="Markeet – Local E-Commerce within 40 km" />
+  <meta name="description" content="Markeet connects local sellers and buyers within a 40 km radius for fast, hyperlocal delivery." />
+  <link rel="canonical" href="https://www.markeet.in/" />
 
-  <link rel="canonical" href="https://www.markeet.in/">
+  <!-- ===== OPEN GRAPH / FACEBOOK ===== -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.markeet.in/" />
+  <meta property="og:title" content="Markeet – Local E-Commerce within 40 km" />
+  <meta property="og:description" content="Discover and buy products from sellers near you. Fast delivery within 40 km of your location." />
+  <meta property="og:image" content="https://www.markeet.in/logo512.png" />
 
-  <!-- ===== OPEN GRAPH / TWITTER ===== -->
-  <meta property="og:type"        content="website">
-  <meta property="og:url"         content="https://www.markeet.in/">
-  <meta property="og:title"       content="Markeet – Local E-Commerce within 40 km">
-  <meta property="og:description" content="Discover and buy products from sellers near you. Fast delivery within 40 km of your location.">
-  <meta property="og:image"       content="https://www.markeet.in/favicon.png">
+  <!-- ===== TWITTER CARD ===== -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://www.markeet.in/" />
+  <meta name="twitter:title" content="Markeet – Local E-Commerce within 40 km" />
+  <meta name="twitter:description" content="Discover and buy products from sellers near you. Fast delivery within 40 km of your location." />
+  <meta name="twitter:image" content="https://www.markeet.in/logo512.png" />
 
-  <meta name="twitter:card"       content="summary_large_image">
-  <meta name="twitter:title"      content="Markeet – Local E-Commerce within 40 km">
-  <meta name="twitter:description"
-        content="Discover and buy products from sellers near you. Fast delivery within 40 km of your location.">
-  <meta name="twitter:image"      content="https://www.markeet.in/favicon.png">
+  <!-- ===== THEME COLOR FOR MOBILE BROWSERS ===== -->
+  <meta name="theme-color" content="#F8A044" />
 
-  <!-- ===== THEME COLOR (used on Android URL bar) ===== -->
-  <meta name="theme-color" content="#F8A044">
-
-  <!-- Optional: force HTTPS + www in production -->
+  <!-- ===== REDIRECT TO HTTPS & WWW IN PRODUCTION ===== -->
   <script>
     (() => {
       const host = location.hostname;
       if (!/^(localhost|127\.0\.0\.1)$/.test(host)) {
         if (location.protocol !== 'https:') {
-          location.replace('https:' + location.href.substring(location.protocol.length));
+          location.replace('https:' + window.location.href.substring(location.protocol.length));
           return;
         }
         if (host === 'markeet.in') {
-          location.replace(location.href.replace('markeet.in', 'www.markeet.in'));
+          location.replace(window.location.href.replace('markeet.in', 'www.markeet.in'));
         }
       }
     })();
