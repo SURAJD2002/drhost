@@ -7780,6 +7780,546 @@
 // }
 
 
+// import React, { useState, useEffect, useContext, useCallback } from 'react';
+// import { supabase } from '../supabaseClient';
+// import { useNavigate } from 'react-router-dom';
+// import { LocationContext } from '../App';
+// import { useFetchCartProducts } from '../hooks/useFetchCartProducts';
+// import '../style/Checkout.css';
+// import Footer from './Footer';
+// import { Helmet } from 'react-helmet-async';
+// import { toast } from 'react-hot-toast';
+
+// // -----------------------------------------------------------------------------
+// // CONSTANTS
+// // -----------------------------------------------------------------------------
+// const DEFAULT_IMAGE =
+//   'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+// const DEFAULT_LOCATION = { lat: 23.7407, lon: 86.4146 };
+// const DEFAULT_ADDRESS = 'Jharia, Dhanbad, Jharkhand 828111, India';
+// const DELIVERY_RADIUS_FALLBACK = 40; // km
+
+// // -----------------------------------------------------------------------------
+// // HELPER UTILS
+// // -----------------------------------------------------------------------------
+// /** Simple debounce */
+// const debounce = (fn, delay = 500) => {
+//   let tId;
+//   return (...args) => {
+//     clearTimeout(tId);
+//     tId = setTimeout(() => fn(...args), delay);
+//   };
+// };
+
+// /** Haversine distance (km) */
+// function calculateDistance(a, b) {
+//   if (!a?.lat || !a?.lon || !b?.lat || !b?.lon) return null;
+//   const R = 6371;
+//   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+//   const dLon = ((b.lon - a.lon) * Math.PI) / 180;
+//   const sLat = Math.sin(dLat / 2);
+//   const sLon = Math.sin(dLon / 2);
+//   const h =
+//     sLat ** 2 +
+//     Math.cos((a.lat * Math.PI) / 180) *
+//       Math.cos((b.lat * Math.PI) / 180) *
+//       sLon ** 2;
+//   return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+// }
+
+// /** Generic retry wrapper */
+// const retryRequest = async (fn, maxAttempts = 3, delay = 1000) => {
+//   for (let i = 1; i <= maxAttempts; i += 1) {
+//     try {
+//       return await fn();
+//     } catch (err) {
+//       if (i === maxAttempts) throw err;
+//       await new Promise((r) => setTimeout(r, delay));
+//       delay *= 2;
+//     }
+//   }
+// };
+
+// const matchProduct = (item, product) =>
+//   item.product_id === product.id &&
+//   (item.variant_id ?? null) === (product.selectedVariant?.id ?? null);
+
+// // -----------------------------------------------------------------------------
+// // COMPONENT
+// // -----------------------------------------------------------------------------
+// export default function Checkout() {
+//   // CONTEXT ------------------------------------------------
+//   const { buyerLocation, setCartCount } = useContext(LocationContext);
+
+//   // STATE --------------------------------------------------
+//   const [cartItems, setCartItems] = useState([]);
+//   const [userLocation, setUserLocation] = useState(buyerLocation);
+//   const [address, setAddress] = useState('');
+//   const [manualAddress, setManualAddress] = useState('');
+//   const [addressError, setAddressError] = useState('');
+//   const [orderConfirmed, setOrderConfirmed] = useState(false);
+//   const [locationMsg, setLocationMsg] = useState('');
+
+//   // HOOKS --------------------------------------------------
+//   const navigate = useNavigate();
+//   const {
+//     fetchCartProducts,
+//     products,
+//     loading,
+//     error,
+//     setLoading,
+//     setError,
+//     setProducts,
+//   } = useFetchCartProducts(userLocation);
+
+//   // ---------------------------------------------------------------------------
+//   // EFFECTS / CALLBACKS
+//   // ---------------------------------------------------------------------------
+//   /** Reverse-geocode helper – debounced */
+//   const fetchAddress = useCallback(
+//     debounce(async (lat, lon) => {
+//       try {
+//         const res = await fetch(
+//           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+//           { headers: { 'User-Agent': 'Markeet/1.0' } },
+//         );
+//         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+//         const data = await res.json();
+//         const displayName = data.display_name || DEFAULT_ADDRESS;
+//         setAddress(displayName);
+//         setManualAddress(displayName);
+//         setLocationMsg('Address fetched successfully.');
+//         toast.success('Address fetched successfully.');
+//       } catch (err) {
+//         setAddress(DEFAULT_ADDRESS);
+//         setManualAddress(DEFAULT_ADDRESS);
+//         setLocationMsg('Unable to fetch address – please enter manually.');
+//         toast.error('Failed to fetch address.');
+//       }
+//     }, 500),
+//     [],
+//   );
+
+//   /** Detect browser location */
+//   const handleDetectLocation = useCallback(() => {
+//     if (!navigator.geolocation) {
+//       toast.error('Geolocation not supported by browser.');
+//       return;
+//     }
+//     setLocationMsg('Detecting location…');
+//     navigator.geolocation.getCurrentPosition(
+//       (pos) => {
+//         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+//         setUserLocation(coords);
+//         fetchAddress(coords.lat, coords.lon);
+//       },
+//       () => {
+//         setLocationMsg('Unable to detect location.');
+//         toast.error('Location detection failed.');
+//       },
+//       { enableHighAccuracy: true, timeout: 10000 },
+//     );
+//   }, [fetchAddress]);
+
+//   /** Sync context location */
+//   useEffect(() => {
+//     if (buyerLocation?.lat && buyerLocation?.lon) {
+//       setUserLocation(buyerLocation);
+//       fetchAddress(buyerLocation.lat, buyerLocation.lon);
+//     }
+//   }, [buyerLocation, fetchAddress]);
+
+//   /** Fetch cart + products once location is available */
+//   const initializeCart = useCallback(async () => {
+//     if (!userLocation?.lat || !userLocation?.lon) {
+//       setError('Location data unavailable. Please set your location.');
+//       setLoading(false);
+//       return;
+//     }
+
+//     try {
+//       setLoading(true);
+//       setError(null);
+
+//       const {
+//         data: { session },
+//         error: sessionErr,
+//       } = await supabase.auth.getSession();
+
+//       if (sessionErr || !session?.user || !session?.access_token) {
+//         localStorage.removeItem('supabase.auth.token');
+//         await supabase.auth.signOut();
+//         setError('Please log in to view your cart.');
+//         setCartItems([]);
+//         setProducts([]);
+//         setCartCount(0);
+//         localStorage.setItem('cart', JSON.stringify([]));
+//         toast.error('Please log in to checkout.', { duration: 3000 });
+//         navigate('/auth');
+//         return;
+//       }
+
+//       const { data: rows, error: cartErr } = await supabase
+//         .from('cart')
+//         .select('*')
+//         .eq('user_id', session.user.id);
+//       if (cartErr) throw cartErr;
+
+//       if (!rows?.length) {
+//         setError('Your cart is empty.');
+//         setCartItems([]);
+//         setProducts([]);
+//         setCartCount(0);
+//         localStorage.setItem('cart', JSON.stringify([]));
+//         return;
+//       }
+
+//       setCartItems(rows);
+//       localStorage.setItem('cart', JSON.stringify(rows));
+//       setCartCount(rows.length);
+//       await fetchCartProducts(rows);
+//     } catch (err) {
+//       setError(err.message || 'Failed to load cart');
+//       toast.error(err.message || 'Failed to load cart', { duration: 3000 });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [userLocation, fetchCartProducts, setCartCount, setProducts, setError, setLoading]);
+
+//   useEffect(() => {
+//     initializeCart();
+//   }, [initializeCart]);
+
+//   // ---------------------------------------------------------------------------
+//   // COMPUTED
+//   // ---------------------------------------------------------------------------
+//   const total = products.reduce((sum, p) => {
+//     const ci = cartItems.find((c) => c.id === p.cartId);
+//     if (!ci) return sum;
+//     const qty = ci.quantity ?? 1;
+//     const price = parseFloat(p.selectedVariant?.price ?? p.price ?? ci.price ?? 0);
+//     return sum + price * qty;
+//   }, 0);
+
+//   /** Group cart items by seller */
+//   const groupCartItemsBySeller = () => {
+//     const map = {};
+//     cartItems.forEach((ci) => {
+//       const prod = products.find((p) => matchProduct(ci, p));
+//       if (!prod) return;
+//       const seller = prod.seller_id;
+//       if (!map[seller]) map[seller] = { items: [], effectiveRadius: prod.deliveryRadius ?? DELIVERY_RADIUS_FALLBACK };
+//       const price = parseFloat(prod.selectedVariant?.price ?? prod.price ?? ci.price ?? 0);
+//       map[seller].items.push({
+//         product_id: ci.product_id,
+//         variant_id: ci.variant_id ?? null,
+//         quantity: ci.quantity ?? 1,
+//         price,
+//       });
+//     });
+//     return map;
+//   };
+
+//   /** Insert orders + items */
+//   const placeOrdersForAllSellers = async (userId, shipLoc, shipAddr) => {
+//     const grouped = groupCartItemsBySeller();
+//     const newOrderIds = [];
+
+//     for (const [sellerId, { items, effectiveRadius }] of Object.entries(grouped)) {
+//       const { data: sellerData, error: sellerErr } = await supabase
+//         .from('sellers')
+//         .select('latitude, longitude')
+//         .eq('id', sellerId)
+//         .single();
+
+//       if (sellerErr) throw sellerErr;
+
+//       const sellerLoc = { lat: sellerData.latitude, lon: sellerData.longitude };
+//       const distKm = calculateDistance(shipLoc, sellerLoc);
+//       if (distKm === null || distKm > effectiveRadius) {
+//         throw new Error(`Seller out of range (${distKm?.toFixed(1)} km)`);
+//       }
+
+//       const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+//       const eta = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+//       const { data: orderRow, error: orderErr } = await supabase
+//         .from('orders')
+//         .insert({
+//           user_id: userId,
+//           seller_id: sellerId,
+//           total: subtotal,
+//           order_status: 'pending',
+//           payment_method: 'cash_on_delivery',
+//           shipping_location: `POINT(${shipLoc.lon} ${shipLoc.lat})`,
+//           shipping_address: shipAddr,
+//           estimated_delivery: eta.toISOString(),
+//         })
+//         .select()
+//         .single();
+
+//       if (orderErr) throw orderErr;
+//       newOrderIds.push(orderRow.id);
+
+//       const { error: itemsErr } = await supabase
+//         .from('order_items')
+//         .insert(items.map((i) => ({ order_id: orderRow.id, ...i })));
+//       if (itemsErr) throw itemsErr;
+//     }
+//     return newOrderIds;
+//   };
+
+//   // ---------------------------------------------------------------------------
+//   // ADDRESS VALIDATION
+//   // ---------------------------------------------------------------------------
+//   const validateAddress = (addr) => {
+//     const ok = addr && addr.trim().length >= 10;
+//     if (!ok) throw new Error('Address must be at least 10 characters');
+//     return true;
+//   };
+
+//   const validateManualAddress = (addr) => {
+//     try {
+//       validateAddress(addr);
+//       setAddressError('');
+//       return true;
+//     } catch (err) {
+//       setAddressError(err.message);
+//       toast.error(err.message);
+//       return false;
+//     }
+//   };
+
+//   // ---------------------------------------------------------------------------
+//   // MAIN CHECKOUT HANDLER
+//   // ---------------------------------------------------------------------------
+//   const handleCheckout = async (e) => {
+//     e.preventDefault();
+//     if (!products.length) return toast.error('Cart is empty');
+
+//     setLoading(true);
+//     const originalCart = [...cartItems];
+
+//     try {
+//       let {
+//         data: { session },
+//       } = await supabase.auth.getSession();
+
+//       if (!session?.user || !session?.access_token) {
+//         toast.error('Authentication required.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       const { data: refreshed, error: refErr } = await supabase.auth.refreshSession();
+//       if (refErr || !refreshed?.session?.access_token) {
+//         toast.error('Session expired.');
+//         navigate('/auth');
+//         return;
+//       }
+
+//       session = refreshed.session;
+
+//       const shipLoc = userLocation || DEFAULT_LOCATION;
+//       const shipAddr = manualAddress || address || DEFAULT_ADDRESS;
+//       validateAddress(shipAddr);
+
+//       // Delivery radius check
+//       for (const p of products) {
+//         const { data: sellerLoc, error: sellerErr } = await supabase
+//           .from('sellers')
+//           .select('latitude, longitude')
+//           .eq('id', p.seller_id)
+//           .single();
+//         if (sellerErr) throw sellerErr;
+//         const d = calculateDistance(shipLoc, {
+//           lat: sellerLoc.latitude,
+//           lon: sellerLoc.longitude,
+//         });
+//         const radius = p.deliveryRadius || DELIVERY_RADIUS_FALLBACK;
+//         if (d === null || d > radius) throw new Error(`${p.title} out of delivery range.`);
+//       }
+
+//       const newOrderIds = await placeOrdersForAllSellers(
+//         session.user.id,
+//         shipLoc,
+//         shipAddr
+//       );
+
+//       // Empty cart
+//       await supabase.from('cart').delete().eq('user_id', session.user.id);
+//       setCartItems([]);
+//       setProducts([]);
+//       setCartCount(0);
+//       localStorage.removeItem('cart');
+
+//       setOrderConfirmed(true);
+//       toast.success("Don't worry, we're on our way with your delivery in no time!", { duration: 5000 });
+//       setTimeout(() => navigate('/account', { state: { newOrderIds } }), 5000);
+//     } catch (err) {
+//       setCartItems(originalCart);
+//       toast.error(err.message || 'Checkout failed');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // ---------------------------------------------------------------------------
+//   // RENDER
+//   // ---------------------------------------------------------------------------
+//   const pageUrl = 'https://www.markeet.com/checkout';
+//   if (loading) return <div className="checkout-loading">Loading...</div>;
+//   if (error) return <div className="checkout-error">{error}</div>;
+
+//   if (orderConfirmed) {
+//     return (
+//       <div className="checkout-success">
+//         <Helmet>
+//           <title>Order Confirmed – Markeet</title>
+//           <meta name="robots" content="noindex" />
+//           <link rel="canonical" href={pageUrl} />
+//         </Helmet>
+//         <h1>Order Confirmed!</h1>
+//         <p>Don't worry, we're on our way with your delivery in no time!</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="checkout">
+//       <Helmet>
+//         <title>Checkout – Markeet</title>
+//         <meta name="robots" content="noindex" />
+//         <link rel="canonical" href={pageUrl} />
+//       </Helmet>
+
+//       <h1 className="checkout-title">Checkout</h1>
+
+//       {!products.length ? (
+//         <p className="empty-checkout">Your cart is empty.</p>
+//       ) : (
+//         <>
+//           {/* ITEMS LIST */}
+//           <div className="checkout-items">
+//             {products.map((p) => {
+//               const cartItem = cartItems.find((ci) => ci.id === p.cartId);
+//               if (!cartItem) {
+//                 toast.error(`Failed to load ${p.title || 'product'}.`, { duration: 3000 });
+//                 return null;
+//               }
+//               const qty = cartItem.quantity ?? 1;
+//               const price = parseFloat(p.selectedVariant?.price ?? p.price ?? cartItem.price ?? 0);
+//               const attrs = p.selectedVariant?.attributes
+//                 ? Object.entries(p.selectedVariant.attributes)
+//                     .filter(([, v]) => v)
+//                     .map(([k, v]) => `${k}: ${v}`)
+//                     .join(', ')
+//                 : null;
+//               return (
+//                 <div className="checkout-item" key={`${p.id}-${cartItem.id}`}>
+//                   <img
+//                     src={p.images?.[0] || DEFAULT_IMAGE}
+//                     alt={`${p.title} checkout image`}
+//                     onError={(e) => {
+//                       e.target.src = DEFAULT_IMAGE;
+//                     }}
+//                     className="checkout-item-image"
+//                   />
+//                   <div className="checkout-item-details">
+//                     <h3 className="checkout-item-title">{p.title || 'Unnamed Product'}</h3>
+//                     {attrs && <p className="variant-info">Variant: {attrs}</p>}
+//                     <div className="checkout-item-price-section">
+//                       <div className="price-container">
+//                         <span className="checkout-item-final-price">
+//                           ₹{price.toLocaleString('en-IN', {
+//                             minimumFractionDigits: 2,
+//                             maximumFractionDigits: 2,
+//                           })}
+//                         </span>
+//                       </div>
+//                     </div>
+//                     <p>Quantity: {qty}</p>
+//                     <p>
+//                       Subtotal: ₹{(price * qty).toLocaleString('en-IN', {
+//                         minimumFractionDigits: 2,
+//                         maximumFractionDigits: 2,
+//                       })}
+//                     </p>
+//                   </div>
+//                 </div>
+//               );
+//             })}
+//           </div>
+
+//           {/* CHECKOUT DETAILS */}
+//           <div className="checkout-details">
+//             <h2 className="checkout-summary-title">Order Summary</h2>
+//             <p className="checkout-total">
+//               Total: ₹{total.toLocaleString('en-IN', {
+//                 minimumFractionDigits: 2,
+//                 maximumFractionDigits: 2,
+//               })}
+//             </p>
+
+//             <h3 className="checkout-section-title">Shipping Address</h3>
+//             <button
+//               onClick={handleDetectLocation}
+//               className="detect-location-btn"
+//               disabled={loading}
+//               aria-label="Detect my current location"
+//             >
+//               Detect My Location
+//             </button>
+//             {locationMsg && <p className="location-message">{locationMsg}</p>}
+//             {userLocation && address ? (
+//               <p className="detected-address">
+//                 Detected: {address} (Lat {userLocation.lat.toFixed(4)}, Lon{' '}
+//                 {userLocation.lon.toFixed(4)})
+//               </p>
+//             ) : (
+//               <p className="no-address">Please enter your address below.</p>
+//             )}
+//             <label htmlFor="shipping-address" className="address-label">
+//               Shipping Address
+//             </label>
+//             <textarea
+//               id="shipping-address"
+//               value={manualAddress}
+//               onChange={(e) => {
+//                 setManualAddress(e.target.value);
+//                 validateManualAddress(e.target.value);
+//               }}
+//               placeholder="Enter your full address (e.g., 123 Main St, Jharia, Dhanbad, Jharkhand, India)"
+//               rows="4"
+//               className="address-textarea"
+//               aria-label="Enter shipping address"
+//             />
+//             {addressError && <p className="address-error">{addressError}</p>}
+
+//             <h3 className="checkout-section-title">Payment</h3>
+//             <p className="payment-method-cod">Pay with Cash on Delivery</p>
+//             <p className="payment-method-info">
+//               At delivery time, you can also pay online if preferred.
+//             </p>
+
+//             <div className="checkout-action">
+//               <button
+//                 onClick={handleCheckout}
+//                 className="place-order-btn"
+//                 disabled={loading || addressError || products.length === 0 || total <= 0}
+//                 aria-label="Place order with Cash on Delivery"
+//               >
+//                 {loading ? 'Processing...' : 'Place Order'}
+//               </button>
+//             </div>
+//           </div>
+//         </>
+//       )}
+//       <Footer />
+//     </div>
+//   );
+// }
+
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -7897,7 +8437,7 @@ export default function Checkout() {
         toast.error('Failed to fetch address.');
       }
     }, 500),
-    [],
+    [setAddress, setManualAddress, setLocationMsg, toast]
   );
 
   /** Detect browser location */
@@ -7919,7 +8459,7 @@ export default function Checkout() {
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
-  }, [fetchAddress]);
+  }, [fetchAddress, setLocationMsg, setUserLocation, toast]);
 
   /** Sync context location */
   useEffect(() => {
@@ -7984,7 +8524,7 @@ export default function Checkout() {
     } finally {
       setLoading(false);
     }
-  }, [userLocation, fetchCartProducts, setCartCount, setProducts, setError, setLoading]);
+  }, [userLocation, fetchCartProducts, setCartCount, setProducts, setError, setLoading, navigate, toast]);
 
   useEffect(() => {
     initializeCart();
@@ -8219,7 +8759,7 @@ export default function Checkout() {
                 <div className="checkout-item" key={`${p.id}-${cartItem.id}`}>
                   <img
                     src={p.images?.[0] || DEFAULT_IMAGE}
-                    alt={`${p.title} checkout image`}
+                    alt={`${p.title}`} // Removed "checkout image" to fix redundant alt warning
                     onError={(e) => {
                       e.target.src = DEFAULT_IMAGE;
                     }}
@@ -8297,9 +8837,8 @@ export default function Checkout() {
             {addressError && <p className="address-error">{addressError}</p>}
 
             <h3 className="checkout-section-title">Payment</h3>
-            <p className="payment-method-cod">Pay with Cash on Delivery</p>
-            <p className="payment-method-info">
-              At delivery time, you can also pay online if preferred.
+            <p className="payment-method-cod">
+              Choose <strong style={{ fontSize: '1.2em', color: '#ff4500' }}>Cash on Delivery</strong> — online payment also available at delivery.
             </p>
 
             <div className="checkout-action">

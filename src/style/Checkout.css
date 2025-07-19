@@ -390,3 +390,8 @@
     font-size: 22px;
   }
 }
+.payment-method-cod strong {
+  font-size: 1.2em;
+  color: #ff4500;
+  font-weight: bold;
+}

@@ -5,35 +5,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- ===== FAVICONS & APP ICONS ===== -->
-  <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+  <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg" />
+  <link rel="icon" type="image/png" sizes="96x96" href="%PUBLIC_URL%/favicon-96x96.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/android-chrome-192x192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="%PUBLIC_URL%/android-chrome-512x512.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/favicon-16x16.png" />
   <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.ico" type="image/x-icon" />
+  <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/apple-touch-icon.png" />
+
+  <!-- ===== iOS PWA CONFIGURATION ===== -->
+  <meta name="apple-mobile-web-app-title" content="Markeet" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
   <!-- ===== WEB APP MANIFEST ===== -->
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
   <!-- ===== BASIC SEO ===== -->
   <title>Markeet – Local E-Commerce within 40 km</title>
-  <meta name="title"       content="Markeet – Local E-Commerce within 40 km" />
+  <meta name="title" content="Markeet – Local E-Commerce within 40 km" />
   <meta name="description" content="Markeet connects local buyers and sellers within a 40 km radius for fast, hyperlocal delivery." />
-  <link rel="canonical"    href="https://www.markeet.in/" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://www.markeet.in/" />
 
   <!-- ===== OPEN GRAPH / FACEBOOK ===== -->
-  <meta property="og:type"        content="website" />
-  <meta property="og:url"         content="https://www.markeet.in/" />
-  <meta property="og:title"       content="Markeet – Local E-Commerce within 40 km" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.markeet.in/" />
+  <meta property="og:title" content="Markeet – Local E-Commerce within 40 km" />
   <meta property="og:description" content="Discover and buy products from sellers near you. Fast delivery within 40 km of your location." />
-  <meta property="og:image"       content="https://www.markeet.in/android-chrome-512x512.png" />
+  <meta property="og:image" content="https://www.markeet.in/android-chrome-512x512.png" />
 
   <!-- ===== TWITTER CARD ===== -->
-  <meta name="twitter:card"        content="summary_large_image" />
-  <meta name="twitter:url"         content="https://www.markeet.in/" />
-  <meta name="twitter:title"       content="Markeet – Local E-Commerce within 40 km" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="https://www.markeet.in/" />
+  <meta name="twitter:title" content="Markeet – Local E-Commerce within 40 km" />
   <meta name="twitter:description" content="Discover and buy products from sellers near you. Fast delivery within 40 km of your location." />
-  <meta name="twitter:image"       content="https://www.markeet.in/android-chrome-512x512.png" />
+  <meta name="twitter:image" content="https://www.markeet.in/android-chrome-512x512.png" />
 
   <!-- ===== THEME COLOR FOR MOBILE BROWSERS ===== -->
   <meta name="theme-color" content="#F8A044" />
@@ -44,7 +52,7 @@
       const host = location.hostname;
       if (!/^(localhost|127\.0\.0\.1)$/.test(host)) {
         if (location.protocol !== 'https:') {
-          location.replace('https:' + window.location.href.substring(location.protocol.length));
+          location.replace(`https:${window.location.href.substring(location.protocol.length)}`);
           return;
         }
         if (host === 'markeet.in') {
