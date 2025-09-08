@@ -1765,6 +1765,7 @@ import Home from './components/Home';
 import ProductPage from './components/ProductPage';
 import Cart from './components/Cart';
 import Checkout from './components/Checkout';
+import CheckoutDebug from './components/CheckoutDebug';
 import Auth from './components/Auth';
 import Categories from './components/Categories';
 import Products from './components/Products';
@@ -2038,6 +2039,10 @@ function App() {
                     <Navigate to={isSeller ? '/seller' : '/auth'} />
                   )
                 }
+              />
+              <Route
+                path="/checkout-debug"
+                element={<CheckoutDebug />}
               />
               <Route
                 path="/account"

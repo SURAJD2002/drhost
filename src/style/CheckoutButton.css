@@ -1,0 +1,205 @@
+/* CheckoutButton Component Styles */
+
+.checkout-button-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkout-button {
+  /* Base button styles */
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 140px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.checkout-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+.checkout-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.checkout-button:disabled {
+  background: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Loading state */
+.checkout-button:disabled {
+  position: relative;
+}
+
+.checkout-button:disabled::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid transparent;
+  border-top: 2px solid #999;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Error message styling */
+.error-message {
+  color: #e74c3c;
+  background-color: #fdf2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  text-align: center;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Success state animation */
+.checkout-button.success {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  animation: successPulse 0.6s ease-in-out;
+}
+
+@keyframes successPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .checkout-button {
+    padding: 12px 24px;
+    font-size: 14px;
+    min-width: 120px;
+  }
+  
+  .checkout-button-container {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .checkout-button {
+    padding: 10px 20px;
+    font-size: 13px;
+    min-width: 100px;
+  }
+}
+
+/* Focus states for accessibility */
+.checkout-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+}
+
+/* Ripple effect */
+.checkout-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.checkout-button:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Custom button variants */
+.checkout-button.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.checkout-button.secondary {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.checkout-button.success {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.checkout-button.warning {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+/* Button size variants */
+.checkout-button.small {
+  padding: 8px 16px;
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.checkout-button.large {
+  padding: 18px 36px;
+  font-size: 18px;
+  min-width: 180px;
+}
+
+/* Disabled state with custom styling */
+.checkout-button:disabled {
+  opacity: 0.6;
+  background: #f5f5f5;
+  color: #999;
+  border: 1px solid #ddd;
+}
+
+/* Hover effects for different button types */
+.checkout-button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+}
+
+.checkout-button.secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e085e1 0%, #e54b5c 100%);
+}
+
+.checkout-button.success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #45a9f8 0%, #00e0e0 100%);
+}
+
+.checkout-button.warning:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e8658a 0%, #e6d940 100%);
+} 
