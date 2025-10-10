@@ -1,3 +1,4 @@
+
 /* Categories.css - Styles for the Categories page, aligned with Home.css and Products.css */
 
 /* Unified color palette, consistent with Products.css and Home.css */
@@ -15,8 +16,8 @@
   --border: #e5e7eb;
   --shadow: rgba(0, 0, 0, 0.1);
   --disabled: #a3bffa;
-  --toast-error-start: #ef4444;
-  --toast-error-end: #c0392b;
+  --toast-error-start: #f97316; /* Changed to orange */
+  --toast-error-end: #ea580c; /* Darker orange */
   --toast-success-start: #52c41a;
   --toast-success-end: #389e0d;
 }
@@ -199,10 +200,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+
   -webkit-box-orient: vertical;
   max-height: 2.75rem;
 }
+.my-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* for WebKit browsers */
+  line-clamp: 2; /* standard property */
+  overflow: hidden;
+}
+
 
 /* Loading state */
 .cat-loading-container {
@@ -231,7 +240,7 @@
 /* Error state */
 .cat-error {
   padding: 1.25rem;
-  background-color: #fee2e2;
+  background-color: #fef3c7; /* Changed to amber for less alarming look */
   border-radius: 0.5rem;
   text-align: center;
   color: var(--text-secondary);
