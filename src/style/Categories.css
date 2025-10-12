@@ -16,8 +16,8 @@
   --border: #e5e7eb;
   --shadow: rgba(0, 0, 0, 0.1);
   --disabled: #a3bffa;
-  --toast-error-start: #f97316; /* Changed to orange */
-  --toast-error-end: #ea580c; /* Darker orange */
+  --toast-error-start: #3d2de9; /* Changed to orange */
+  --toast-error-end: #3d2de9; /* Darker orange */
   --toast-success-start: #52c41a;
   --toast-success-end: #389e0d;
 }

@@ -10138,6 +10138,2232 @@
 
 
 
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useNavigate, useParams } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { useForm, useFieldArray } from 'react-hook-form';
+// import { LocationContext } from '../App';
+// import '../style/AddProductPage.css';
+// import { toast } from 'react-hot-toast';
+// import Swal from 'sweetalert2';
+// import { Helmet } from 'react-helmet-async';
+// import imageCompression from 'browser-image-compression';
+
+// // Utility function for retrying Supabase requests with exponential backoff
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
+//       await new Promise((resolve) => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Optimized image compression function to prioritize quality and relax size constraints
+// const compressImage = async (file, isThumbnail = false) => {
+//   const minSizeKB = isThumbnail ? 10 : 50; // Relaxed minimum size for full-size images
+//   const maxSizeKB = isThumbnail ? 80 : 500; // Maximum size for thumbnails and full-size
+//   let quality = isThumbnail ? 0.8 : 0.95; // High initial quality for better clarity
+//   const maxAttempts = 5; // Number of attempts for compression
+
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     const options = isThumbnail
+//       ? {
+//           maxSizeMB: maxSizeKB / 1024,
+//           maxWidthOrHeight: 200, // Slightly higher for better thumbnail quality
+//           useWebWorker: true,
+//           initialQuality: quality,
+//           fileType: 'image/webp', // WebP for better compression
+//           alwaysKeepResolution: true, // Preserve resolution for quality
+//         }
+//       : {
+//           maxSizeMB: maxSizeKB / 1024,
+//           maxWidthOrHeight: file.size > 2 * 1024 * 1024 ? 1920 : 1080, // Higher resolution for large images
+//           useWebWorker: true,
+//           initialQuality: quality,
+//           fileType: 'image/webp',
+//           alwaysKeepResolution: true, // Preserve resolution for quality
+//         };
+
+//     try {
+//       console.log(`🖼️ Attempt ${attempt}: Compressing ${isThumbnail ? 'thumbnail' : 'full-size'} image: ${file.name}, original size: ${(file.size / 1024).toFixed(2)} KB, target quality: ${quality}`);
+//       const compressedFile = await imageCompression(file, options);
+//       const compressedSizeKB = compressedFile.size / 1024;
+
+//       if (compressedSizeKB >= minSizeKB && compressedSizeKB <= maxSizeKB) {
+//         console.log(`✅ Compressed ${isThumbnail ? 'thumbnail' : 'full-size'} image: ${file.name}, new size: ${compressedSizeKB.toFixed(2)} KB`);
+//         return compressedFile;
+//       } else if (compressedSizeKB < minSizeKB) {
+//         console.warn(`⚠️ Compressed image too small: ${compressedSizeKB.toFixed(2)} KB, increasing quality`);
+//         quality = Math.min(quality + 0.05, 1.0); // Finer quality increment
+//       } else {
+//         console.warn(`⚠️ Compressed image too large: ${compressedSizeKB.toFixed(2)} KB, decreasing quality`);
+//         quality = Math.max(quality - 0.05, 0.7); // Finer quality decrement
+//       }
+
+//       if (attempt === maxAttempts) {
+//         if (compressedSizeKB < minSizeKB && quality >= 1.0) {
+//           console.log(`ℹ️ Accepting image at ${compressedSizeKB.toFixed(2)} KB as quality is maximized (1.0)`);
+//           return compressedFile; // Accept the image if quality is maxed out
+//         }
+//         throw new Error(`Unable to compress image within ${minSizeKB}KB-${maxSizeKB}KB after ${maxAttempts} attempts. Final size: ${compressedSizeKB.toFixed(2)} KB`);
+//       }
+//     } catch (error) {
+//       console.error(`❌ Compression attempt ${attempt} failed for ${file.name}: ${error.message}`);
+//       if (attempt === maxAttempts) {
+//         throw new Error(`Image compression failed: ${error.message}`);
+//       }
+//     }
+//   }
+// };
+
+// // Image upload function using Supabase Storage
+// const uploadImage = async (file) => {
+//   try {
+//     if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+//       console.error(`❌ Invalid file: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
+//       throw new Error('Invalid image file (must be an image, max 5MB before compression).');
+//     }
+
+//     // Compress full-size image
+//     const compressedFull = await compressImage(file, false);
+//     if (compressedFull.size > 500 * 1024) {
+//       console.error(`❌ Compressed full-size image too large: ${file.name}, size: ${(compressedFull.size / 1024).toFixed(2)} KB`);
+//       throw new Error('Compressed full-size image exceeds 500KB.');
+//     }
+
+//     // Compress thumbnail
+//     const compressedThumb = await compressImage(file, true);
+//     if (compressedThumb.size > 80 * 1024) {
+//       console.error(`❌ Compressed thumbnail too large: ${file.name}, size: ${(compressedThumb.size / 1024).toFixed(2)} KB`);
+//       throw new Error('Compressed thumbnail exceeds 80KB.');
+//     }
+
+//     // Generate unique file names
+//     const fileExt = 'webp';
+//     const fileName = `products/full/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+//     const thumbFileName = `products/thumbnails/${Date.now()}_${Math.random().toString(36).substring(2)}_thumb.${fileExt}`;
+
+//     // Upload full-size image to Supabase
+//     console.log(`⬆️ Uploading full-size image: ${fileName}`);
+//     const { error: fullUploadError } = await retryRequest(() =>
+//       supabase.storage
+//         .from('product-images')
+//         .upload(fileName, compressedFull, {
+//           contentType: 'image/webp',
+//         })
+//     );
+//     if (fullUploadError) {
+//       console.error(`❌ Failed to upload full-size image ${fileName}: ${fullUploadError.message}`);
+//       throw new Error(`Failed to upload full-size image: ${fullUploadError.message}`);
+//     }
+
+//     // Upload thumbnail to Supabase
+//     console.log(`⬆️ Uploading thumbnail: ${thumbFileName}`);
+//     const { error: thumbUploadError } = await retryRequest(() =>
+//       supabase.storage
+//         .from('product-images')
+//         .upload(thumbFileName, compressedThumb, {
+//           contentType: 'image/webp',
+//         })
+//     );
+//     if (thumbUploadError) {
+//       console.error(`❌ Failed to upload thumbnail ${thumbFileName}: ${thumbUploadError.message}`);
+//       // Clean up full-size image if thumbnail upload fails
+//       await supabase.storage.from('product-images').remove([fileName]);
+//       throw new Error(`Failed to upload thumbnail: ${thumbUploadError.message}`);
+//     }
+
+//     // Get public URLs
+//     const { data: { publicUrl: fullUrl } } = supabase.storage
+//       .from('product-images')
+//       .getPublicUrl(fileName);
+//     const { data: { publicUrl: thumbUrl } } = supabase.storage
+//       .from('product-images')
+//       .getPublicUrl(thumbFileName);
+
+//     if (!fullUrl || !thumbUrl || !fullUrl.startsWith('https://') || !thumbUrl.startsWith('https://')) {
+//       console.error('❌ Failed to generate valid public URLs');
+//       // Clean up uploaded files
+//       await supabase.storage.from('product-images').remove([fileName, thumbFileName]);
+//       throw new Error('Failed to generate public URLs for images.');
+//     }
+
+//     console.log(`📦 Upload successful - Full URL: ${fullUrl}, Thumbnail URL: ${thumbUrl}`);
+//     return { fullUrl, thumbUrl };
+//   } catch (err) {
+//     console.error(`❌ Upload failed for ${file.name}: ${err.message}`);
+//     throw new Error(`Failed to upload image: ${err.message}`);
+//   }
+// };
+
+// function AddProductPage() {
+//   const navigate = useNavigate();
+//   const { productId } = useParams();
+//   const { sellerLocation } = useContext(LocationContext);
+//   const isEditMode = !!productId;
+
+//   const [categories, setCategories] = useState([]);
+//   const [selectedCategory, setSelectedCategory] = useState(null);
+//   const [previewImages, setPreviewImages] = useState([]);
+//   const [thumbPreviews, setThumbPreviews] = useState([]);
+//   const [primaryImageIndex, setPrimaryImageIndex] = useState(null);
+//   const [variantPreviews, setVariantPreviews] = useState({});
+//   const [variantThumbPreviews, setVariantThumbPreviews] = useState({});
+//   const [loading, setLoading] = useState(false);
+//   const [imageLoading, setImageLoading] = useState(false);
+//   const [error, setError] = useState(null);
+//   const [message, setMessage] = useState('');
+//   const [enableVariants, setEnableVariants] = useState(false);
+//   const [calculatedPrice, setCalculatedPrice] = useState(null);
+
+//   const {
+//     register,
+//     handleSubmit,
+//     reset,
+//     setValue,
+//     watch,
+//     formState: { errors },
+//     control,
+//     trigger,
+//   } = useForm({
+//     defaultValues: {
+//       title: 'Silver Chain Necklace with Pink Gemstone Pendant',
+//       description: 'Elevate your elegance with this exquisite silver chain necklace, adorned with a cushion-cut pink gemstone pendant framed by radiant crystal accents. Its timeless design seamlessly blends sophistication and modern allure, making it an ideal accessory for daily wear or special occasions such as parties and weddings. A perfect gift, this statement piece adds a touch of radiant sparkle to any ensemble.',
+//       price: '',
+//       commission: '',
+//       discount: '',
+//       stock: '',
+//       category_id: '',
+//       images: [],
+//       variants: [],
+//       specifications: [],
+//       deliveryRadius: '',
+//     },
+//     mode: 'onChange',
+//   });
+
+//   const { fields: variantFields, append: appendVariant, remove: removeVariant, replace: replaceVariants } = useFieldArray({
+//     control,
+//     name: 'variants',
+//   });
+
+//   const { fields: specFields, append: appendSpec, remove: removeSpec, replace: replaceSpecs } = useFieldArray({
+//     control,
+//     name: 'specifications',
+//   });
+
+//   const watchCategoryId = watch('category_id');
+//   const watchPrice = watch('price');
+//   const watchDiscount = watch('discount');
+
+//   // Calculate price after discount
+//   useEffect(() => {
+//     if (watchPrice && watchDiscount >= 0) {
+//       const price = parseFloat(watchPrice) || 0;
+//       const discountAmount = parseFloat(watchDiscount) || 0;
+//       const finalPrice = price - discountAmount;
+//       setCalculatedPrice(finalPrice >= 0 ? finalPrice.toFixed(2) : 0);
+//     } else {
+//       setCalculatedPrice(null);
+//     }
+//   }, [watchPrice, watchDiscount]);
+
+//   // Handle category change and specifications
+//   useEffect(() => {
+//     if (watchCategoryId) {
+//       const categoryId = parseInt(watchCategoryId, 10);
+//       setSelectedCategory(categoryId);
+//       const selectedCategoryData = categories.find((c) => c.id === categoryId) || {};
+//       const specFieldsFromBackend = selectedCategoryData.specifications_fields || [];
+//       let initialSpecs = [...specFieldsFromBackend];
+
+//       if (selectedCategoryData.name === 'Jewelry' || categoryId === 2) { // Assuming 'Jewelry' category ID is 2
+//         const jewelrySpecs = [
+//           { key: 'Material', value: 'Sterling Silver' },
+//           { key: 'Gemstone', value: 'Pink Sapphire' },
+//           { key: 'Chain Length', value: '' },
+//         ];
+//         initialSpecs = jewelrySpecs.map(spec => ({ ...spec, value: spec.value || '' }));
+//       }
+
+//       replaceSpecs(initialSpecs.map((field) => ({ key: field.key || '', value: field.value || '' })));
+//     } else {
+//       setSelectedCategory(null);
+//       replaceSpecs([]);
+//     }
+//   }, [watchCategoryId, categories, replaceSpecs]);
+
+//   // Fetch categories
+//   const fetchCategories = useCallback(async () => {
+//     try {
+//       const { data, error } = await retryRequest(() =>
+//         supabase
+//           .from('categories')
+//           .select('id, name, variant_attributes, specifications_fields')
+//           .order('id', { ascending: true })
+//       );
+//       if (error) throw error;
+//       setCategories(data || []);
+//     } catch (err) {
+//       setError('Failed to load categories.');
+//       toast.error('Failed to load categories.', {
+//         position: 'top-center',
+//         duration: 3000,
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//         },
+//       });
+//     }
+//   }, []);
+
+//   // Fetch product data for edit mode
+//   const fetchProductData = useCallback(async () => {
+//     if (!isEditMode) return;
+//     setLoading(true);
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) {
+//         throw new Error('You must be logged in.');
+//       }
+//       const sellerId = session.user.id;
+
+//       const { data: productData, error: productError } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select('id, title, description, original_price, commission_amount, discount_amount, stock, category_id, images, specifications, delivery_radius_km')
+//           .eq('id', productId)
+//           .eq('seller_id', sellerId)
+//           .maybeSingle()
+//       );
+//       if (productError) throw productError;
+//       if (!productData) {
+//         throw new Error('Product not found or you do not have permission.');
+//       }
+
+//       setValue('title', productData.title || '');
+//       setValue('description', productData.description || '');
+//       setValue('price', productData.original_price != null ? productData.original_price.toString() : '');
+//       setValue('commission', productData.commission_amount != null ? productData.commission_amount.toString() : '0');
+//       setValue('discount', productData.discount_amount != null ? productData.discount_amount.toString() : '0');
+//       setValue('stock', productData.stock != null ? productData.stock.toString() : '');
+//       setValue('category_id', productData.category_id != null ? productData.category_id.toString() : '');
+//       setValue('deliveryRadius', productData.delivery_radius_km != null ? productData.delivery_radius_km.toString() : '');
+//       setValue('images', []);
+//       setPreviewImages(productData.images || []);
+//       setThumbPreviews(productData.images || []);
+//       setPrimaryImageIndex(productData.images?.length > 0 ? 0 : null);
+
+//       await trigger(['price', 'commission', 'discount', 'stock', 'category_id', 'deliveryRadius']);
+
+//       const specs = productData.specifications
+//         ? Object.entries(productData.specifications).map(([key, value]) => ({ key, value }))
+//         : [];
+//       replaceSpecs(specs);
+
+//       const { data: variantsData, error: variantsError } = await retryRequest(() =>
+//         supabase
+//           .from('product_variants')
+//           .select('id, attributes, original_price, commission_amount, stock, images')
+//           .eq('product_id', productId)
+//       );
+//       if (variantsError) throw variantsError;
+
+//       if (variantsData?.length > 0) {
+//         setEnableVariants(true);
+//         const variants = variantsData.map(variant => ({
+//           id: variant.id,
+//           ...variant.attributes,
+//           price: variant.original_price != null ? variant.original_price.toString() : '',
+//           commission: variant.commission_amount != null ? variant.commission_amount.toString() : '0',
+//           stock: variant.stock != null ? variant.stock.toString() : '',
+//           images: [],
+//         }));
+//         replaceVariants(variants);
+//         const previews = {};
+//         const thumbPreviews = {};
+//         variantsData.forEach((variant, index) => {
+//           if (variant.images?.length > 0) {
+//             previews[index] = variant.images;
+//             thumbPreviews[index] = variant.images;
+//           }
+//         });
+//         setVariantPreviews(previews);
+//         setVariantThumbPreviews(thumbPreviews);
+//       }
+//     } catch (err) {
+//       setError(`Error: ${err.message}`);
+//       toast.error(`Error: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 3000,
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//         },
+//       });
+//       navigate('/seller');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [isEditMode, productId, setValue, replaceSpecs, replaceVariants, navigate, trigger]);
+
+//   useEffect(() => {
+//     fetchCategories();
+//     if (isEditMode) {
+//       fetchProductData();
+//     }
+//   }, [fetchCategories, fetchProductData, isEditMode]);
+
+//   const handleImageChange = async (e) => {
+//     const files = Array.from(e.target.files);
+//     if (!files.length) return;
+
+//     // Clear previous previews to avoid stale data
+//     setPreviewImages([]);
+//     setThumbPreviews([]);
+//     setValue('images', []);  // Reset form field immediately
+
+//     setImageLoading(true);
+//     try {
+//       console.log(`🖼️ Processing ${files.length} images for compression and upload`);
+//       const uploadPromises = files.map(async (file) => {
+//         if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+//           console.error(`❌ Invalid file: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
+//           throw new Error(`Invalid image file: ${file.name} (must be an image, max 5MB before compression).`);
+//         }
+//         const { fullUrl, thumbUrl } = await uploadImage(file);
+//         return { fullUrl, thumbUrl };
+//       });
+
+//       const results = await Promise.all(uploadPromises);
+//       const newImageUrls = results.map((r) => r.fullUrl).filter(Boolean);
+//       const newThumbUrls = results.map((r) => r.thumbUrl).filter(Boolean);
+
+//       if (newImageUrls.length !== files.length || newThumbUrls.length !== files.length) {
+//         throw new Error('Incomplete image uploads detected.');
+//       }
+
+//       setValue('images', files);  // Now safe to set after full success
+//       setPreviewImages(newImageUrls);
+//       setThumbPreviews(newThumbUrls);
+//       setPrimaryImageIndex(0);  // Set first as primary if none set
+//       console.log('✅ Images uploaded and loaded for preview');
+//       toast.success('Images uploaded successfully!', {
+//         position: 'top-center',
+//         duration: 2000,
+//       });
+//     } catch (err) {
+//       console.error(`❌ Error in handleImageChange: ${err.message}`);
+//       // Revert: clear everything on failure
+//       setPreviewImages([]);
+//       setThumbPreviews([]);
+//       setValue('images', []);
+//       setPrimaryImageIndex(null);
+//       // Clear the file input
+//       e.target.value = '';
+//       toast.error(`Upload failed: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 4000,
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//         },
+//       });
+//     } finally {
+//       setImageLoading(false);
+//     }
+//   };
+
+//   const setPrimaryImage = (index) => {
+//     console.log(`🖼️ Setting primary image to index: ${index}`);
+//     setPrimaryImageIndex(index);
+//   };
+
+//   const handleVariantImageChange = async (e, index) => {
+//     const files = Array.from(e.target.files);
+//     if (!files.length) return;
+
+//     // Clear previous for this variant to avoid stale data
+//     setVariantPreviews((prev) => ({ ...prev, [index]: [] }));
+//     setVariantThumbPreviews((prev) => ({ ...prev, [index]: [] }));
+//     setValue(`variants.${index}.images`, []);
+
+//     setImageLoading(true);
+//     try {
+//       console.log(`🖼️ Processing ${files.length} variant images for index ${index}`);
+//       const uploadPromises = files.map(async (file) => {
+//         if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+//           console.error(`❌ Invalid variant file: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
+//           throw new Error(`Invalid image file: ${file.name} (must be an image, max 5MB before compression).`);
+//         }
+//         const { fullUrl } = await uploadImage(file);  // Only fullUrl for variants as per original code
+//         return fullUrl;
+//       });
+
+//       const newImageUrls = await Promise.all(uploadPromises);
+
+//       if (newImageUrls.length !== files.length || newImageUrls.some(url => !url)) {
+//         throw new Error('Incomplete variant image uploads detected.');
+//       }
+
+//       setValue(`variants.${index}.images`, files);  // Safe after success
+//       setVariantPreviews((prev) => ({
+//         ...prev,
+//         [index]: newImageUrls.filter(Boolean),
+//       }));
+//       setVariantThumbPreviews((prev) => ({
+//         ...prev,
+//         [index]: newImageUrls.filter(Boolean),
+//       }));
+//       console.log(`✅ Variant images uploaded and loaded for index ${index}`);
+//       toast.success('Variant images uploaded successfully!', {
+//         position: 'top-center',
+//         duration: 2000,
+//       });
+//     } catch (err) {
+//       console.error(`❌ Error in handleVariantImageChange for index ${index}: ${err.message}`);
+//       // Revert
+//       setVariantPreviews((prev) => {
+//         const newPreviews = { ...prev };
+//         delete newPreviews[index];
+//         return newPreviews;
+//       });
+//       setVariantThumbPreviews((prev) => {
+//         const newPreviews = { ...prev };
+//         delete newPreviews[index];
+//         return newPreviews;
+//       });
+//       setValue(`variants.${index}.images`, []);
+//       e.target.value = '';  // Clear input
+//       toast.error(`Variant upload failed: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 4000,
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//         },
+//       });
+//     } finally {
+//       setImageLoading(false);
+//     }
+//   };
+
+//   const onSubmitProduct = async (formData) => {
+//     setLoading(true);
+//     setMessage('');
+//     setError(null);
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (!session?.user) {
+//         console.error('❌ User not logged in');
+//         throw new Error('You must be logged in.');
+//       }
+//       const sellerId = session.user.id;
+
+//       if (!sellerLocation || !sellerLocation.lat || !sellerLocation.lon) {
+//         console.error('❌ Store location not set');
+//         throw new Error('Please set your store location in the Account page before adding a product.');
+//       }
+
+//       // Image validation: Always use previewImages as source of truth for valid URLs
+//       let imageUrls = previewImages;
+//       let thumbUrls = thumbPreviews;
+
+//       if (imageUrls.length === 0) {
+//         console.error('❌ No images provided');
+//         throw new Error('At least one product image is required.');
+//       }
+
+//       if (imageUrls.length > 10) {
+//         console.error('❌ Too many images');
+//         throw new Error('Cannot upload more than 10 images.');
+//       }
+
+//       // Ensure uploads are not in progress (prevents race conditions)
+//       if (imageLoading) {
+//         console.error('❌ Image upload still in progress');
+//         throw new Error('Please wait for image uploads to complete before submitting.');
+//       }
+
+//       // Primary image reordering
+//       if (primaryImageIndex !== null && primaryImageIndex >= 0 && primaryImageIndex < imageUrls.length) {
+//         const primaryImage = imageUrls[primaryImageIndex];
+//         const primaryThumb = thumbUrls[primaryImageIndex];
+//         imageUrls.splice(primaryImageIndex, 1);
+//         thumbUrls.splice(primaryImageIndex, 1);
+//         imageUrls.unshift(primaryImage);
+//         thumbUrls.unshift(primaryThumb);
+//         console.log('🖼️ Primary image set and reordered');
+//       }
+
+//       const specifications = formData.specifications.reduce((obj, spec) => {
+//         if (spec.key && spec.value) {
+//           obj[spec.key.trim()] = spec.value.trim();
+//         }
+//         return obj;
+//       }, {});
+//       if (Object.keys(specifications).length === 0 && specFields.length > 0) {
+//         console.error('❌ No valid specifications provided');
+//         throw new Error('Please fill in at least one specification.');
+//       }
+
+//       const price = parseFloat(formData.price);
+//       const commissionAmount = parseFloat(formData.commission) || 0;
+//       const discountAmount = parseFloat(formData.discount) || 0;
+//       const finalPrice = price - discountAmount;
+//       if (finalPrice < 0) {
+//         console.error('❌ Negative final price detected');
+//         throw new Error('Final price cannot be negative after discount.');
+//       }
+//       if (commissionAmount > price) {
+//         console.error('❌ Commission exceeds original price');
+//         throw new Error('Commission cannot exceed the original price.');
+//       }
+
+//       const deliveryRadius = formData.deliveryRadius ? parseInt(formData.deliveryRadius, 10) : null;
+//       if (deliveryRadius !== null && (deliveryRadius < 1 || deliveryRadius > 100)) {
+//         console.error('❌ Invalid delivery radius');
+//         throw new Error('Delivery radius must be between 1 and 100 km.');
+//       }
+
+//       let newProductId = productId;
+
+//       if (isEditMode) {
+//         console.log(`🔄 Updating product ID: ${productId}`);
+//         const { error: productError } = await retryRequest(() =>
+//           supabase
+//             .from('products')
+//             .update({
+//               category_id: parseInt(formData.category_id, 10),
+//               title: formData.title.trim(),
+//               description: formData.description.trim(),
+//               price: finalPrice,
+//               original_price: price,
+//               commission_amount: commissionAmount,
+//               discount_amount: discountAmount,
+//               stock: parseInt(formData.stock, 10),
+//               images: imageUrls,
+//               specifications,
+//               delivery_radius_km: deliveryRadius,
+//               updated_at: new Date().toISOString(),
+//             })
+//             .eq('id', productId)
+//             .eq('seller_id', sellerId)
+//         );
+//         if (productError) {
+//           console.error(`❌ Failed to update product: ${productError.message}`);
+//           throw new Error(`Failed to update product: ${productError.message}`);
+//         }
+
+//         if (enableVariants && formData.variants?.length > 0) {
+//           const selectedCategoryData = categories.find((c) => c.id === parseInt(formData.category_id, 10));
+//           const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes)
+//             ? selectedCategoryData.variant_attributes
+//             : [];
+
+//           for (const [index, variant] of formData.variants.entries()) {
+//             const variantPrice = parseFloat(variant.price);
+//             const variantCommission = parseFloat(variant.commission) || 0;
+//             const variantFinalPrice = variantPrice - discountAmount;
+//             const variantStock = parseInt(variant.stock, 10);
+
+//             if (variantFinalPrice < 0) {
+//               console.error(`❌ Variant ${index + 1}: Negative final price`);
+//               throw new Error(`Variant ${index + 1}: Final price cannot be negative.`);
+//             }
+//             if (variantCommission > variantPrice) {
+//               console.error(`❌ Variant ${index + 1}: Commission exceeds price`);
+//               throw new Error(`Variant ${index + 1}: Commission cannot exceed the original price.`);
+//             }
+//             if (isNaN(variantPrice) || variantPrice < 0) {
+//               console.error(`❌ Variant ${index + 1}: Invalid price`);
+//               throw new Error(`Variant ${index + 1}: Price must be a non-negative number.`);
+//             }
+//             if (isNaN(variantStock) || variantStock < 0) {
+//               console.error(`❌ Variant ${index + 1}: Invalid stock`);
+//               throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
+//             }
+
+//             let hasAttribute = false;
+//             const attributes = {};
+//             if (variantAttributes.length > 0) {
+//               variantAttributes.forEach((attr) => {
+//                 if (variant[attr] && variant[attr].trim()) {
+//                   attributes[attr] = variant[attr].trim();
+//                   hasAttribute = true;
+//                 } else {
+//                   attributes[attr] = '';
+//                 }
+//               });
+//               if (!hasAttribute) {
+//                 console.error(`❌ Variant ${index + 1}: No attributes provided`);
+//                 throw new Error(`Variant ${index + 1}: At least one attribute must be filled.`);
+//               }
+//             } else {
+//               attributes.attribute1 = variant.attribute1 ? variant.attribute1.trim() : '';
+//               if (attributes.attribute1) hasAttribute = true;
+//               if (!hasAttribute) {
+//                 console.error(`❌ Variant ${index + 1}: Attribute required`);
+//                 throw new Error(`Variant ${index + 1}: Attribute is required for variants.`);
+//               }
+//             }
+
+//             let variantImageUrls = variantPreviews[index] || [];
+//             if (variantImageUrls.length > 5) {
+//               console.error(`❌ Variant ${index + 1}: Too many images`);
+//               throw new Error(`Variant ${index + 1}: Cannot upload more than 5 images.`);
+//             }
+
+//             if (variant.id) {
+//               console.log(`🔄 Updating variant ID: ${variant.id}`);
+//               const { error: variantError } = await retryRequest(() =>
+//                 supabase
+//                   .from('product_variants')
+//                   .update({
+//                     attributes,
+//                     price: variantFinalPrice,
+//                     original_price: variantPrice,
+//                     commission_amount: variantCommission,
+//                     stock: variantStock,
+//                     images: variantImageUrls,
+//                     updated_at: new Date().toISOString(),
+//                   })
+//                   .eq('id', variant.id)
+//               );
+//               if (variantError) {
+//                 console.error(`❌ Failed to update variant ${index + 1}: ${variantError.message}`);
+//                 throw new Error(`Failed to update variant ${index + 1}: ${variantError.message}`);
+//               }
+//             } else {
+//               console.log(`➕ Inserting new variant for product ID: ${productId}`);
+//               const { error: variantError } = await retryRequest(() =>
+//                 supabase
+//                   .from('product_variants')
+//                   .insert({
+//                     product_id: productId,
+//                     attributes,
+//                     price: variantFinalPrice,
+//                     original_price: variantPrice,
+//                     commission_amount: variantCommission,
+//                     stock: variantStock,
+//                     images: variantImageUrls,
+//                     status: 'active',
+//                   })
+//               );
+//               if (variantError) {
+//                 console.error(`❌ Failed to insert variant ${index + 1}: ${variantError.message}`);
+//                 throw new Error(`Failed to insert variant ${index + 1}: ${variantError.message}`);
+//               }
+//             }
+//           }
+//         } else {
+//           console.log(`🗑️ Deleting all variants for product ID: ${productId}`);
+//           const { error: deleteError } = await retryRequest(() =>
+//             supabase
+//               .from('product_variants')
+//               .delete()
+//               .eq('product_id', productId)
+//           );
+//           if (deleteError) {
+//             console.error(`❌ Failed to delete variants: ${deleteError.message}`);
+//             throw new Error(`Failed to delete variants: ${deleteError.message}`);
+//           }
+//         }
+//       } else {
+//         console.log('➕ Inserting new product');
+//         const { data: insertedProduct, error: productError } = await retryRequest(() =>
+//           supabase
+//             .from('products')
+//             .insert({
+//               seller_id: sellerId,
+//               category_id: parseInt(formData.category_id, 10),
+//               title: formData.title.trim(),
+//               description: formData.description.trim(),
+//               price: finalPrice,
+//               original_price: price,
+//               commission_amount: commissionAmount,
+//               discount_amount: discountAmount,
+//               stock: parseInt(formData.stock, 10),
+//               images: imageUrls,
+//               latitude: sellerLocation.lat,
+//               longitude: sellerLocation.lon,
+//               is_approved: false,
+//               status: 'active',
+//               specifications,
+//               delivery_radius_km: deliveryRadius,
+//             })
+//             .select('id')
+//             .single()
+//         );
+//         if (productError) {
+//           console.error(`❌ Failed to insert product: ${productError.message}`);
+//           throw new Error(`Failed to insert product: ${productError.message}`);
+//         }
+//         newProductId = insertedProduct.id;
+
+//         if (enableVariants && formData.variants?.length > 0) {
+//           const selectedCategoryData = categories.find((c) => c.id === parseInt(formData.category_id, 10));
+//           const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes)
+//             ? selectedCategoryData.variant_attributes
+//             : [];
+
+//           const variantPromises = formData.variants.map(async (variant, index) => {
+//             const variantPrice = parseFloat(variant.price);
+//             const variantCommission = parseFloat(variant.commission) || 0;
+//             const variantFinalPrice = variantPrice - discountAmount;
+//             const variantStock = parseInt(variant.stock, 10);
+
+//             if (variantFinalPrice < 0) {
+//               console.error(`❌ Variant ${index + 1}: Negative final price`);
+//               throw new Error(`Variant ${index + 1}: Final price cannot be negative.`);
+//             }
+//             if (variantCommission > variantPrice) {
+//               console.error(`❌ Variant ${index + 1}: Commission exceeds price`);
+//               throw new Error(`Variant ${index + 1}: Commission cannot exceed the original price.`);
+//             }
+//             if (isNaN(variantPrice) || variantPrice < 0) {
+//               console.error(`❌ Variant ${index + 1}: Invalid price`);
+//               throw new Error(`Variant ${index + 1}: Price must be a non-negative number.`);
+//             }
+//             if (isNaN(variantStock) || variantStock < 0) {
+//               console.error(`❌ Variant ${index + 1}: Invalid stock`);
+//               throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
+//             }
+
+//             let hasAttribute = false;
+//             const attributes = {};
+//             if (variantAttributes.length > 0) {
+//               variantAttributes.forEach((attr) => {
+//                 if (variant[attr] && variant[attr].trim()) {
+//                   attributes[attr] = variant[attr].trim();
+//                   hasAttribute = true;
+//                 } else {
+//                   attributes[attr] = '';
+//                 }
+//               });
+//               if (!hasAttribute) {
+//                 console.error(`❌ Variant ${index + 1}: No attributes provided`);
+//                 throw new Error(`Variant ${index + 1}: At least one attribute must be filled.`);
+//               }
+//             } else {
+//               attributes.attribute1 = variant.attribute1 ? variant.attribute1.trim() : '';
+//               if (attributes.attribute1) hasAttribute = true;
+//               if (!hasAttribute) {
+//                 console.error(`❌ Variant ${index + 1}: Attribute required`);
+//                 throw new Error(`Variant ${index + 1}: Attribute is required for variants.`);
+//               }
+//             }
+
+//             let variantImageUrls = variantPreviews[index] || [];
+//             if (variantImageUrls.length > 5) {
+//               console.error(`❌ Variant ${index + 1}: Too many images`);
+//               throw new Error(`Variant ${index + 1}: Cannot upload more than 5 images.`);
+//             }
+
+//             console.log(`➕ Inserting new variant for product ID: ${newProductId}`);
+//             const { error: variantError } = await retryRequest(() =>
+//               supabase
+//                 .from('product_variants')
+//                 .insert({
+//                   product_id: newProductId,
+//                   attributes,
+//                   price: variantFinalPrice,
+//                   original_price: variantPrice,
+//                   commission_amount: variantCommission,
+//                   stock: variantStock,
+//                   images: variantImageUrls,
+//                   status: 'active',
+//                 })
+//             );
+//             if (variantError) {
+//               console.error(`❌ Failed to insert variant ${index + 1}: ${variantError.message}`);
+//               throw new Error(`Failed to insert variant ${index + 1}: ${variantError.message}`);
+//             }
+//           });
+//           await Promise.all(variantPromises);
+//         }
+//       }
+
+//       console.log(isEditMode ? '✅ Product updated successfully' : '✅ Product added successfully');
+//       await Swal.fire({
+//         title: isEditMode ? 'Product Updated!' : 'Product Added!',
+//         text: isEditMode ? 'Your product has been updated successfully.' : 'Your product has been added successfully.',
+//         icon: 'success',
+//         confirmButtonColor: '#3085d6',
+//       });
+
+//       setMessage(isEditMode ? 'Product updated successfully!' : 'Product added successfully!');
+//       toast.success(isEditMode ? 'Product updated successfully!' : 'Product added successfully!', {
+//         position: 'top-center',
+//         duration: 3000,
+//         style: {
+//           background: '#52c41a',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//         },
+//       });
+
+//       reset({
+//         title: '',
+//         description: '',
+//         price: '',
+//         commission: '',
+//         discount: '',
+//         stock: '',
+//         category_id: '',
+//         images: [],
+//         variants: [],
+//         specifications: [],
+//         deliveryRadius: '',
+//       });
+//       setPreviewImages([]);
+//       setThumbPreviews([]);
+//       setPrimaryImageIndex(null);
+//       setVariantPreviews({});
+//       setVariantThumbPreviews({});
+//       setEnableVariants(false);
+//       replaceSpecs([]);
+//       replaceVariants([]);
+//       setCalculatedPrice(null);
+//       navigate('/seller');
+//     } catch (err) {
+//       console.error(`❌ Error in onSubmitProduct: ${err.message}`);
+//       setError(`Error: ${err.message}`);
+//       toast.error(`Error: ${err.message}`, {
+//         position: 'top-center',
+//         duration: 4000,
+//         style: {
+//           background: '#ff4d4f',
+//           color: '#fff',
+//           fontWeight: 'bold',
+//           borderRadius: '8px',
+//           padding: '16px',
+//         },
+//       });
+//     } finally {
+//       setLoading(false);
+//       setImageLoading(false);
+//     }
+//   };
+
+//   const isJewelryCategory = selectedCategory && categories.find((c) => c.id === selectedCategory)?.name === 'Jewelry';
+
+//   const pageUrl = isEditMode ? `https://www.freshcart.com/edit-product/${productId}` : 'https://www.freshcart.com/seller/add-product';
+//   const defaultImage = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+//   const pageTitle = isEditMode ? 'Edit Product - FreshCart' : 'Add Product - FreshCart';
+//   const pageDescription = isEditMode
+//     ? 'Edit your product details and variants on FreshCart.'
+//     : 'Add a new product to your FreshCart seller account, including variants and specifications.';
+
+//   useEffect(() => {
+//     const images = document.querySelectorAll('.lazy-load');
+//     const observer = new IntersectionObserver((entries) => {
+//       entries.forEach((entry) => {
+//         if (entry.isIntersecting) {
+//           const img = entry.target;
+//           img.src = img.dataset.src;
+//           img.classList.add('loaded');
+//           observer.unobserve(img);
+//         }
+//       });
+//     });
+//     images.forEach((img) => observer.observe(img));
+//     return () => observer.disconnect();
+//   }, [previewImages, variantPreviews]);
+
+//   return (
+//     <div className="add-product-container">
+//       <Helmet>
+//         <title>{pageTitle}</title>
+//         <meta name="description" content={pageDescription} />
+//         <meta name="keywords" content={isEditMode ? 'edit, product, seller, ecommerce, FreshCart' : 'add, product, seller, ecommerce, FreshCart'} />
+//         <meta name="robots" content="noindex, nofollow" />
+//         <link rel="canonical" href={pageUrl} />
+//         <meta property="og:title" content={pageTitle} />
+//         <meta property="og:description" content={pageDescription} />
+//         <meta property="og:image" content={thumbPreviews[0] || previewImages[0] || defaultImage} />
+//         <meta property="og:url" content={pageUrl} />
+//         <meta property="og:type" content="website" />
+//         <meta name="twitter:card" content="summary_large_image" />
+//         <meta name="twitter:title" content={pageTitle} />
+//         <meta name="twitter:description" content={pageDescription} />
+//         <meta name="twitter:image" content={thumbPreviews[0] || previewImages[0] || defaultImage} />
+//         <script type="application/ld+json">
+//           {JSON.stringify({
+//             '@context': 'https://schema.org',
+//             '@type': 'WebPage',
+//             name: pageTitle,
+//             description: pageDescription,
+//             url: pageUrl,
+//             publisher: {
+//               '@type': 'Organization',
+//               name: 'FreshCart',
+//             },
+//           })}
+//         </script>
+//       </Helmet>
+//       <h2 className="add-product-title">{isEditMode ? 'Edit Product' : 'Add New Product'}</h2>
+//       {message && <p className="success-message">{message}</p>}
+//       {error && <p className="error-message">{error}</p>}
+//       {(loading || imageLoading) && <div className="loading-spinner">{imageLoading ? 'Uploading images...' : 'Saving...'}</div>}
+
+//       <form onSubmit={handleSubmit(onSubmitProduct)} className="add-product-form">
+//         <div className="form-group">
+//           <label htmlFor="title" className="form-label">Product Name</label>
+//           <input
+//             id="title"
+//             {...register('title', { 
+//               required: 'Product name is required', 
+//               maxLength: { value: 200, message: 'Product name cannot exceed 200 characters' },
+//               pattern: { value: /^[A-Za-z0-9\s\-.,&()]+$/, message: 'Invalid characters in product name' }
+//             })}
+//             placeholder="Enter product name"
+//             className="form-input"
+//           />
+//           {errors.title && <p className="error-text">{errors.title.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="description" className="form-label">Description</label>
+//           <textarea
+//             id="description"
+//             {...register('description', { 
+//               required: 'Description is required',
+//               maxLength: { value: 2000, message: 'Description cannot exceed 2000 characters' }
+//             })}
+//             placeholder="Enter product description (use semicolons to separate points)"
+//             className="form-textarea"
+//           />
+//           {errors.description && <p className="error-text">{errors.description.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="price" className="form-label">Price (₹)</label>
+//           <input
+//             id="price"
+//             type="number"
+//             step="0.01"
+//             {...register('price', { 
+//               required: 'Price is required', 
+//               min: { value: 0, message: 'Price must be non-negative' },
+//               max: { value: 1000000, message: 'Price cannot exceed ₹1,000,000' }
+//             })}
+//             placeholder="Enter price"
+//             className="form-input"
+//           />
+//           {errors.price && <p className="error-text">{errors.price.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="commission" className="form-label">Commission (₹)</label>
+//           <input
+//             id="commission"
+//             type="number"
+//             step="0.01"
+//             {...register('commission', { 
+//               required: 'Commission amount is required', 
+//               min: { value: 0, message: 'Commission must be non-negative' },
+//               max: { value: 100000, message: 'Commission cannot exceed ₹100,000' }
+//             })}
+//             placeholder="Enter commission amount (e.g., 50 for ₹50)"
+//             className="form-input"
+//           />
+//           {errors.commission && <p className="error-text">{errors.commission.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="discount" className="form-label">Discount (₹)</label>
+//           <input
+//             id="discount"
+//             type="number"
+//             step="0.01"
+//             {...register('discount', { 
+//               required: 'Discount amount is required', 
+//               min: { value: 0, message: 'Discount must be non-negative' },
+//               max: { value: 1000000, message: 'Discount cannot exceed ₹1,000,000' }
+//             })}
+//             placeholder="Enter discount amount (e.g., 100 for ₹100)"
+//             className="form-input"
+//           />
+//           {errors.discount && <p className="error-text">{errors.discount.message}</p>}
+//         </div>
+
+//         {calculatedPrice !== null && (
+//           <div className="form-group">
+//             <label className="form-label">Final Price After Discount (₹)</label>
+//             <p className="calculated-price">{calculatedPrice}</p>
+//           </div>
+//         )}
+
+//         <div className="form-group">
+//           <label htmlFor="stock" className="form-label">Stock</label>
+//           <input
+//             id="stock"
+//             type="number"
+//             {...register('stock', { 
+//               required: 'Stock is required', 
+//               min: { value: 0, message: 'Stock must be non-negative' },
+//               max: { value: 10000, message: 'Stock cannot exceed 10,000' }
+//             })}
+//             placeholder="Enter stock quantity"
+//             className="form-input"
+//           />
+//           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="deliveryRadius" className="form-label">Delivery Radius (km, Optional)</label>
+//           <input
+//             id="deliveryRadius"
+//             type="number"
+//             {...register('deliveryRadius', { 
+//               min: { value: 1, message: 'Delivery radius must be at least 1 km' },
+//               max: { value: 100, message: 'Delivery radius cannot exceed 100 km' }
+//             })}
+//             placeholder="Enter custom delivery radius (leave blank to use category default)"
+//             className="form-input"
+//           />
+//           {errors.deliveryRadius && <p className="error-text">{errors.deliveryRadius.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="category_id" className="form-label">Category</label>
+//           <select
+//             id="category_id"
+//             {...register('category_id', { required: 'Category is required' })}
+//             className="form-select"
+//           >
+//             <option value="">Select Category</option>
+//             {categories.map((category) => (
+//               <option key={category.id} value={category.id}>
+//                 {category.name.trim()}
+//               </option>
+//             ))}
+//           </select>
+//           {errors.category_id && <p className="error-text">{errors.category_id.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="images" className="form-label">Product Images (Max 10)</label>
+//           <input
+//             id="images"
+//             type="file"
+//             multiple
+//             accept="image/*"
+//             onChange={handleImageChange}
+//             className="form-input"
+//             disabled={imageLoading}
+//           />
+//           {previewImages.length > 0 && (
+//             <div className="image-preview">
+//               {previewImages.map((src, idx) => (
+//                 <div key={idx} className="image-preview-item">
+//                   <img
+//                     src={thumbPreviews[idx] || src}
+//                     data-src={src}
+//                     alt={`Preview ${idx}`}
+//                     className={`preview-image lazy-load ${primaryImageIndex === idx ? 'primary-image' : ''}`}
+//                     onClick={() => setPrimaryImage(idx)}
+//                     loading="lazy"
+//                   />
+//                   {primaryImageIndex === idx && <span className="primary-label">Primary</span>}
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">Specifications</h3>
+//           {specFields.map((field, index) => (
+//             <div key={field.id} className="spec-field">
+//               <input
+//                 {...register(`specifications.${index}.key`, { 
+//                   required: 'Specification key is required',
+//                   maxLength: { value: 100, message: 'Specification key cannot exceed 100 characters' }
+//                 })}
+//                 placeholder="Specification Key (e.g., Material)"
+//                 className="form-input spec-input"
+//                 defaultValue={field.key}
+//                 disabled={!!field.key}
+//               />
+//               <input
+//                 {...register(`specifications.${index}.value`, { 
+//                   required: 'Specification value is required',
+//                   maxLength: { value: 500, message: 'Specification value cannot exceed 500 characters' }
+//                 })}
+//                 placeholder="Specification Value (e.g., Sterling Silver)"
+//                 className="form-input spec-input"
+//               />
+//               <button
+//                 type="button"
+//                 onClick={() => removeSpec(index)}
+//                 className="remove-spec-btn"
+//                 disabled={!!field.key && isJewelryCategory}
+//               >
+//                 Remove
+//               </button>
+//             </div>
+//           ))}
+//           <button
+//             type="button"
+//             onClick={() => appendSpec({ key: '', value: '' })}
+//             className="add-spec-btn"
+//           >
+//             Add Custom Specification
+//           </button>
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">
+//             Variants
+//             <label className="variant-toggle">
+//               <input
+//                 type="checkbox"
+//                 checked={enableVariants}
+//                 onChange={() => {
+//                   setEnableVariants(!enableVariants);
+//                   if (!enableVariants) {
+//                     appendVariant({ attributes: {}, price: '', commission: '0', stock: '', images: [] });
+//                   } else {
+//                     replaceVariants([]);
+//                     setVariantPreviews({});
+//                     setVariantThumbPreviews({});
+//                   }
+//                 }}
+//               />
+//               Enable Variants
+//             </label>
+//           </h3>
+//           {enableVariants ? (
+//             <>
+//               {variantFields.length === 0 ? (
+//                 <p className="no-variants">No variants added. Click below to add a variant.</p>
+//               ) : (
+//                 variantFields.map((field, index) => {
+//                   const selectedCategoryData = categories.find((c) => c.id === selectedCategory);
+//                   const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes)
+//                     ? selectedCategoryData.variant_attributes
+//                     : [];
+
+//                   let variantInputs = variantAttributes.length > 0 ? (
+//                     variantAttributes.map((attr) => (
+//                       <div key={attr} className="variant-input">
+//                         <label className="form-label">{`Variant ${attr}`}</label>
+//                         <input
+//                           {...register(`variants.${index}.${attr}`, {
+//                             required: variantAttributes.length > 0 ? `${attr} is required` : false,
+//                             maxLength: { value: 100, message: `${attr} cannot exceed 100 characters` }
+//                           })}
+//                           placeholder={`Enter ${attr}`}
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.[attr] && (
+//                           <p className="error-text">{errors.variants[index][attr].message}</p>
+//                         )}
+//                       </div>
+//                     ))
+//                   ) : (
+//                     <div className="variant-input">
+//                       <label className="form-label">Attribute 1</label>
+//                       <input
+//                         {...register(`variants.${index}.attribute1`, { 
+//                           required: 'Attribute is required',
+//                           maxLength: { value: 100, message: 'Attribute cannot exceed 100 characters' }
+//                         })}
+//                         placeholder="Enter attribute"
+//                         className="form-input"
+//                       />
+//                       {errors.variants?.[index]?.attribute1 && (
+//                         <p className="error-text">{errors.variants[index].attribute1.message}</p>
+//                       )}
+//                     </div>
+//                   );
+
+//                   return (
+//                     <div key={field.id} className="variant-field">
+//                       {variantInputs}
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Price (₹)</label>
+//                         <input
+//                           {...register(`variants.${index}.price`, {
+//                             required: 'Variant price is required',
+//                             min: { value: 0, message: 'Price must be non-negative' },
+//                             max: { value: 1000000, message: 'Price cannot exceed ₹1,000,000' }
+//                           })}
+//                           type="number"
+//                           step="0.01"
+//                           placeholder="Enter variant price"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.price && (
+//                           <p className="error-text">{errors.variants[index].price.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Commission (₹)</label>
+//                         <input
+//                           {...register(`variants.${index}.commission`, {
+//                             required: 'Variant commission is required',
+//                             min: { value: 0, message: 'Commission must be non-negative' },
+//                             max: { value: 100000, message: 'Commission cannot exceed ₹100,000' }
+//                           })}
+//                           type="number"
+//                           step="0.01"
+//                           placeholder="Enter variant commission"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.commission && (
+//                           <p className="error-text">{errors.variants[index].commission.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Stock</label>
+//                         <input
+//                           {...register(`variants.${index}.stock`, {
+//                             required: 'Variant stock is required',
+//                             min: { value: 0, message: 'Stock must be non-negative' },
+//                             max: { value: 10000, message: 'Stock cannot exceed 10,000' }
+//                           })}
+//                           type="number"
+//                           placeholder="Enter variant stock"
+//                           className="form-input"
+//                         />
+//                         {errors.variants?.[index]?.stock && (
+//                           <p className="error-text">{errors.variants[index].stock.message}</p>
+//                         )}
+//                       </div>
+//                       <div className="variant-input">
+//                         <label className="form-label">Variant Images (Max 5, Optional)</label>
+//                         <input
+//                           type="file"
+//                           multiple
+//                           accept="image/*"
+//                           onChange={(e) => handleVariantImageChange(e, index)}
+//                           className="form-input"
+//                           disabled={imageLoading}
+//                         />
+//                         {variantPreviews[index] && variantPreviews[index].length > 0 && (
+//                           <div className="image-preview">
+//                             {variantPreviews[index].map((src, idx) => (
+//                               <img
+//                                 key={idx}
+//                                 src={variantThumbPreviews[index]?.[idx] || src}
+//                                 data-src={src}
+//                                 alt={`Variant Preview ${idx}`}
+//                                 className="preview-image lazy-load"
+//                                 loading="lazy"
+//                               />
+//                             ))}
+//                           </div>
+//                         )}
+//                       </div>
+//                       <button
+//                         type="button"
+//                         onClick={() => {
+//                           removeVariant(index);
+//                           setVariantPreviews((prev) => {
+//                             const newPreviews = { ...prev };
+//                             delete newPreviews[index];
+//                             return newPreviews;
+//                           });
+//                           setVariantThumbPreviews((prev) => {
+//                             const newPreviews = { ...prev };
+//                             delete newPreviews[index];
+//                             return newPreviews;
+//                           });
+//                         }}
+//                         className="remove-variant-btn"
+//                       >
+//                         Remove Variant
+//                       </button>
+//                     </div>
+//                   );
+//                 })
+//               )}
+//               <button
+//                 type="button"
+//                 onClick={() => appendVariant({ attributes: {}, price: '', commission: '0', stock: '', images: [] })}
+//                 className="add-variant-btn"
+//               >
+//                 Add Variant
+//               </button>
+//             </>
+//           ) : (
+//             <p className="no-variants">Variants are disabled. Enable to add variants.</p>
+//           )}
+//         </div>
+
+//         <div className="form-actions">
+//           <button
+//             type="submit"
+//             disabled={loading || imageLoading || (!isEditMode && previewImages.length === 0)}
+//             className="submit-btn"
+//           >
+//             {loading || imageLoading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Add Product'}
+//           </button>
+//           <button
+//             type="button"
+//             onClick={() => navigate('/seller')}
+//             disabled={loading || imageLoading}
+//             className="cancel-btn"
+//           >
+//             Cancel
+//           </button>
+//         </div>
+//       </form>
+//     </div>
+//   );
+// }
+
+// export default AddProductPage;
+
+
+
+
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useNavigate, useParams } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { useForm, useFieldArray } from 'react-hook-form';
+// import { LocationContext } from '../App';
+// import '../style/AddProductPage.css';
+// import { toast } from 'react-hot-toast';
+// import Swal from 'sweetalert2';
+// import { Helmet } from 'react-helmet-async';
+// import imageCompression from 'browser-image-compression';
+
+// // Utility function for retrying Supabase requests with exponential backoff
+// async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
+//   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+//     try {
+//       return await fn();
+//     } catch (error) {
+//       if (attempt === maxAttempts) throw error;
+//       const delay = initialDelay * Math.pow(2, attempt - 1);
+//       await new Promise((resolve) => setTimeout(resolve, delay));
+//     }
+//   }
+// }
+
+// // Calculate final price and validate
+// const calculateFinalPrice = (price, discount, commission) => {
+//   const originalPrice = parseFloat(price) || 0;
+//   const discountAmount = parseFloat(discount) || 0;
+//   const commissionAmount = parseFloat(commission) || 0;
+//   const finalPrice = originalPrice - discountAmount;
+
+//   if (finalPrice < 0) {
+//     return { finalPrice: null, error: 'Final price cannot be negative.' };
+//   }
+//   if (commissionAmount > originalPrice) {
+//     return { finalPrice: null, error: 'Commission cannot exceed the original price.' };
+//   }
+//   return { finalPrice: finalPrice.toFixed(2), error: null };
+// };
+
+// // Compress image with quality prioritization
+// const compressImage = async (file, isThumbnail = false) => {
+//   const maxSizeKB = isThumbnail ? 80 : 500;
+//   const options = isThumbnail
+//     ? {
+//         maxSizeMB: maxSizeKB / 1024,
+//         maxWidthOrHeight: 200,
+//         useWebWorker: true,
+//         initialQuality: 0.8,
+//         fileType: 'image/webp',
+//         alwaysKeepResolution: true,
+//       }
+//     : {
+//         maxSizeMB: maxSizeKB / 1024,
+//         maxWidthOrHeight: file.size > 2 * 1024 * 1024 ? 1920 : 1080,
+//         useWebWorker: true,
+//         initialQuality: 0.95,
+//         fileType: 'image/webp',
+//         alwaysKeepResolution: true,
+//       };
+
+//   try {
+//     const compressedFile = await imageCompression(file, options);
+//     const compressedSizeKB = compressedFile.size / 1024;
+//     if (compressedSizeKB > maxSizeKB) {
+//       throw new Error(`Compressed ${isThumbnail ? 'thumbnail' : 'image'} exceeds ${maxSizeKB}KB.`);
+//     }
+//     return compressedFile;
+//   } catch (error) {
+//     throw new Error(`Image compression failed: ${error.message}`);
+//   }
+// };
+
+// // Upload image to Supabase Storage
+// const uploadImage = async (file) => {
+//   if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+//     throw new Error('Invalid image file (must be an image, max 5MB).');
+//   }
+
+//   const compressedFull = await compressImage(file, false);
+//   const compressedThumb = await compressImage(file, true);
+//   const fileExt = 'webp';
+//   const fileName = `products/full/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+//   const thumbFileName = `products/thumbnails/${Date.now()}_${Math.random().toString(36).substring(2)}_thumb.${fileExt}`;
+
+//   const { error: fullUploadError } = await retryRequest(() =>
+//     supabase.storage
+//       .from('product-images')
+//       .upload(fileName, compressedFull, { contentType: 'image/webp' })
+//   );
+//   if (fullUploadError) {
+//     throw new Error(`Failed to upload full-size image: ${fullUploadError.message}`);
+//   }
+
+//   const { error: thumbUploadError } = await retryRequest(() =>
+//     supabase.storage
+//       .from('product-images')
+//       .upload(thumbFileName, compressedThumb, { contentType: 'image/webp' })
+//   );
+//   if (thumbUploadError) {
+//     await supabase.storage.from('product-images').remove([fileName]);
+//     throw new Error(`Failed to upload thumbnail: ${thumbUploadError.message}`);
+//   }
+
+//   const { data: { publicUrl: fullUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName);
+//   const { data: { publicUrl: thumbUrl } } = supabase.storage.from('product-images').getPublicUrl(thumbFileName);
+
+//   if (!fullUrl || !thumbUrl || !fullUrl.startsWith('https://') || !thumbUrl.startsWith('https://')) {
+//     await supabase.storage.from('product-images').remove([fileName, thumbFileName]);
+//     throw new Error('Failed to generate valid public URLs.');
+//   }
+
+//   return { fullUrl, thumbUrl };
+// };
+
+// function AddProductPage() {
+//   const navigate = useNavigate();
+//   const { productId } = useParams();
+//   const { sellerLocation } = useContext(LocationContext);
+//   const isEditMode = !!productId;
+
+//   const [categories, setCategories] = useState([]);
+//   const [imagePreviews, setImagePreviews] = useState({ main: [], variants: {} });
+//   const [primaryImageIndex, setPrimaryImageIndex] = useState(null);
+//   const [enableVariants, setEnableVariants] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState(null);
+
+//   const { register, handleSubmit, reset, setValue, watch, control, trigger, formState: { errors } } = useForm({
+//     defaultValues: {
+//       title: '',
+//       description: '',
+//       price: '',
+//       commission: '0',
+//       discount: '0',
+//       stock: '',
+//       category_id: '',
+//       deliveryRadius: '',
+//       images: [],
+//       variants: [],
+//       specifications: [],
+//     },
+//     mode: 'onChange',
+//   });
+
+//   const { fields: variantFields, append: appendVariant, remove: removeVariant, replace: replaceVariants } = useFieldArray({
+//     control,
+//     name: 'variants',
+//   });
+
+//   const { fields: specFields, append: appendSpec, remove: removeSpec, replace: replaceSpecs } = useFieldArray({
+//     control,
+//     name: 'specifications',
+//   });
+
+//   const watchCategoryId = watch('category_id');
+//   const watchPrice = watch('price');
+//   const watchDiscount = watch('discount');
+//   const watchCommission = watch('commission');
+
+//   // Calculate final price
+//   const { finalPrice, error: priceError } = calculateFinalPrice(watchPrice, watchDiscount, watchCommission);
+
+//   // Handle category change and specifications
+//   useEffect(() => {
+//     if (watchCategoryId) {
+//       const categoryId = parseInt(watchCategoryId, 10);
+//       const category = categories.find((c) => c.id === categoryId) || {};
+//       const specs = category.specifications_fields || [];
+//       replaceSpecs(specs.map((field) => ({ key: field.key || '', value: '' })));
+//     } else {
+//       replaceSpecs([]);
+//     }
+//   }, [watchCategoryId, categories, replaceSpecs]);
+
+//   // Fetch categories
+//   const fetchCategories = useCallback(async () => {
+//     try {
+//       const { data, error } = await retryRequest(() =>
+//         supabase.from('categories').select('id, name, variant_attributes, specifications_fields').order('id')
+//       );
+//       if (error) throw error;
+//       setCategories(data || []);
+//     } catch (err) {
+//       setError('Failed to load categories.');
+//       toast.error('Failed to load categories.');
+//     }
+//   }, []);
+
+//   // Fetch product data for edit mode
+//   const fetchProductData = useCallback(async () => {
+//     if (!isEditMode) return;
+//     setLoading(true);
+//     try {
+//       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+//       if (sessionError || !session?.user) throw new Error('You must be logged in.');
+
+//       const { data, error } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select('id, title, description, original_price, commission_amount, discount_amount, stock, category_id, images, specifications, delivery_radius_km')
+//           .eq('id', productId)
+//           .eq('seller_id', session.user.id)
+//           .maybeSingle()
+//       );
+//       if (error || !data) throw new Error('Product not found or unauthorized.');
+
+//       setValue('title', data.title || '');
+//       setValue('description', data.description || '');
+//       setValue('price', data.original_price?.toString() || '');
+//       setValue('commission', data.commission_amount?.toString() || '0');
+//       setValue('discount', data.discount_amount?.toString() || '0');
+//       setValue('stock', data.stock?.toString() || '');
+//       setValue('category_id', data.category_id?.toString() || '');
+//       setValue('deliveryRadius', data.delivery_radius_km?.toString() || '');
+//       setImagePreviews((prev) => ({ ...prev, main: data.images || [] }));
+//       setPrimaryImageIndex(data.images?.length > 0 ? 0 : null);
+//       replaceSpecs(Object.entries(data.specifications || {}).map(([key, value]) => ({ key, value })));
+
+//       const { data: variants, error: variantsError } = await retryRequest(() =>
+//         supabase.from('product_variants').select('id, attributes, original_price, commission_amount, stock, images').eq('product_id', productId)
+//       );
+//       if (variantsError) throw variantsError;
+
+//       if (variants?.length > 0) {
+//         setEnableVariants(true);
+//         const variantData = variants.map((v) => ({
+//           id: v.id,
+//           ...v.attributes,
+//           price: v.original_price?.toString() || '',
+//           commission: v.commission_amount?.toString() || '0',
+//           stock: v.stock?.toString() || '',
+//           images: [],
+//         }));
+//         replaceVariants(variantData);
+//         const variantImages = {};
+//         variants.forEach((v, idx) => {
+//           if (v.images?.length > 0) variantImages[idx] = v.images;
+//         });
+//         setImagePreviews((prev) => ({ ...prev, variants: variantImages }));
+//       }
+//     } catch (err) {
+//       setError(`Error: ${err.message}`);
+//       toast.error(`Error: ${err.message}`);
+//       navigate('/seller');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [isEditMode, productId, setValue, replaceSpecs, replaceVariants, navigate]);
+
+//   useEffect(() => {
+//     fetchCategories();
+//     if (isEditMode) fetchProductData();
+//   }, [fetchCategories, fetchProductData, isEditMode]);
+
+//   // Handle main product image uploads
+//   const handleImageChange = async (e) => {
+//     const files = Array.from(e.target.files).slice(0, 10);
+//     if (!files.length) return;
+
+//     setLoading(true);
+//     try {
+//       const uploads = await Promise.all(files.map(uploadImage));
+//       const fullUrls = uploads.map((u) => u.fullUrl);
+//       const thumbUrls = uploads.map((u) => u.thumbUrl);
+
+//       setImagePreviews((prev) => ({ ...prev, main: fullUrls }));
+//       setPrimaryImageIndex(0);
+//       toast.success('Images uploaded successfully!');
+//     } catch (err) {
+//       setImagePreviews((prev) => ({ ...prev, main: [] }));
+//       setPrimaryImageIndex(null);
+//       e.target.value = '';
+//       toast.error(`Upload failed: ${err.message}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Handle variant image uploads
+//   const handleVariantImageChange = async (e, index) => {
+//     const files = Array.from(e.target.files).slice(0, 5);
+//     if (!files.length) return;
+
+//     setLoading(true);
+//     try {
+//       const uploads = await Promise.all(files.map((file) => uploadImage(file).then((u) => u.fullUrl)));
+//       setImagePreviews((prev) => ({
+//         ...prev,
+//         variants: { ...prev.variants, [index]: uploads },
+//       }));
+//       toast.success('Variant images uploaded successfully!');
+//     } catch (err) {
+//       setImagePreviews((prev) => ({
+//         ...prev,
+//         variants: { ...prev.variants, [index]: [] },
+//       }));
+//       e.target.value = '';
+//       toast.error(`Variant upload failed: ${err.message}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Validate and submit form
+//   const onSubmitProduct = async (data) => {
+//     setLoading(true);
+//     setError(null);
+
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (!session?.user) throw new Error('You must be logged in.');
+//       if (!sellerLocation?.lat || !sellerLocation?.lon) throw new Error('Please set your store location.');
+
+//       if (imagePreviews.main.length === 0) throw new Error('At least one product image is required.');
+//       if (priceError) throw new Error(priceError);
+
+//       const specifications = data.specifications.reduce((obj, spec) => {
+//         if (spec.key && spec.value) obj[spec.key.trim()] = spec.value.trim();
+//         return obj;
+//       }, {});
+//       if (specFields.length > 0 && Object.keys(specifications).length === 0) {
+//         throw new Error('At least one specification is required.');
+//       }
+
+//       const images = primaryImageIndex != null && primaryImageIndex >= 0
+//         ? [imagePreviews.main[primaryImageIndex], ...imagePreviews.main.filter((_, i) => i !== primaryImageIndex)]
+//         : imagePreviews.main;
+
+//       const productData = {
+//         seller_id: session.user.id,
+//         category_id: parseInt(data.category_id, 10),
+//         title: data.title.trim(),
+//         description: data.description.trim(),
+//         price: parseFloat(finalPrice),
+//         original_price: parseFloat(data.price),
+//         commission_amount: parseFloat(data.commission) || 0,
+//         discount_amount: parseFloat(data.discount) || 0,
+//         stock: parseInt(data.stock, 10),
+//         images,
+//         specifications,
+//         delivery_radius_km: data.deliveryRadius ? parseInt(data.deliveryRadius, 10) : null,
+//         latitude: sellerLocation.lat,
+//         longitude: sellerLocation.lon,
+//         is_approved: false,
+//         status: 'active',
+//         updated_at: new Date().toISOString(),
+//       };
+
+//       let newProductId = productId;
+
+//       if (isEditMode) {
+//         const { error } = await retryRequest(() =>
+//           supabase.from('products').update(productData).eq('id', productId).eq('seller_id', session.user.id)
+//         );
+//         if (error) throw new Error(`Failed to update product: ${error.message}`);
+//       } else {
+//         const { data: inserted, error } = await retryRequest(() =>
+//           supabase.from('products').insert(productData).select('id').single()
+//         );
+//         if (error) throw new Error(`Failed to insert product: ${error.message}`);
+//         newProductId = inserted.id;
+//       }
+
+//       if (enableVariants && data.variants?.length > 0) {
+//         const category = categories.find((c) => c.id === parseInt(data.category_id, 10));
+//         const variantAttributes = category?.variant_attributes || ['attribute1'];
+
+//         for (const [index, variant] of data.variants.entries()) {
+//           const { finalPrice: variantFinalPrice, error: variantPriceError } = calculateFinalPrice(
+//             variant.price,
+//             data.discount,
+//             variant.commission
+//           );
+//           if (variantPriceError) throw new Error(`Variant ${index + 1}: ${variantPriceError}`);
+
+//           const attributes = variantAttributes.reduce((obj, attr) => {
+//             obj[attr] = variant[attr]?.trim() || '';
+//             return obj;
+//           }, {});
+//           if (!Object.values(attributes).some((v) => v)) {
+//             throw new Error(`Variant ${index + 1}: At least one attribute is required.`);
+//           }
+
+//           const variantData = {
+//             product_id: newProductId,
+//             attributes,
+//             price: parseFloat(variantFinalPrice),
+//             original_price: parseFloat(variant.price),
+//             commission_amount: parseFloat(variant.commission) || 0,
+//             stock: parseInt(variant.stock, 10),
+//             images: imagePreviews.variants[index] || [],
+//             status: 'active',
+//             updated_at: new Date().toISOString(),
+//           };
+
+//           if (variant.id) {
+//             const { error } = await retryRequest(() =>
+//               supabase.from('product_variants').update(variantData).eq('id', variant.id)
+//             );
+//             if (error) throw new Error(`Failed to update variant ${index + 1}: ${error.message}`);
+//           } else {
+//             const { error } = await retryRequest(() =>
+//               supabase.from('product_variants').insert(variantData)
+//             );
+//             if (error) throw new Error(`Failed to insert variant ${index + 1}: ${error.message}`);
+//           }
+//         }
+//       } else if (isEditMode) {
+//         const { error } = await retryRequest(() =>
+//           supabase.from('product_variants').delete().eq('product_id', productId)
+//         );
+//         if (error) throw new Error(`Failed to delete variants: ${error.message}`);
+//       }
+
+//       await Swal.fire({
+//         title: isEditMode ? 'Product Updated!' : 'Product Added!',
+//         text: isEditMode ? 'Your product has been updated.' : 'Your product has been added.',
+//         icon: 'success',
+//         confirmButtonColor: '#3085d6',
+//       });
+
+//       reset();
+//       setImagePreviews({ main: [], variants: {} });
+//       setPrimaryImageIndex(null);
+//       setEnableVariants(false);
+//       replaceSpecs([]);
+//       replaceVariants([]);
+//       navigate('/seller');
+//     } catch (err) {
+//       setError(`Error: ${err.message}`);
+//       toast.error(`Error: ${err.message}`);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Lazy load images
+//   useEffect(() => {
+//     const images = document.querySelectorAll('.lazy-load');
+//     const observer = new IntersectionObserver((entries) => {
+//       entries.forEach((entry) => {
+//         if (entry.isIntersecting) {
+//           const img = entry.target;
+//           img.src = img.dataset.src;
+//           img.classList.add('loaded');
+//           observer.unobserve(img);
+//         }
+//       });
+//     });
+//     images.forEach((img) => observer.observe(img));
+//     return () => observer.disconnect();
+//   }, [imagePreviews]);
+
+//   const pageTitle = isEditMode ? 'Edit Product - FreshCart' : 'Add Product - FreshCart';
+//   const defaultImage = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
+
+//   return (
+//     <div className="add-product-container">
+//       <Helmet>
+//         <title>{pageTitle}</title>
+//         <meta name="description" content={isEditMode ? 'Edit your product details.' : 'Add a new product to your FreshCart account.'} />
+//         <meta name="robots" content="noindex, nofollow" />
+//       </Helmet>
+//       <h2 className="add-product-title">{isEditMode ? 'Edit Product' : 'Add New Product'}</h2>
+//       {error && <p className="error-message">{error}</p>}
+//       {loading && <div className="loading-spinner">Processing...</div>}
+
+//       <form onSubmit={handleSubmit(onSubmitProduct)} className="add-product-form">
+//         <div className="form-group">
+//           <label htmlFor="title" className="form-label">Product Name</label>
+//           <input
+//             id="title"
+//             {...register('title', {
+//               required: 'Product name is required',
+//               maxLength: { value: 200, message: 'Max 200 characters' },
+//               pattern: { value: /^[A-Za-z0-9\s\-.,&()]+$/, message: 'Invalid characters' },
+//             })}
+//             placeholder="Enter product name"
+//             className="form-input"
+//           />
+//           {errors.title && <p className="error-text">{errors.title.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="description" className="form-label">Description</label>
+//           <textarea
+//             id="description"
+//             {...register('description', {
+//               required: 'Description is required',
+//               maxLength: { value: 2000, message: 'Max 2000 characters' },
+//             })}
+//             placeholder="Enter product description"
+//             className="form-textarea"
+//           />
+//           {errors.description && <p className="error-text">{errors.description.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="price" className="form-label">Price (₹)</label>
+//           <input
+//             id="price"
+//             type="number"
+//             step="0.01"
+//             {...register('price', {
+//               required: 'Price is required',
+//               min: { value: 0, message: 'Price must be non-negative' },
+//               max: { value: 1000000, message: 'Max ₹1,000,000' },
+//             })}
+//             placeholder="Enter price"
+//             className="form-input"
+//           />
+//           {errors.price && <p className="error-text">{errors.price.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="commission" className="form-label">Commission (₹)</label>
+//           <input
+//             id="commission"
+//             type="number"
+//             step="0.01"
+//             {...register('commission', {
+//               required: 'Commission is required',
+//               min: { value: 0, message: 'Commission must be non-negative' },
+//             })}
+//             placeholder="Enter commission"
+//             className="form-input"
+//           />
+//           {errors.commission && <p className="error-text">{errors.commission.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="discount" className="form-label">Discount (₹)</label>
+//           <input
+//             id="discount"
+//             type="number"
+//             step="0.01"
+//             {...register('discount', {
+//               required: 'Discount is required',
+//               min: { value: 0, message: 'Discount must be non-negative' },
+//             })}
+//             placeholder="Enter discount"
+//             className="form-input"
+//           />
+//           {errors.discount && <p className="error-text">{errors.discount.message}</p>}
+//         </div>
+
+//         {finalPrice && !priceError && (
+//           <div className="form-group">
+//             <label className="form-label">Final Price (₹)</label>
+//             <p className="calculated-price">{finalPrice}</p>
+//           </div>
+//         )}
+//         {priceError && <p className="error-text">{priceError}</p>}
+
+//         <div className="form-group">
+//           <label htmlFor="stock" className="form-label">Stock</label>
+//           <input
+//             id="stock"
+//             type="number"
+//             {...register('stock', {
+//               required: 'Stock is required',
+//               min: { value: 0, message: 'Stock must be non-negative' },
+//               max: { value: 10000, message: 'Max 10,000' },
+//             })}
+//             placeholder="Enter stock quantity"
+//             className="form-input"
+//           />
+//           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="deliveryRadius" className="form-label">Delivery Radius (km, Optional)</label>
+//           <input
+//             id="deliveryRadius"
+//             type="number"
+//             {...register('deliveryRadius', {
+//               min: { value: 1, message: 'Min 1 km' },
+//               max: { value: 100, message: 'Max 100 km' },
+//             })}
+//             placeholder="Enter delivery radius"
+//             className="form-input"
+//           />
+//           {errors.deliveryRadius && <p className="error-text">{errors.deliveryRadius.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="category_id" className="form-label">Category</label>
+//           <select
+//             id="category_id"
+//             {...register('category_id', { required: 'Category is required' })}
+//             className="form-select"
+//           >
+//             <option value="">Select Category</option>
+//             {categories.map((category) => (
+//               <option key={category.id} value={category.id}>
+//                 {category.name.trim()}
+//               </option>
+//             ))}
+//           </select>
+//           {errors.category_id && <p className="error-text">{errors.category_id.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label htmlFor="images" className="form-label">Product Images (Max 10)</label>
+//           <input
+//             id="images"
+//             type="file"
+//             multiple
+//             accept="image/*"
+//             onChange={handleImageChange}
+//             className="form-input"
+//             disabled={loading}
+//           />
+//           {imagePreviews.main.length > 0 && (
+//             <div className="image-preview">
+//               {imagePreviews.main.map((src, idx) => (
+//                 <div key={idx} className="image-preview-item">
+//                   <img
+//                     src={src}
+//                     data-src={src}
+//                     alt={`Preview ${idx}`}
+//                     className={`preview-image lazy-load ${primaryImageIndex === idx ? 'primary-image' : ''}`}
+//                     onClick={() => setPrimaryImageIndex(idx)}
+//                     loading="lazy"
+//                   />
+//                   {primaryImageIndex === idx && <span className="primary-label">Primary</span>}
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">Specifications</h3>
+//           {specFields.map((field, index) => (
+//             <div key={field.id} className="spec-field">
+//               <input
+//                 {...register(`specifications.${index}.key`, {
+//                   required: 'Key is required',
+//                   maxLength: { value: 100, message: 'Max 100 characters' },
+//                 })}
+//                 placeholder="Specification Key"
+//                 className="form-input spec-input"
+//                 defaultValue={field.key}
+//                 disabled={!!field.key}
+//               />
+//               <input
+//                 {...register(`specifications.${index}.value`, {
+//                   required: 'Value is required',
+//                   maxLength: { value: 500, message: 'Max 500 characters' },
+//                 })}
+//                 placeholder="Specification Value"
+//                 className="form-input spec-input"
+//               />
+//               <button type="button" onClick={() => removeSpec(index)} className="remove-spec-btn">
+//                 Remove
+//               </button>
+//             </div>
+//           ))}
+//           <button type="button" onClick={() => appendSpec({ key: '', value: '' })} className="add-spec-btn">
+//             Add Specification
+//           </button>
+//         </div>
+
+//         <div className="form-group">
+//           <h3 className="section-title">
+//             Variants
+//             <label className="variant-toggle">
+//               <input
+//                 type="checkbox"
+//                 checked={enableVariants}
+//                 onChange={() => {
+//                   setEnableVariants(!enableVariants);
+//                   if (!enableVariants) appendVariant({ price: '', commission: '0', stock: '', images: [] });
+//                   else {
+//                     replaceVariants([]);
+//                     setImagePreviews((prev) => ({ ...prev, variants: {} }));
+//                   }
+//                 }}
+//               />
+//               Enable Variants
+//             </label>
+//           </h3>
+//           {enableVariants && variantFields.map((field, index) => {
+//             const category = categories.find((c) => c.id === parseInt(watchCategoryId, 10));
+//             const attributes = category?.variant_attributes || ['attribute1'];
+
+//             return (
+//               <div key={field.id} className="variant-field">
+//                 {attributes.map((attr) => (
+//                   <div key={attr} className="variant-input">
+//                     <label className="form-label">{attr}</label>
+//                     <input
+//                       {...register(`variants.${index}.${attr}`, {
+//                         required: `${attr} is required`,
+//                         maxLength: { value: 100, message: `Max 100 characters` },
+//                       })}
+//                       placeholder={`Enter ${attr}`}
+//                       className="form-input"
+//                     />
+//                     {errors.variants?.[index]?.[attr] && (
+//                       <p className="error-text">{errors.variants[index][attr].message}</p>
+//                     )}
+//                   </div>
+//                 ))}
+//                 <div className="variant-input">
+//                   <label className="form-label">Price (₹)</label>
+//                   <input
+//                     {...register(`variants.${index}.price`, {
+//                       required: 'Price is required',
+//                       min: { value: 0, message: 'Price must be non-negative' },
+//                     })}
+//                     type="number"
+//                     step="0.01"
+//                     placeholder="Enter price"
+//                     className="form-input"
+//                   />
+//                   {errors.variants?.[index]?.price && (
+//                     <p className="error-text">{errors.variants[index].price.message}</p>
+//                   )}
+//                 </div>
+//                 <div className="variant-input">
+//                   <label className="form-label">Commission (₹)</label>
+//                   <input
+//                     {...register(`variants.${index}.commission`, {
+//                       required: 'Commission is required',
+//                       min: { value: 0, message: 'Commission must be non-negative' },
+//                     })}
+//                     type="number"
+//                     step="0.01"
+//                     placeholder="Enter commission"
+//                     className="form-input"
+//                   />
+//                   {errors.variants?.[index]?.commission && (
+//                     <p className="error-text">{errors.variants[index].commission.message}</p>
+//                   )}
+//                 </div>
+//                 <div className="variant-input">
+//                   <label className="form-label">Stock</label>
+//                   <input
+//                     {...register(`variants.${index}.stock`, {
+//                       required: 'Stock is required',
+//                       min: { value: 0, message: 'Stock must be non-negative' },
+//                     })}
+//                     type="number"
+//                     placeholder="Enter stock"
+//                     className="form-input"
+//                   />
+//                   {errors.variants?.[index]?.stock && (
+//                     <p className="error-text">{errors.variants[index].stock.message}</p>
+//                   )}
+//                 </div>
+//                 <div className="variant-input">
+//                   <label className="form-label">Images (Max 5, Optional)</label>
+//                   <input
+//                     type="file"
+//                     multiple
+//                     accept="image/*"
+//                     onChange={(e) => handleVariantImageChange(e, index)}
+//                     className="form-input"
+//                     disabled={loading}
+//                   />
+//                   {imagePreviews.variants[index]?.length > 0 && (
+//                     <div className="image-preview">
+//                       {imagePreviews.variants[index].map((src, idx) => (
+//                         <img
+//                           key={idx}
+//                           src={src}
+//                           data-src={src}
+//                           alt={`Variant Preview ${idx}`}
+//                           className="preview-image lazy-load"
+//                           loading="lazy"
+//                         />
+//                       ))}
+//                     </div>
+//                   )}
+//                 </div>
+//                 <button
+//                   type="button"
+//                   onClick={() => {
+//                     removeVariant(index);
+//                     setImagePreviews((prev) => {
+//                       const newVariants = { ...prev.variants };
+//                       delete newVariants[index];
+//                       return { ...prev, variants: newVariants };
+//                     });
+//                   }}
+//                   className="remove-variant-btn"
+//                 >
+//                   Remove Variant
+//                 </button>
+//               </div>
+//             );
+//           })}
+//           {enableVariants && (
+//             <button
+//               type="button"
+//               onClick={() => appendVariant({ price: '', commission: '0', stock: '', images: [] })}
+//               className="add-variant-btn"
+//             >
+//               Add Variant
+//             </button>
+//           )}
+//         </div>
+
+//         <div className="form-actions">
+//           <button type="submit" disabled={loading || priceError} className="submit-btn">
+//             {loading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Add Product'}
+//           </button>
+//           <button type="button" onClick={() => navigate('/seller')} disabled={loading} className="cancel-btn">
+//             Cancel
+//           </button>
+//         </div>
+//       </form>
+//     </div>
+//   );
+// }
+
+// export default AddProductPage;
+
+
+
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -10149,6 +12375,9 @@ import Swal from 'sweetalert2';
 import { Helmet } from 'react-helmet-async';
 import imageCompression from 'browser-image-compression';
 
+// Default image constant (consistent with Products.js)
+const DEFAULT_IMAGE = 'https://dummyimage.com/150';
+
 // Utility function for retrying Supabase requests with exponential backoff
 async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -10157,148 +12386,78 @@ async function retryRequest(fn, maxAttempts = 3, initialDelay = 1000) {
     } catch (error) {
       if (attempt === maxAttempts) throw error;
       const delay = initialDelay * Math.pow(2, attempt - 1);
-      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 }
 
-// Optimized image compression function to prioritize quality and relax size constraints
-const compressImage = async (file, isThumbnail = false) => {
-  const minSizeKB = isThumbnail ? 10 : 50; // Relaxed minimum size for full-size images
-  const maxSizeKB = isThumbnail ? 80 : 500; // Maximum size for thumbnails and full-size
-  let quality = isThumbnail ? 0.8 : 0.95; // High initial quality for better clarity
-  const maxAttempts = 5; // Number of attempts for compression
+// Calculate final price and validate
+const calculateFinalPrice = (price, discount, commission) => {
+  const originalPrice = parseFloat(price) || 0;
+  const discountAmount = parseFloat(discount) || 0;
+  const commissionAmount = parseFloat(commission) || 0;
+  const finalPrice = originalPrice - discountAmount;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const options = isThumbnail
-      ? {
-          maxSizeMB: maxSizeKB / 1024,
-          maxWidthOrHeight: 200, // Slightly higher for better thumbnail quality
-          useWebWorker: true,
-          initialQuality: quality,
-          fileType: 'image/webp', // WebP for better compression
-          alwaysKeepResolution: true, // Preserve resolution for quality
-        }
-      : {
-          maxSizeMB: maxSizeKB / 1024,
-          maxWidthOrHeight: file.size > 2 * 1024 * 1024 ? 1920 : 1080, // Higher resolution for large images
-          useWebWorker: true,
-          initialQuality: quality,
-          fileType: 'image/webp',
-          alwaysKeepResolution: true, // Preserve resolution for quality
-        };
+  if (finalPrice < 0) {
+    return { finalPrice: null, error: 'Final price cannot be negative.' };
+  }
+  if (commissionAmount > originalPrice) {
+    return { finalPrice: null, error: 'Commission cannot exceed the original price.' };
+  }
+  return { finalPrice: finalPrice.toFixed(2), error: null };
+};
 
-    try {
-      console.log(`🖼️ Attempt ${attempt}: Compressing ${isThumbnail ? 'thumbnail' : 'full-size'} image: ${file.name}, original size: ${(file.size / 1024).toFixed(2)} KB, target quality: ${quality}`);
-      const compressedFile = await imageCompression(file, options);
-      const compressedSizeKB = compressedFile.size / 1024;
+// Compress image with quality prioritization
+const compressImage = async (file) => {
+  const maxSizeKB = 500; // Max size for full-size images
+  const options = {
+    maxSizeMB: maxSizeKB / 1024,
+    maxWidthOrHeight: file.size > 2 * 1024 * 1024 ? 1920 : 1080,
+    useWebWorker: true,
+    initialQuality: 0.95,
+    fileType: 'image/webp',
+    alwaysKeepResolution: true,
+  };
 
-      if (compressedSizeKB >= minSizeKB && compressedSizeKB <= maxSizeKB) {
-        console.log(`✅ Compressed ${isThumbnail ? 'thumbnail' : 'full-size'} image: ${file.name}, new size: ${compressedSizeKB.toFixed(2)} KB`);
-        return compressedFile;
-      } else if (compressedSizeKB < minSizeKB) {
-        console.warn(`⚠️ Compressed image too small: ${compressedSizeKB.toFixed(2)} KB, increasing quality`);
-        quality = Math.min(quality + 0.05, 1.0); // Finer quality increment
-      } else {
-        console.warn(`⚠️ Compressed image too large: ${compressedSizeKB.toFixed(2)} KB, decreasing quality`);
-        quality = Math.max(quality - 0.05, 0.7); // Finer quality decrement
-      }
-
-      if (attempt === maxAttempts) {
-        if (compressedSizeKB < minSizeKB && quality >= 1.0) {
-          console.log(`ℹ️ Accepting image at ${compressedSizeKB.toFixed(2)} KB as quality is maximized (1.0)`);
-          return compressedFile; // Accept the image if quality is maxed out
-        }
-        throw new Error(`Unable to compress image within ${minSizeKB}KB-${maxSizeKB}KB after ${maxAttempts} attempts. Final size: ${compressedSizeKB.toFixed(2)} KB`);
-      }
-    } catch (error) {
-      console.error(`❌ Compression attempt ${attempt} failed for ${file.name}: ${error.message}`);
-      if (attempt === maxAttempts) {
-        throw new Error(`Image compression failed: ${error.message}`);
-      }
+  try {
+    const compressedFile = await imageCompression(file, options);
+    const compressedSizeKB = compressedFile.size / 1024;
+    if (compressedSizeKB > maxSizeKB) {
+      throw new Error(`Compressed image exceeds ${maxSizeKB}KB.`);
     }
+    return compressedFile;
+  } catch (error) {
+    throw new Error(`Image compression failed: ${error.message}`);
   }
 };
 
-// Image upload function using Supabase Storage
+// Upload image to Supabase Storage
 const uploadImage = async (file) => {
-  try {
-    if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-      console.error(`❌ Invalid file: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
-      throw new Error('Invalid image file (must be an image, max 5MB before compression).');
-    }
-
-    // Compress full-size image
-    const compressedFull = await compressImage(file, false);
-    if (compressedFull.size > 500 * 1024) {
-      console.error(`❌ Compressed full-size image too large: ${file.name}, size: ${(compressedFull.size / 1024).toFixed(2)} KB`);
-      throw new Error('Compressed full-size image exceeds 500KB.');
-    }
-
-    // Compress thumbnail
-    const compressedThumb = await compressImage(file, true);
-    if (compressedThumb.size > 80 * 1024) {
-      console.error(`❌ Compressed thumbnail too large: ${file.name}, size: ${(compressedThumb.size / 1024).toFixed(2)} KB`);
-      throw new Error('Compressed thumbnail exceeds 80KB.');
-    }
-
-    // Generate unique file names
-    const fileExt = 'webp';
-    const fileName = `products/full/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const thumbFileName = `products/thumbnails/${Date.now()}_${Math.random().toString(36).substring(2)}_thumb.${fileExt}`;
-
-    // Upload full-size image to Supabase
-    console.log(`⬆️ Uploading full-size image: ${fileName}`);
-    const { error: fullUploadError } = await retryRequest(() =>
-      supabase.storage
-        .from('product-images')
-        .upload(fileName, compressedFull, {
-          contentType: 'image/webp',
-        })
-    );
-    if (fullUploadError) {
-      console.error(`❌ Failed to upload full-size image ${fileName}: ${fullUploadError.message}`);
-      throw new Error(`Failed to upload full-size image: ${fullUploadError.message}`);
-    }
-
-    // Upload thumbnail to Supabase
-    console.log(`⬆️ Uploading thumbnail: ${thumbFileName}`);
-    const { error: thumbUploadError } = await retryRequest(() =>
-      supabase.storage
-        .from('product-images')
-        .upload(thumbFileName, compressedThumb, {
-          contentType: 'image/webp',
-        })
-    );
-    if (thumbUploadError) {
-      console.error(`❌ Failed to upload thumbnail ${thumbFileName}: ${thumbUploadError.message}`);
-      // Clean up full-size image if thumbnail upload fails
-      await supabase.storage.from('product-images').remove([fileName]);
-      throw new Error(`Failed to upload thumbnail: ${thumbUploadError.message}`);
-    }
-
-    // Get public URLs
-    const { data: { publicUrl: fullUrl } } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(fileName);
-    const { data: { publicUrl: thumbUrl } } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(thumbFileName);
-
-    if (!fullUrl || !thumbUrl || !fullUrl.startsWith('https://') || !thumbUrl.startsWith('https://')) {
-      console.error('❌ Failed to generate valid public URLs');
-      // Clean up uploaded files
-      await supabase.storage.from('product-images').remove([fileName, thumbFileName]);
-      throw new Error('Failed to generate public URLs for images.');
-    }
-
-    console.log(`📦 Upload successful - Full URL: ${fullUrl}, Thumbnail URL: ${thumbUrl}`);
-    return { fullUrl, thumbUrl };
-  } catch (err) {
-    console.error(`❌ Upload failed for ${file.name}: ${err.message}`);
-    throw new Error(`Failed to upload image: ${err.message}`);
+  if (!file || !file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
+    throw new Error('Invalid image file (must be an image, max 5MB).');
   }
+
+  const compressedFile = await compressImage(file);
+  const fileExt = 'webp';
+  const fileName = `products/full/${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+  const { error: uploadError } = await retryRequest(() =>
+    supabase.storage
+      .from('product-images')
+      .upload(fileName, compressedFile, { contentType: 'image/webp' })
+  );
+  if (uploadError) {
+    throw new Error(`Failed to upload image: ${uploadError.message}`);
+  }
+
+  const { data: { publicUrl } } = supabase.storage.from('product-images').getPublicUrl(fileName);
+
+  if (!publicUrl || !publicUrl.startsWith('https://')) {
+    await supabase.storage.from('product-images').remove([fileName]);
+    throw new Error('Failed to generate valid public URL.');
+  }
+
+  return publicUrl;
 };
 
 function AddProductPage() {
@@ -10308,41 +12467,25 @@ function AddProductPage() {
   const isEditMode = !!productId;
 
   const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [previewImages, setPreviewImages] = useState([]);
-  const [thumbPreviews, setThumbPreviews] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState({ main: [], variants: {} });
   const [primaryImageIndex, setPrimaryImageIndex] = useState(null);
-  const [variantPreviews, setVariantPreviews] = useState({});
-  const [variantThumbPreviews, setVariantThumbPreviews] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [message, setMessage] = useState('');
   const [enableVariants, setEnableVariants] = useState(false);
-  const [calculatedPrice, setCalculatedPrice] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-    control,
-    trigger,
-  } = useForm({
+  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors } } = useForm({
     defaultValues: {
-      title: 'Silver Chain Necklace with Pink Gemstone Pendant',
-      description: 'Elevate your elegance with this exquisite silver chain necklace, adorned with a cushion-cut pink gemstone pendant framed by radiant crystal accents. Its timeless design seamlessly blends sophistication and modern allure, making it an ideal accessory for daily wear or special occasions such as parties and weddings. A perfect gift, this statement piece adds a touch of radiant sparkle to any ensemble.',
+      title: '',
+      description: '',
       price: '',
-      commission: '',
-      discount: '',
+      commission: '0',
+      discount: '0',
       stock: '',
       category_id: '',
+      deliveryRadius: '',
       images: [],
       variants: [],
       specifications: [],
-      deliveryRadius: '',
     },
     mode: 'onChange',
   });
@@ -10360,40 +12503,19 @@ function AddProductPage() {
   const watchCategoryId = watch('category_id');
   const watchPrice = watch('price');
   const watchDiscount = watch('discount');
+  const watchCommission = watch('commission');
 
-  // Calculate price after discount
-  useEffect(() => {
-    if (watchPrice && watchDiscount >= 0) {
-      const price = parseFloat(watchPrice) || 0;
-      const discountAmount = parseFloat(watchDiscount) || 0;
-      const finalPrice = price - discountAmount;
-      setCalculatedPrice(finalPrice >= 0 ? finalPrice.toFixed(2) : 0);
-    } else {
-      setCalculatedPrice(null);
-    }
-  }, [watchPrice, watchDiscount]);
+  // Calculate final price
+  const { finalPrice, error: priceError } = calculateFinalPrice(watchPrice, watchDiscount, watchCommission);
 
   // Handle category change and specifications
   useEffect(() => {
     if (watchCategoryId) {
       const categoryId = parseInt(watchCategoryId, 10);
-      setSelectedCategory(categoryId);
-      const selectedCategoryData = categories.find((c) => c.id === categoryId) || {};
-      const specFieldsFromBackend = selectedCategoryData.specifications_fields || [];
-      let initialSpecs = [...specFieldsFromBackend];
-
-      if (selectedCategoryData.name === 'Jewelry' || categoryId === 2) { // Assuming 'Jewelry' category ID is 2
-        const jewelrySpecs = [
-          { key: 'Material', value: 'Sterling Silver' },
-          { key: 'Gemstone', value: 'Pink Sapphire' },
-          { key: 'Chain Length', value: '' },
-        ];
-        initialSpecs = jewelrySpecs.map(spec => ({ ...spec, value: spec.value || '' }));
-      }
-
-      replaceSpecs(initialSpecs.map((field) => ({ key: field.key || '', value: field.value || '' })));
+      const category = categories.find((c) => c.id === categoryId) || {};
+      const specs = category.specifications_fields || [];
+      replaceSpecs(specs.map((field) => ({ key: field.key || '', value: '' })));
     } else {
-      setSelectedCategory(null);
       replaceSpecs([]);
     }
   }, [watchCategoryId, categories, replaceSpecs]);
@@ -10402,26 +12524,13 @@ function AddProductPage() {
   const fetchCategories = useCallback(async () => {
     try {
       const { data, error } = await retryRequest(() =>
-        supabase
-          .from('categories')
-          .select('id, name, variant_attributes, specifications_fields')
-          .order('id', { ascending: true })
+        supabase.from('categories').select('id, name, variant_attributes, specifications_fields').order('id')
       );
       if (error) throw error;
       setCategories(data || []);
     } catch (err) {
       setError('Failed to load categories.');
-      toast.error('Failed to load categories.', {
-        position: 'top-center',
-        duration: 3000,
-        style: {
-          background: '#ff4d4f',
-          color: '#fff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          padding: '16px',
-        },
-      });
+      toast.error('Failed to load categories.');
     }
   }, []);
 
@@ -10431,650 +12540,246 @@ function AddProductPage() {
     setLoading(true);
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session?.user) {
-        throw new Error('You must be logged in.');
-      }
-      const sellerId = session.user.id;
+      if (sessionError || !session?.user) throw new Error('You must be logged in.');
 
-      const { data: productData, error: productError } = await retryRequest(() =>
+      const { data, error } = await retryRequest(() =>
         supabase
           .from('products')
           .select('id, title, description, original_price, commission_amount, discount_amount, stock, category_id, images, specifications, delivery_radius_km')
           .eq('id', productId)
-          .eq('seller_id', sellerId)
+          .eq('seller_id', session.user.id)
           .maybeSingle()
       );
-      if (productError) throw productError;
-      if (!productData) {
-        throw new Error('Product not found or you do not have permission.');
-      }
+      if (error || !data) throw new Error('Product not found or unauthorized.');
 
-      setValue('title', productData.title || '');
-      setValue('description', productData.description || '');
-      setValue('price', productData.original_price != null ? productData.original_price.toString() : '');
-      setValue('commission', productData.commission_amount != null ? productData.commission_amount.toString() : '0');
-      setValue('discount', productData.discount_amount != null ? productData.discount_amount.toString() : '0');
-      setValue('stock', productData.stock != null ? productData.stock.toString() : '');
-      setValue('category_id', productData.category_id != null ? productData.category_id.toString() : '');
-      setValue('deliveryRadius', productData.delivery_radius_km != null ? productData.delivery_radius_km.toString() : '');
-      setValue('images', []);
-      setPreviewImages(productData.images || []);
-      setThumbPreviews(productData.images || []);
-      setPrimaryImageIndex(productData.images?.length > 0 ? 0 : null);
+      setValue('title', data.title || '');
+      setValue('description', data.description || '');
+      setValue('price', data.original_price?.toString() || '');
+      setValue('commission', data.commission_amount?.toString() || '0');
+      setValue('discount', data.discount_amount?.toString() || '0');
+      setValue('stock', data.stock?.toString() || '');
+      setValue('category_id', data.category_id?.toString() || '');
+      setValue('deliveryRadius', data.delivery_radius_km?.toString() || '');
+      setImagePreviews((prev) => ({ ...prev, main: data.images || [] }));
+      setPrimaryImageIndex(data.images?.length > 0 ? 0 : null);
+      replaceSpecs(Object.entries(data.specifications || {}).map(([key, value]) => ({ key, value })));
 
-      await trigger(['price', 'commission', 'discount', 'stock', 'category_id', 'deliveryRadius']);
-
-      const specs = productData.specifications
-        ? Object.entries(productData.specifications).map(([key, value]) => ({ key, value }))
-        : [];
-      replaceSpecs(specs);
-
-      const { data: variantsData, error: variantsError } = await retryRequest(() =>
-        supabase
-          .from('product_variants')
-          .select('id, attributes, original_price, commission_amount, stock, images')
-          .eq('product_id', productId)
+      const { data: variants, error: variantsError } = await retryRequest(() =>
+        supabase.from('product_variants').select('id, attributes, original_price, commission_amount, stock, images').eq('product_id', productId)
       );
       if (variantsError) throw variantsError;
 
-      if (variantsData?.length > 0) {
+      if (variants?.length > 0) {
         setEnableVariants(true);
-        const variants = variantsData.map(variant => ({
-          id: variant.id,
-          ...variant.attributes,
-          price: variant.original_price != null ? variant.original_price.toString() : '',
-          commission: variant.commission_amount != null ? variant.commission_amount.toString() : '0',
-          stock: variant.stock != null ? variant.stock.toString() : '',
+        const variantData = variants.map((v) => ({
+          id: v.id,
+          ...v.attributes,
+          price: v.original_price?.toString() || '',
+          commission: v.commission_amount?.toString() || '0',
+          stock: v.stock?.toString() || '',
           images: [],
         }));
-        replaceVariants(variants);
-        const previews = {};
-        const thumbPreviews = {};
-        variantsData.forEach((variant, index) => {
-          if (variant.images?.length > 0) {
-            previews[index] = variant.images;
-            thumbPreviews[index] = variant.images;
-          }
+        replaceVariants(variantData);
+        const variantImages = {};
+        variants.forEach((v, idx) => {
+          if (v.images?.length > 0) variantImages[idx] = v.images;
         });
-        setVariantPreviews(previews);
-        setVariantThumbPreviews(thumbPreviews);
+        setImagePreviews((prev) => ({ ...prev, variants: variantImages }));
       }
     } catch (err) {
       setError(`Error: ${err.message}`);
-      toast.error(`Error: ${err.message}`, {
-        position: 'top-center',
-        duration: 3000,
-        style: {
-          background: '#ff4d4f',
-          color: '#fff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          padding: '16px',
-        },
-      });
+      toast.error(`Error: ${err.message}`);
       navigate('/seller');
     } finally {
       setLoading(false);
     }
-  }, [isEditMode, productId, setValue, replaceSpecs, replaceVariants, navigate, trigger]);
+  }, [isEditMode, productId, setValue, replaceSpecs, replaceVariants, navigate]);
 
   useEffect(() => {
     fetchCategories();
-    if (isEditMode) {
-      fetchProductData();
-    }
+    if (isEditMode) fetchProductData();
   }, [fetchCategories, fetchProductData, isEditMode]);
 
+  // Handle main product image uploads
   const handleImageChange = async (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files).slice(0, 10);
     if (!files.length) return;
 
-    // Clear previous previews to avoid stale data
-    setPreviewImages([]);
-    setThumbPreviews([]);
-    setValue('images', []);  // Reset form field immediately
-
-    setImageLoading(true);
-    try {
-      console.log(`🖼️ Processing ${files.length} images for compression and upload`);
-      const uploadPromises = files.map(async (file) => {
-        if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-          console.error(`❌ Invalid file: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
-          throw new Error(`Invalid image file: ${file.name} (must be an image, max 5MB before compression).`);
-        }
-        const { fullUrl, thumbUrl } = await uploadImage(file);
-        return { fullUrl, thumbUrl };
-      });
-
-      const results = await Promise.all(uploadPromises);
-      const newImageUrls = results.map((r) => r.fullUrl).filter(Boolean);
-      const newThumbUrls = results.map((r) => r.thumbUrl).filter(Boolean);
-
-      if (newImageUrls.length !== files.length || newThumbUrls.length !== files.length) {
-        throw new Error('Incomplete image uploads detected.');
-      }
-
-      setValue('images', files);  // Now safe to set after full success
-      setPreviewImages(newImageUrls);
-      setThumbPreviews(newThumbUrls);
-      setPrimaryImageIndex(0);  // Set first as primary if none set
-      console.log('✅ Images uploaded and loaded for preview');
-      toast.success('Images uploaded successfully!', {
-        position: 'top-center',
-        duration: 2000,
-      });
-    } catch (err) {
-      console.error(`❌ Error in handleImageChange: ${err.message}`);
-      // Revert: clear everything on failure
-      setPreviewImages([]);
-      setThumbPreviews([]);
-      setValue('images', []);
-      setPrimaryImageIndex(null);
-      // Clear the file input
-      e.target.value = '';
-      toast.error(`Upload failed: ${err.message}`, {
-        position: 'top-center',
-        duration: 4000,
-        style: {
-          background: '#ff4d4f',
-          color: '#fff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          padding: '16px',
-        },
-      });
-    } finally {
-      setImageLoading(false);
-    }
-  };
-
-  const setPrimaryImage = (index) => {
-    console.log(`🖼️ Setting primary image to index: ${index}`);
-    setPrimaryImageIndex(index);
-  };
-
-  const handleVariantImageChange = async (e, index) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    // Clear previous for this variant to avoid stale data
-    setVariantPreviews((prev) => ({ ...prev, [index]: [] }));
-    setVariantThumbPreviews((prev) => ({ ...prev, [index]: [] }));
-    setValue(`variants.${index}.images`, []);
-
-    setImageLoading(true);
-    try {
-      console.log(`🖼️ Processing ${files.length} variant images for index ${index}`);
-      const uploadPromises = files.map(async (file) => {
-        if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024) {
-          console.error(`❌ Invalid variant file: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
-          throw new Error(`Invalid image file: ${file.name} (must be an image, max 5MB before compression).`);
-        }
-        const { fullUrl } = await uploadImage(file);  // Only fullUrl for variants as per original code
-        return fullUrl;
-      });
-
-      const newImageUrls = await Promise.all(uploadPromises);
-
-      if (newImageUrls.length !== files.length || newImageUrls.some(url => !url)) {
-        throw new Error('Incomplete variant image uploads detected.');
-      }
-
-      setValue(`variants.${index}.images`, files);  // Safe after success
-      setVariantPreviews((prev) => ({
-        ...prev,
-        [index]: newImageUrls.filter(Boolean),
-      }));
-      setVariantThumbPreviews((prev) => ({
-        ...prev,
-        [index]: newImageUrls.filter(Boolean),
-      }));
-      console.log(`✅ Variant images uploaded and loaded for index ${index}`);
-      toast.success('Variant images uploaded successfully!', {
-        position: 'top-center',
-        duration: 2000,
-      });
-    } catch (err) {
-      console.error(`❌ Error in handleVariantImageChange for index ${index}: ${err.message}`);
-      // Revert
-      setVariantPreviews((prev) => {
-        const newPreviews = { ...prev };
-        delete newPreviews[index];
-        return newPreviews;
-      });
-      setVariantThumbPreviews((prev) => {
-        const newPreviews = { ...prev };
-        delete newPreviews[index];
-        return newPreviews;
-      });
-      setValue(`variants.${index}.images`, []);
-      e.target.value = '';  // Clear input
-      toast.error(`Variant upload failed: ${err.message}`, {
-        position: 'top-center',
-        duration: 4000,
-        style: {
-          background: '#ff4d4f',
-          color: '#fff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          padding: '16px',
-        },
-      });
-    } finally {
-      setImageLoading(false);
-    }
-  };
-
-  const onSubmitProduct = async (formData) => {
     setLoading(true);
-    setMessage('');
+    try {
+      const fullUrls = await Promise.all(files.map(uploadImage));
+      setImagePreviews((prev) => ({ ...prev, main: fullUrls }));
+      setPrimaryImageIndex(0);
+      toast.success('Images uploaded successfully!');
+    } catch (err) {
+      setImagePreviews((prev) => ({ ...prev, main: [] }));
+      setPrimaryImageIndex(null);
+      e.target.value = '';
+      toast.error(`Upload failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle variant image uploads
+  const handleVariantImageChange = async (e, index) => {
+    const files = Array.from(e.target.files).slice(0, 5);
+    if (!files.length) return;
+
+    setLoading(true);
+    try {
+      const fullUrls = await Promise.all(files.map(uploadImage));
+      setImagePreviews((prev) => ({
+        ...prev,
+        variants: { ...prev.variants, [index]: fullUrls },
+      }));
+      toast.success('Variant images uploaded successfully!');
+    } catch (err) {
+      setImagePreviews((prev) => ({
+        ...prev,
+        variants: { ...prev.variants, [index]: [] },
+      }));
+      e.target.value = '';
+      toast.error(`Variant upload failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Validate and submit form
+  const onSubmitProduct = async (data) => {
+    setLoading(true);
     setError(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        console.error('❌ User not logged in');
-        throw new Error('You must be logged in.');
-      }
-      const sellerId = session.user.id;
+      if (!session?.user) throw new Error('You must be logged in.');
+      if (!sellerLocation?.lat || !sellerLocation?.lon) throw new Error('Please set your store location.');
 
-      if (!sellerLocation || !sellerLocation.lat || !sellerLocation.lon) {
-        console.error('❌ Store location not set');
-        throw new Error('Please set your store location in the Account page before adding a product.');
-      }
+      if (imagePreviews.main.length === 0) throw new Error('At least one product image is required.');
+      if (priceError) throw new Error(priceError);
 
-      // Image validation: Always use previewImages as source of truth for valid URLs
-      let imageUrls = previewImages;
-      let thumbUrls = thumbPreviews;
-
-      if (imageUrls.length === 0) {
-        console.error('❌ No images provided');
-        throw new Error('At least one product image is required.');
-      }
-
-      if (imageUrls.length > 10) {
-        console.error('❌ Too many images');
-        throw new Error('Cannot upload more than 10 images.');
-      }
-
-      // Ensure uploads are not in progress (prevents race conditions)
-      if (imageLoading) {
-        console.error('❌ Image upload still in progress');
-        throw new Error('Please wait for image uploads to complete before submitting.');
-      }
-
-      // Primary image reordering
-      if (primaryImageIndex !== null && primaryImageIndex >= 0 && primaryImageIndex < imageUrls.length) {
-        const primaryImage = imageUrls[primaryImageIndex];
-        const primaryThumb = thumbUrls[primaryImageIndex];
-        imageUrls.splice(primaryImageIndex, 1);
-        thumbUrls.splice(primaryImageIndex, 1);
-        imageUrls.unshift(primaryImage);
-        thumbUrls.unshift(primaryThumb);
-        console.log('🖼️ Primary image set and reordered');
-      }
-
-      const specifications = formData.specifications.reduce((obj, spec) => {
-        if (spec.key && spec.value) {
-          obj[spec.key.trim()] = spec.value.trim();
-        }
+      const specifications = data.specifications.reduce((obj, spec) => {
+        if (spec.key && spec.value) obj[spec.key.trim()] = spec.value.trim();
         return obj;
       }, {});
-      if (Object.keys(specifications).length === 0 && specFields.length > 0) {
-        console.error('❌ No valid specifications provided');
-        throw new Error('Please fill in at least one specification.');
+      if (specFields.length > 0 && Object.keys(specifications).length === 0) {
+        throw new Error('At least one specification is required.');
       }
 
-      const price = parseFloat(formData.price);
-      const commissionAmount = parseFloat(formData.commission) || 0;
-      const discountAmount = parseFloat(formData.discount) || 0;
-      const finalPrice = price - discountAmount;
-      if (finalPrice < 0) {
-        console.error('❌ Negative final price detected');
-        throw new Error('Final price cannot be negative after discount.');
-      }
-      if (commissionAmount > price) {
-        console.error('❌ Commission exceeds original price');
-        throw new Error('Commission cannot exceed the original price.');
-      }
+      const images = primaryImageIndex != null && primaryImageIndex >= 0
+        ? [imagePreviews.main[primaryImageIndex], ...imagePreviews.main.filter((_, i) => i !== primaryImageIndex)]
+        : imagePreviews.main;
 
-      const deliveryRadius = formData.deliveryRadius ? parseInt(formData.deliveryRadius, 10) : null;
-      if (deliveryRadius !== null && (deliveryRadius < 1 || deliveryRadius > 100)) {
-        console.error('❌ Invalid delivery radius');
-        throw new Error('Delivery radius must be between 1 and 100 km.');
-      }
+      const productData = {
+        seller_id: session.user.id,
+        category_id: parseInt(data.category_id, 10),
+        title: data.title.trim(),
+        description: data.description.trim(),
+        price: parseFloat(finalPrice),
+        original_price: parseFloat(data.price),
+        commission_amount: parseFloat(data.commission) || 0,
+        discount_amount: parseFloat(data.discount) || 0,
+        stock: parseInt(data.stock, 10),
+        images,
+        specifications,
+        delivery_radius_km: data.deliveryRadius ? parseInt(data.deliveryRadius, 10) : null,
+        latitude: sellerLocation.lat,
+        longitude: sellerLocation.lon,
+        is_approved: false,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      };
 
       let newProductId = productId;
 
       if (isEditMode) {
-        console.log(`🔄 Updating product ID: ${productId}`);
-        const { error: productError } = await retryRequest(() =>
-          supabase
-            .from('products')
-            .update({
-              category_id: parseInt(formData.category_id, 10),
-              title: formData.title.trim(),
-              description: formData.description.trim(),
-              price: finalPrice,
-              original_price: price,
-              commission_amount: commissionAmount,
-              discount_amount: discountAmount,
-              stock: parseInt(formData.stock, 10),
-              images: imageUrls,
-              specifications,
-              delivery_radius_km: deliveryRadius,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', productId)
-            .eq('seller_id', sellerId)
+        const { error } = await retryRequest(() =>
+          supabase.from('products').update(productData).eq('id', productId).eq('seller_id', session.user.id)
         );
-        if (productError) {
-          console.error(`❌ Failed to update product: ${productError.message}`);
-          throw new Error(`Failed to update product: ${productError.message}`);
-        }
-
-        if (enableVariants && formData.variants?.length > 0) {
-          const selectedCategoryData = categories.find((c) => c.id === parseInt(formData.category_id, 10));
-          const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes)
-            ? selectedCategoryData.variant_attributes
-            : [];
-
-          for (const [index, variant] of formData.variants.entries()) {
-            const variantPrice = parseFloat(variant.price);
-            const variantCommission = parseFloat(variant.commission) || 0;
-            const variantFinalPrice = variantPrice - discountAmount;
-            const variantStock = parseInt(variant.stock, 10);
-
-            if (variantFinalPrice < 0) {
-              console.error(`❌ Variant ${index + 1}: Negative final price`);
-              throw new Error(`Variant ${index + 1}: Final price cannot be negative.`);
-            }
-            if (variantCommission > variantPrice) {
-              console.error(`❌ Variant ${index + 1}: Commission exceeds price`);
-              throw new Error(`Variant ${index + 1}: Commission cannot exceed the original price.`);
-            }
-            if (isNaN(variantPrice) || variantPrice < 0) {
-              console.error(`❌ Variant ${index + 1}: Invalid price`);
-              throw new Error(`Variant ${index + 1}: Price must be a non-negative number.`);
-            }
-            if (isNaN(variantStock) || variantStock < 0) {
-              console.error(`❌ Variant ${index + 1}: Invalid stock`);
-              throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
-            }
-
-            let hasAttribute = false;
-            const attributes = {};
-            if (variantAttributes.length > 0) {
-              variantAttributes.forEach((attr) => {
-                if (variant[attr] && variant[attr].trim()) {
-                  attributes[attr] = variant[attr].trim();
-                  hasAttribute = true;
-                } else {
-                  attributes[attr] = '';
-                }
-              });
-              if (!hasAttribute) {
-                console.error(`❌ Variant ${index + 1}: No attributes provided`);
-                throw new Error(`Variant ${index + 1}: At least one attribute must be filled.`);
-              }
-            } else {
-              attributes.attribute1 = variant.attribute1 ? variant.attribute1.trim() : '';
-              if (attributes.attribute1) hasAttribute = true;
-              if (!hasAttribute) {
-                console.error(`❌ Variant ${index + 1}: Attribute required`);
-                throw new Error(`Variant ${index + 1}: Attribute is required for variants.`);
-              }
-            }
-
-            let variantImageUrls = variantPreviews[index] || [];
-            if (variantImageUrls.length > 5) {
-              console.error(`❌ Variant ${index + 1}: Too many images`);
-              throw new Error(`Variant ${index + 1}: Cannot upload more than 5 images.`);
-            }
-
-            if (variant.id) {
-              console.log(`🔄 Updating variant ID: ${variant.id}`);
-              const { error: variantError } = await retryRequest(() =>
-                supabase
-                  .from('product_variants')
-                  .update({
-                    attributes,
-                    price: variantFinalPrice,
-                    original_price: variantPrice,
-                    commission_amount: variantCommission,
-                    stock: variantStock,
-                    images: variantImageUrls,
-                    updated_at: new Date().toISOString(),
-                  })
-                  .eq('id', variant.id)
-              );
-              if (variantError) {
-                console.error(`❌ Failed to update variant ${index + 1}: ${variantError.message}`);
-                throw new Error(`Failed to update variant ${index + 1}: ${variantError.message}`);
-              }
-            } else {
-              console.log(`➕ Inserting new variant for product ID: ${productId}`);
-              const { error: variantError } = await retryRequest(() =>
-                supabase
-                  .from('product_variants')
-                  .insert({
-                    product_id: productId,
-                    attributes,
-                    price: variantFinalPrice,
-                    original_price: variantPrice,
-                    commission_amount: variantCommission,
-                    stock: variantStock,
-                    images: variantImageUrls,
-                    status: 'active',
-                  })
-              );
-              if (variantError) {
-                console.error(`❌ Failed to insert variant ${index + 1}: ${variantError.message}`);
-                throw new Error(`Failed to insert variant ${index + 1}: ${variantError.message}`);
-              }
-            }
-          }
-        } else {
-          console.log(`🗑️ Deleting all variants for product ID: ${productId}`);
-          const { error: deleteError } = await retryRequest(() =>
-            supabase
-              .from('product_variants')
-              .delete()
-              .eq('product_id', productId)
-          );
-          if (deleteError) {
-            console.error(`❌ Failed to delete variants: ${deleteError.message}`);
-            throw new Error(`Failed to delete variants: ${deleteError.message}`);
-          }
-        }
+        if (error) throw new Error(`Failed to update product: ${error.message}`);
       } else {
-        console.log('➕ Inserting new product');
-        const { data: insertedProduct, error: productError } = await retryRequest(() =>
-          supabase
-            .from('products')
-            .insert({
-              seller_id: sellerId,
-              category_id: parseInt(formData.category_id, 10),
-              title: formData.title.trim(),
-              description: formData.description.trim(),
-              price: finalPrice,
-              original_price: price,
-              commission_amount: commissionAmount,
-              discount_amount: discountAmount,
-              stock: parseInt(formData.stock, 10),
-              images: imageUrls,
-              latitude: sellerLocation.lat,
-              longitude: sellerLocation.lon,
-              is_approved: false,
-              status: 'active',
-              specifications,
-              delivery_radius_km: deliveryRadius,
-            })
-            .select('id')
-            .single()
+        const { data: inserted, error } = await retryRequest(() =>
+          supabase.from('products').insert(productData).select('id').single()
         );
-        if (productError) {
-          console.error(`❌ Failed to insert product: ${productError.message}`);
-          throw new Error(`Failed to insert product: ${productError.message}`);
-        }
-        newProductId = insertedProduct.id;
-
-        if (enableVariants && formData.variants?.length > 0) {
-          const selectedCategoryData = categories.find((c) => c.id === parseInt(formData.category_id, 10));
-          const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes)
-            ? selectedCategoryData.variant_attributes
-            : [];
-
-          const variantPromises = formData.variants.map(async (variant, index) => {
-            const variantPrice = parseFloat(variant.price);
-            const variantCommission = parseFloat(variant.commission) || 0;
-            const variantFinalPrice = variantPrice - discountAmount;
-            const variantStock = parseInt(variant.stock, 10);
-
-            if (variantFinalPrice < 0) {
-              console.error(`❌ Variant ${index + 1}: Negative final price`);
-              throw new Error(`Variant ${index + 1}: Final price cannot be negative.`);
-            }
-            if (variantCommission > variantPrice) {
-              console.error(`❌ Variant ${index + 1}: Commission exceeds price`);
-              throw new Error(`Variant ${index + 1}: Commission cannot exceed the original price.`);
-            }
-            if (isNaN(variantPrice) || variantPrice < 0) {
-              console.error(`❌ Variant ${index + 1}: Invalid price`);
-              throw new Error(`Variant ${index + 1}: Price must be a non-negative number.`);
-            }
-            if (isNaN(variantStock) || variantStock < 0) {
-              console.error(`❌ Variant ${index + 1}: Invalid stock`);
-              throw new Error(`Variant ${index + 1}: Stock must be a non-negative number.`);
-            }
-
-            let hasAttribute = false;
-            const attributes = {};
-            if (variantAttributes.length > 0) {
-              variantAttributes.forEach((attr) => {
-                if (variant[attr] && variant[attr].trim()) {
-                  attributes[attr] = variant[attr].trim();
-                  hasAttribute = true;
-                } else {
-                  attributes[attr] = '';
-                }
-              });
-              if (!hasAttribute) {
-                console.error(`❌ Variant ${index + 1}: No attributes provided`);
-                throw new Error(`Variant ${index + 1}: At least one attribute must be filled.`);
-              }
-            } else {
-              attributes.attribute1 = variant.attribute1 ? variant.attribute1.trim() : '';
-              if (attributes.attribute1) hasAttribute = true;
-              if (!hasAttribute) {
-                console.error(`❌ Variant ${index + 1}: Attribute required`);
-                throw new Error(`Variant ${index + 1}: Attribute is required for variants.`);
-              }
-            }
-
-            let variantImageUrls = variantPreviews[index] || [];
-            if (variantImageUrls.length > 5) {
-              console.error(`❌ Variant ${index + 1}: Too many images`);
-              throw new Error(`Variant ${index + 1}: Cannot upload more than 5 images.`);
-            }
-
-            console.log(`➕ Inserting new variant for product ID: ${newProductId}`);
-            const { error: variantError } = await retryRequest(() =>
-              supabase
-                .from('product_variants')
-                .insert({
-                  product_id: newProductId,
-                  attributes,
-                  price: variantFinalPrice,
-                  original_price: variantPrice,
-                  commission_amount: variantCommission,
-                  stock: variantStock,
-                  images: variantImageUrls,
-                  status: 'active',
-                })
-            );
-            if (variantError) {
-              console.error(`❌ Failed to insert variant ${index + 1}: ${variantError.message}`);
-              throw new Error(`Failed to insert variant ${index + 1}: ${variantError.message}`);
-            }
-          });
-          await Promise.all(variantPromises);
-        }
+        if (error) throw new Error(`Failed to insert product: ${error.message}`);
+        newProductId = inserted.id;
       }
 
-      console.log(isEditMode ? '✅ Product updated successfully' : '✅ Product added successfully');
+      if (enableVariants && data.variants?.length > 0) {
+        const category = categories.find((c) => c.id === parseInt(data.category_id, 10));
+        const variantAttributes = category?.variant_attributes || ['attribute1'];
+
+        for (const [index, variant] of data.variants.entries()) {
+          const { finalPrice: variantFinalPrice, error: variantPriceError } = calculateFinalPrice(
+            variant.price,
+            data.discount,
+            variant.commission
+          );
+          if (variantPriceError) throw new Error(`Variant ${index + 1}: ${variantPriceError}`);
+
+          const attributes = variantAttributes.reduce((obj, attr) => {
+            obj[attr] = variant[attr]?.trim() || '';
+            return obj;
+          }, {});
+          if (!Object.values(attributes).some((v) => v)) {
+            throw new Error(`Variant ${index + 1}: At least one attribute is required.`);
+          }
+
+          const variantData = {
+            product_id: newProductId,
+            attributes,
+            price: parseFloat(variantFinalPrice),
+            original_price: parseFloat(variant.price),
+            commission_amount: parseFloat(variant.commission) || 0,
+            stock: parseInt(variant.stock, 10),
+            images: imagePreviews.variants[index] || [],
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          };
+
+          if (variant.id) {
+            const { error } = await retryRequest(() =>
+              supabase.from('product_variants').update(variantData).eq('id', variant.id)
+            );
+            if (error) throw new Error(`Failed to update variant ${index + 1}: ${error.message}`);
+          } else {
+            const { error } = await retryRequest(() =>
+              supabase.from('product_variants').insert(variantData)
+            );
+            if (error) throw new Error(`Failed to insert variant ${index + 1}: ${error.message}`);
+          }
+        }
+      } else if (isEditMode) {
+        const { error } = await retryRequest(() =>
+          supabase.from('product_variants').delete().eq('product_id', productId)
+        );
+        if (error) throw new Error(`Failed to delete variants: ${error.message}`);
+      }
+
       await Swal.fire({
         title: isEditMode ? 'Product Updated!' : 'Product Added!',
-        text: isEditMode ? 'Your product has been updated successfully.' : 'Your product has been added successfully.',
+        text: isEditMode ? 'Your product has been updated.' : 'Your product has been added.',
         icon: 'success',
         confirmButtonColor: '#3085d6',
       });
 
-      setMessage(isEditMode ? 'Product updated successfully!' : 'Product added successfully!');
-      toast.success(isEditMode ? 'Product updated successfully!' : 'Product added successfully!', {
-        position: 'top-center',
-        duration: 3000,
-        style: {
-          background: '#52c41a',
-          color: '#fff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          padding: '16px',
-        },
-      });
-
-      reset({
-        title: '',
-        description: '',
-        price: '',
-        commission: '',
-        discount: '',
-        stock: '',
-        category_id: '',
-        images: [],
-        variants: [],
-        specifications: [],
-        deliveryRadius: '',
-      });
-      setPreviewImages([]);
-      setThumbPreviews([]);
+      reset();
+      setImagePreviews({ main: [], variants: {} });
       setPrimaryImageIndex(null);
-      setVariantPreviews({});
-      setVariantThumbPreviews({});
       setEnableVariants(false);
       replaceSpecs([]);
       replaceVariants([]);
-      setCalculatedPrice(null);
       navigate('/seller');
     } catch (err) {
-      console.error(`❌ Error in onSubmitProduct: ${err.message}`);
       setError(`Error: ${err.message}`);
-      toast.error(`Error: ${err.message}`, {
-        position: 'top-center',
-        duration: 4000,
-        style: {
-          background: '#ff4d4f',
-          color: '#fff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          padding: '16px',
-        },
-      });
+      toast.error(`Error: ${err.message}`);
     } finally {
       setLoading(false);
-      setImageLoading(false);
     }
   };
 
-  const isJewelryCategory = selectedCategory && categories.find((c) => c.id === selectedCategory)?.name === 'Jewelry';
-
-  const pageUrl = isEditMode ? `https://www.freshcart.com/edit-product/${productId}` : 'https://www.freshcart.com/seller/add-product';
-  const defaultImage = 'https://arrettgksxgdajacsmbe.supabase.co/storage/v1/object/public/product-images/default.jpg';
-  const pageTitle = isEditMode ? 'Edit Product - FreshCart' : 'Add Product - FreshCart';
-  const pageDescription = isEditMode
-    ? 'Edit your product details and variants on FreshCart.'
-    : 'Add a new product to your FreshCart seller account, including variants and specifications.';
-
+  // Lazy load images
   useEffect(() => {
     const images = document.querySelectorAll('.lazy-load');
     const observer = new IntersectionObserver((entries) => {
@@ -11089,56 +12794,38 @@ function AddProductPage() {
     });
     images.forEach((img) => observer.observe(img));
     return () => observer.disconnect();
-  }, [previewImages, variantPreviews]);
+  }, [imagePreviews]);
+
+  const pageTitle = isEditMode ? 'Edit Product - Markeet' : 'Add Product - Markeet';
+  const pageDescription = isEditMode
+    ? 'Edit your product details on Markeet.'
+    : 'Add a new product to your Markeet seller account.';
 
   return (
     <div className="add-product-container">
       <Helmet>
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
-        <meta name="keywords" content={isEditMode ? 'edit, product, seller, ecommerce, FreshCart' : 'add, product, seller, ecommerce, FreshCart'} />
         <meta name="robots" content="noindex, nofollow" />
-        <link rel="canonical" href={pageUrl} />
-        <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={pageDescription} />
-        <meta property="og:image" content={thumbPreviews[0] || previewImages[0] || defaultImage} />
-        <meta property="og:url" content={pageUrl} />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={pageTitle} />
-        <meta name="twitter:description" content={pageDescription} />
-        <meta name="twitter:image" content={thumbPreviews[0] || previewImages[0] || defaultImage} />
-        <script type="application/ld+json">
-          {JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'WebPage',
-            name: pageTitle,
-            description: pageDescription,
-            url: pageUrl,
-            publisher: {
-              '@type': 'Organization',
-              name: 'FreshCart',
-            },
-          })}
-        </script>
+        <meta name="keywords" content="add product, edit product, seller, Markeet, ecommerce" />
       </Helmet>
       <h2 className="add-product-title">{isEditMode ? 'Edit Product' : 'Add New Product'}</h2>
-      {message && <p className="success-message">{message}</p>}
       {error && <p className="error-message">{error}</p>}
-      {(loading || imageLoading) && <div className="loading-spinner">{imageLoading ? 'Uploading images...' : 'Saving...'}</div>}
+      {loading && <div className="loading-spinner">Processing...</div>}
 
       <form onSubmit={handleSubmit(onSubmitProduct)} className="add-product-form">
         <div className="form-group">
           <label htmlFor="title" className="form-label">Product Name</label>
           <input
             id="title"
-            {...register('title', { 
-              required: 'Product name is required', 
-              maxLength: { value: 200, message: 'Product name cannot exceed 200 characters' },
-              pattern: { value: /^[A-Za-z0-9\s\-.,&()]+$/, message: 'Invalid characters in product name' }
+            {...register('title', {
+              required: 'Product name is required',
+              maxLength: { value: 200, message: 'Max 200 characters' },
+              pattern: { value: /^[A-Za-z0-9\s\-.,&()]+$/, message: 'Invalid characters' },
             })}
             placeholder="Enter product name"
             className="form-input"
+            aria-invalid={errors.title ? 'true' : 'false'}
           />
           {errors.title && <p className="error-text">{errors.title.message}</p>}
         </div>
@@ -11147,12 +12834,13 @@ function AddProductPage() {
           <label htmlFor="description" className="form-label">Description</label>
           <textarea
             id="description"
-            {...register('description', { 
+            {...register('description', {
               required: 'Description is required',
-              maxLength: { value: 2000, message: 'Description cannot exceed 2000 characters' }
+              maxLength: { value: 2000, message: 'Max 2000 characters' },
             })}
-            placeholder="Enter product description (use semicolons to separate points)"
+            placeholder="Enter product description"
             className="form-textarea"
+            aria-invalid={errors.description ? 'true' : 'false'}
           />
           {errors.description && <p className="error-text">{errors.description.message}</p>}
         </div>
@@ -11163,13 +12851,14 @@ function AddProductPage() {
             id="price"
             type="number"
             step="0.01"
-            {...register('price', { 
-              required: 'Price is required', 
+            {...register('price', {
+              required: 'Price is required',
               min: { value: 0, message: 'Price must be non-negative' },
-              max: { value: 1000000, message: 'Price cannot exceed ₹1,000,000' }
+              max: { value: 1000000, message: 'Max ₹1,000,000' },
             })}
             placeholder="Enter price"
             className="form-input"
+            aria-invalid={errors.price ? 'true' : 'false'}
           />
           {errors.price && <p className="error-text">{errors.price.message}</p>}
         </div>
@@ -11180,13 +12869,13 @@ function AddProductPage() {
             id="commission"
             type="number"
             step="0.01"
-            {...register('commission', { 
-              required: 'Commission amount is required', 
+            {...register('commission', {
+              required: 'Commission is required',
               min: { value: 0, message: 'Commission must be non-negative' },
-              max: { value: 100000, message: 'Commission cannot exceed ₹100,000' }
             })}
-            placeholder="Enter commission amount (e.g., 50 for ₹50)"
+            placeholder="Enter commission"
             className="form-input"
+            aria-invalid={errors.commission ? 'true' : 'false'}
           />
           {errors.commission && <p className="error-text">{errors.commission.message}</p>}
         </div>
@@ -11197,36 +12886,38 @@ function AddProductPage() {
             id="discount"
             type="number"
             step="0.01"
-            {...register('discount', { 
-              required: 'Discount amount is required', 
+            {...register('discount', {
+              required: 'Discount is required',
               min: { value: 0, message: 'Discount must be non-negative' },
-              max: { value: 1000000, message: 'Discount cannot exceed ₹1,000,000' }
             })}
-            placeholder="Enter discount amount (e.g., 100 for ₹100)"
+            placeholder="Enter discount"
             className="form-input"
+            aria-invalid={errors.discount ? 'true' : 'false'}
           />
           {errors.discount && <p className="error-text">{errors.discount.message}</p>}
         </div>
 
-        {calculatedPrice !== null && (
+        {finalPrice && !priceError && (
           <div className="form-group">
-            <label className="form-label">Final Price After Discount (₹)</label>
-            <p className="calculated-price">{calculatedPrice}</p>
+            <label className="form-label">Final Price (₹)</label>
+            <p className="calculated-price">{finalPrice}</p>
           </div>
         )}
+        {priceError && <p className="error-text">{priceError}</p>}
 
         <div className="form-group">
           <label htmlFor="stock" className="form-label">Stock</label>
           <input
             id="stock"
             type="number"
-            {...register('stock', { 
-              required: 'Stock is required', 
+            {...register('stock', {
+              required: 'Stock is required',
               min: { value: 0, message: 'Stock must be non-negative' },
-              max: { value: 10000, message: 'Stock cannot exceed 10,000' }
+              max: { value: 10000, message: 'Max 10,000' },
             })}
             placeholder="Enter stock quantity"
             className="form-input"
+            aria-invalid={errors.stock ? 'true' : 'false'}
           />
           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
         </div>
@@ -11236,12 +12927,13 @@ function AddProductPage() {
           <input
             id="deliveryRadius"
             type="number"
-            {...register('deliveryRadius', { 
-              min: { value: 1, message: 'Delivery radius must be at least 1 km' },
-              max: { value: 100, message: 'Delivery radius cannot exceed 100 km' }
+            {...register('deliveryRadius', {
+              min: { value: 1, message: 'Min 1 km' },
+              max: { value: 100, message: 'Max 100 km' },
             })}
-            placeholder="Enter custom delivery radius (leave blank to use category default)"
+            placeholder="Enter delivery radius"
             className="form-input"
+            aria-invalid={errors.deliveryRadius ? 'true' : 'false'}
           />
           {errors.deliveryRadius && <p className="error-text">{errors.deliveryRadius.message}</p>}
         </div>
@@ -11252,6 +12944,7 @@ function AddProductPage() {
             id="category_id"
             {...register('category_id', { required: 'Category is required' })}
             className="form-select"
+            aria-invalid={errors.category_id ? 'true' : 'false'}
           >
             <option value="">Select Category</option>
             {categories.map((category) => (
@@ -11272,19 +12965,24 @@ function AddProductPage() {
             accept="image/*"
             onChange={handleImageChange}
             className="form-input"
-            disabled={imageLoading}
+            disabled={loading}
+            aria-describedby="image-instructions"
           />
-          {previewImages.length > 0 && (
+          <small id="image-instructions" className="form-text">
+            Upload up to 10 images (max 5MB each). Click an image to set it as primary.
+          </small>
+          {imagePreviews.main.length > 0 && (
             <div className="image-preview">
-              {previewImages.map((src, idx) => (
+              {imagePreviews.main.map((src, idx) => (
                 <div key={idx} className="image-preview-item">
                   <img
-                    src={thumbPreviews[idx] || src}
+                    src={src}
                     data-src={src}
-                    alt={`Preview ${idx}`}
+                    alt={`Preview ${idx + 1}`}
                     className={`preview-image lazy-load ${primaryImageIndex === idx ? 'primary-image' : ''}`}
-                    onClick={() => setPrimaryImage(idx)}
+                    onClick={() => setPrimaryImageIndex(idx)}
                     loading="lazy"
+                    aria-label={`Set image ${idx + 1} as primary`}
                   />
                   {primaryImageIndex === idx && <span className="primary-label">Primary</span>}
                 </div>
@@ -11298,39 +12996,48 @@ function AddProductPage() {
           {specFields.map((field, index) => (
             <div key={field.id} className="spec-field">
               <input
-                {...register(`specifications.${index}.key`, { 
-                  required: 'Specification key is required',
-                  maxLength: { value: 100, message: 'Specification key cannot exceed 100 characters' }
+                {...register(`specifications.${index}.key`, {
+                  required: 'Key is required',
+                  maxLength: { value: 100, message: 'Max 100 characters' },
                 })}
-                placeholder="Specification Key (e.g., Material)"
+                placeholder="Specification Key"
                 className="form-input spec-input"
                 defaultValue={field.key}
                 disabled={!!field.key}
+                aria-invalid={errors.specifications?.[index]?.key ? 'true' : 'false'}
               />
               <input
-                {...register(`specifications.${index}.value`, { 
-                  required: 'Specification value is required',
-                  maxLength: { value: 500, message: 'Specification value cannot exceed 500 characters' }
+                {...register(`specifications.${index}.value`, {
+                  required: 'Value is required',
+                  maxLength: { value: 500, message: 'Max 500 characters' },
                 })}
-                placeholder="Specification Value (e.g., Sterling Silver)"
+                placeholder="Specification Value"
                 className="form-input spec-input"
+                aria-invalid={errors.specifications?.[index]?.value ? 'true' : 'false'}
               />
               <button
                 type="button"
                 onClick={() => removeSpec(index)}
                 className="remove-spec-btn"
-                disabled={!!field.key && isJewelryCategory}
+                aria-label={`Remove specification ${index + 1}`}
               >
                 Remove
               </button>
+              {errors.specifications?.[index]?.key && (
+                <p className="error-text">{errors.specifications[index].key.message}</p>
+              )}
+              {errors.specifications?.[index]?.value && (
+                <p className="error-text">{errors.specifications[index].value.message}</p>
+              )}
             </div>
           ))}
           <button
             type="button"
             onClick={() => appendSpec({ key: '', value: '' })}
             className="add-spec-btn"
+            aria-label="Add new specification"
           >
-            Add Custom Specification
+            Add Specification
           </button>
         </div>
 
@@ -11343,190 +13050,165 @@ function AddProductPage() {
                 checked={enableVariants}
                 onChange={() => {
                   setEnableVariants(!enableVariants);
-                  if (!enableVariants) {
-                    appendVariant({ attributes: {}, price: '', commission: '0', stock: '', images: [] });
-                  } else {
+                  if (!enableVariants) appendVariant({ price: '', commission: '0', stock: '', images: [] });
+                  else {
                     replaceVariants([]);
-                    setVariantPreviews({});
-                    setVariantThumbPreviews({});
+                    setImagePreviews((prev) => ({ ...prev, variants: {} }));
                   }
                 }}
+                aria-label="Enable product variants"
               />
               Enable Variants
             </label>
           </h3>
-          {enableVariants ? (
-            <>
-              {variantFields.length === 0 ? (
-                <p className="no-variants">No variants added. Click below to add a variant.</p>
-              ) : (
-                variantFields.map((field, index) => {
-                  const selectedCategoryData = categories.find((c) => c.id === selectedCategory);
-                  const variantAttributes = Array.isArray(selectedCategoryData?.variant_attributes)
-                    ? selectedCategoryData.variant_attributes
-                    : [];
+          {enableVariants && variantFields.map((field, index) => {
+            const category = categories.find((c) => c.id === parseInt(watchCategoryId, 10));
+            const attributes = category?.variant_attributes || ['attribute1'];
 
-                  let variantInputs = variantAttributes.length > 0 ? (
-                    variantAttributes.map((attr) => (
-                      <div key={attr} className="variant-input">
-                        <label className="form-label">{`Variant ${attr}`}</label>
-                        <input
-                          {...register(`variants.${index}.${attr}`, {
-                            required: variantAttributes.length > 0 ? `${attr} is required` : false,
-                            maxLength: { value: 100, message: `${attr} cannot exceed 100 characters` }
-                          })}
-                          placeholder={`Enter ${attr}`}
-                          className="form-input"
+            return (
+              <div key={field.id} className="variant-field">
+                {attributes.map((attr) => (
+                  <div key={attr} className="variant-input">
+                    <label className="form-label">{attr}</label>
+                    <input
+                      {...register(`variants.${index}.${attr}`, {
+                        required: `${attr} is required`,
+                        maxLength: { value: 100, message: `Max 100 characters` },
+                      })}
+                      placeholder={`Enter ${attr}`}
+                      className="form-input"
+                      aria-invalid={errors.variants?.[index]?.[attr] ? 'true' : 'false'}
+                    />
+                    {errors.variants?.[index]?.[attr] && (
+                      <p className="error-text">{errors.variants[index][attr].message}</p>
+                    )}
+                  </div>
+                ))}
+                <div className="variant-input">
+                  <label className="form-label">Price (₹)</label>
+                  <input
+                    {...register(`variants.${index}.price`, {
+                      required: 'Price is required',
+                      min: { value: 0, message: 'Price must be non-negative' },
+                    })}
+                    type="number"
+                    step="0.01"
+                    placeholder="Enter price"
+                    className="form-input"
+                    aria-invalid={errors.variants?.[index]?.price ? 'true' : 'false'}
+                  />
+                  {errors.variants?.[index]?.price && (
+                    <p className="error-text">{errors.variants[index].price.message}</p>
+                  )}
+                </div>
+                <div className="variant-input">
+                  <label className="form-label">Commission (₹)</label>
+                  <input
+                    {...register(`variants.${index}.commission`, {
+                      required: 'Commission is required',
+                      min: { value: 0, message: 'Commission must be non-negative' },
+                    })}
+                    type="number"
+                    step="0.01"
+                    placeholder="Enter commission"
+                    className="form-input"
+                    aria-invalid={errors.variants?.[index]?.commission ? 'true' : 'false'}
+                  />
+                  {errors.variants?.[index]?.commission && (
+                    <p className="error-text">{errors.variants[index].commission.message}</p>
+                  )}
+                </div>
+                <div className="variant-input">
+                  <label className="form-label">Stock</label>
+                  <input
+                    {...register(`variants.${index}.stock`, {
+                      required: 'Stock is required',
+                      min: { value: 0, message: 'Stock must be non-negative' },
+                    })}
+                    type="number"
+                    placeholder="Enter stock"
+                    className="form-input"
+                    aria-invalid={errors.variants?.[index]?.stock ? 'true' : 'false'}
+                  />
+                  {errors.variants?.[index]?.stock && (
+                    <p className="error-text">{errors.variants[index].stock.message}</p>
+                  )}
+                </div>
+                <div className="variant-input">
+                  <label className="form-label">Images (Max 5, Optional)</label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => handleVariantImageChange(e, index)}
+                    className="form-input"
+                    disabled={loading}
+                    aria-describedby={`variant-image-instructions-${index}`}
+                  />
+                  <small id={`variant-image-instructions-${index}`} className="form-text">
+                    Upload up to 5 images (max 5MB each) for this variant.
+                  </small>
+                  {imagePreviews.variants[index]?.length > 0 && (
+                    <div className="image-preview">
+                      {imagePreviews.variants[index].map((src, idx) => (
+                        <img
+                          key={idx}
+                          src={src}
+                          data-src={src}
+                          alt={`Variant Preview ${idx + 1}`}
+                          className="preview-image lazy-load"
+                          loading="lazy"
+                          aria-label={`Variant ${index + 1} image ${idx + 1}`}
                         />
-                        {errors.variants?.[index]?.[attr] && (
-                          <p className="error-text">{errors.variants[index][attr].message}</p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="variant-input">
-                      <label className="form-label">Attribute 1</label>
-                      <input
-                        {...register(`variants.${index}.attribute1`, { 
-                          required: 'Attribute is required',
-                          maxLength: { value: 100, message: 'Attribute cannot exceed 100 characters' }
-                        })}
-                        placeholder="Enter attribute"
-                        className="form-input"
-                      />
-                      {errors.variants?.[index]?.attribute1 && (
-                        <p className="error-text">{errors.variants[index].attribute1.message}</p>
-                      )}
+                      ))}
                     </div>
-                  );
-
-                  return (
-                    <div key={field.id} className="variant-field">
-                      {variantInputs}
-                      <div className="variant-input">
-                        <label className="form-label">Variant Price (₹)</label>
-                        <input
-                          {...register(`variants.${index}.price`, {
-                            required: 'Variant price is required',
-                            min: { value: 0, message: 'Price must be non-negative' },
-                            max: { value: 1000000, message: 'Price cannot exceed ₹1,000,000' }
-                          })}
-                          type="number"
-                          step="0.01"
-                          placeholder="Enter variant price"
-                          className="form-input"
-                        />
-                        {errors.variants?.[index]?.price && (
-                          <p className="error-text">{errors.variants[index].price.message}</p>
-                        )}
-                      </div>
-                      <div className="variant-input">
-                        <label className="form-label">Variant Commission (₹)</label>
-                        <input
-                          {...register(`variants.${index}.commission`, {
-                            required: 'Variant commission is required',
-                            min: { value: 0, message: 'Commission must be non-negative' },
-                            max: { value: 100000, message: 'Commission cannot exceed ₹100,000' }
-                          })}
-                          type="number"
-                          step="0.01"
-                          placeholder="Enter variant commission"
-                          className="form-input"
-                        />
-                        {errors.variants?.[index]?.commission && (
-                          <p className="error-text">{errors.variants[index].commission.message}</p>
-                        )}
-                      </div>
-                      <div className="variant-input">
-                        <label className="form-label">Variant Stock</label>
-                        <input
-                          {...register(`variants.${index}.stock`, {
-                            required: 'Variant stock is required',
-                            min: { value: 0, message: 'Stock must be non-negative' },
-                            max: { value: 10000, message: 'Stock cannot exceed 10,000' }
-                          })}
-                          type="number"
-                          placeholder="Enter variant stock"
-                          className="form-input"
-                        />
-                        {errors.variants?.[index]?.stock && (
-                          <p className="error-text">{errors.variants[index].stock.message}</p>
-                        )}
-                      </div>
-                      <div className="variant-input">
-                        <label className="form-label">Variant Images (Max 5, Optional)</label>
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*"
-                          onChange={(e) => handleVariantImageChange(e, index)}
-                          className="form-input"
-                          disabled={imageLoading}
-                        />
-                        {variantPreviews[index] && variantPreviews[index].length > 0 && (
-                          <div className="image-preview">
-                            {variantPreviews[index].map((src, idx) => (
-                              <img
-                                key={idx}
-                                src={variantThumbPreviews[index]?.[idx] || src}
-                                data-src={src}
-                                alt={`Variant Preview ${idx}`}
-                                className="preview-image lazy-load"
-                                loading="lazy"
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          removeVariant(index);
-                          setVariantPreviews((prev) => {
-                            const newPreviews = { ...prev };
-                            delete newPreviews[index];
-                            return newPreviews;
-                          });
-                          setVariantThumbPreviews((prev) => {
-                            const newPreviews = { ...prev };
-                            delete newPreviews[index];
-                            return newPreviews;
-                          });
-                        }}
-                        className="remove-variant-btn"
-                      >
-                        Remove Variant
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-              <button
-                type="button"
-                onClick={() => appendVariant({ attributes: {}, price: '', commission: '0', stock: '', images: [] })}
-                className="add-variant-btn"
-              >
-                Add Variant
-              </button>
-            </>
-          ) : (
-            <p className="no-variants">Variants are disabled. Enable to add variants.</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeVariant(index);
+                    setImagePreviews((prev) => {
+                      const newVariants = { ...prev.variants };
+                      delete newVariants[index];
+                      return { ...prev, variants: newVariants };
+                    });
+                  }}
+                  className="remove-variant-btn"
+                  aria-label={`Remove variant ${index + 1}`}
+                >
+                  Remove Variant
+                </button>
+              </div>
+            );
+          })}
+          {enableVariants && (
+            <button
+              type="button"
+              onClick={() => appendVariant({ price: '', commission: '0', stock: '', images: [] })}
+              className="add-variant-btn"
+              aria-label="Add new variant"
+            >
+              Add Variant
+            </button>
           )}
         </div>
 
         <div className="form-actions">
           <button
             type="submit"
-            disabled={loading || imageLoading || (!isEditMode && previewImages.length === 0)}
+            disabled={loading || priceError}
             className="submit-btn"
+            aria-label={isEditMode ? 'Save product changes' : 'Add new product'}
           >
-            {loading || imageLoading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Add Product'}
+            {loading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Add Product'}
           </button>
           <button
             type="button"
             onClick={() => navigate('/seller')}
-            disabled={loading || imageLoading}
+            disabled={loading}
             className="cancel-btn"
+            aria-label="Cancel and return to seller dashboard"
           >
             Cancel
           </button>

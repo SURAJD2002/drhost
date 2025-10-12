@@ -462,3 +462,246 @@
     height: 120px;
   }
 }
+/* Existing styles (partial, from previous context) */
+.location-prompt {
+  background: #fff1f0;
+  border: 1px solid #ff4d4f;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.location-prompt h3 {
+  margin-top: 0;
+  color: #ff4d4f;
+  font-size: 1.2rem;
+}
+
+.location-prompt p {
+  margin: 10px 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.browser-instructions {
+  margin-top: 15px;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 4px;
+}
+
+.browser-instructions ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.detect-location-btn.prompt-btn {
+  background: #3b82f6;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-right: 10px;
+  transition: background 0.3s ease;
+}
+
+.detect-location-btn.prompt-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.detect-location-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
+
+.dismiss-prompt-btn {
+  background: #6b7280;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s ease;
+}
+
+.dismiss-prompt-btn:hover {
+  background: #4b5563;
+}
+
+.place-order-wrapper {
+  position: relative;
+}
+
+.place-order-btn {
+  background: #a0aec0;
+  color: #fff;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 4px;
+  cursor: not-allowed;
+  font-size: 1rem;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.place-order-btn.enabled {
+  background: #10b981;
+  cursor: pointer;
+}
+
+.place-order-btn.enabled:hover {
+  background: #059669;
+  transform: scale(1.02);
+}
+
+.place-order-btn:disabled:hover {
+  transform: none;
+}
+
+.place-order-wrapper[data-tooltip]:hover:after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  z-index: 10;
+  margin-bottom: 10px;
+}
+
+.place-order-error {
+  color: #ff4d4f;
+  font-size: 0.9rem;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.spinner.small {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.invalid-products-warning {
+  background: #fff1f0;
+  border: 1px solid #ff4d4f;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 1rem;
+  color: #7f1d1d;
+}
+
+.invalid-products-warning p {
+  margin: 0;
+}
+
+.remove-invalid-btn {
+  background: #ef4444;
+  color: #fff;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-left: 10px;
+  transition: background 0.3s ease;
+}
+
+.remove-invalid-btn:hover {
+  background: #dc2626;
+}
+
+/* New styles for manual location input */
+.location-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.manual-location-input {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.manual-location-input h4 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.coordinate-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.coordinate-inputs label {
+  font-size: 0.9rem;
+  color: #374151;
+  margin-bottom: 5px;
+}
+
+.coordinate-input {
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.coordinate-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.location-error {
+  color: #ff4d4f;
+  font-size: 0.9rem;
+  margin: 5px 0;
+}
+
+.set-location-btn {
+  background: #3b82f6;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s ease;
+}
+
+.set-location-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.set-location-btn:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+}
