@@ -220,3 +220,4 @@ For issues or questions about this component:
 **Component Version**: 1.0.0  
 **Last Updated**: December 2024  
 **Compatible with**: React 18+, Supabase 2.x
+
