@@ -15105,10 +15105,16 @@ function ProductPage() {
             // Use max_delivery_radius_km from RPC result if available, otherwise fetch from categoryData
             const maxDeliveryRadius = item.max_delivery_radius_km || 
               (categoryData.find((c) => c.id === item.category_id)?.max_delivery_radius_km);
-            const distance = seller ? calculateDistance(buyerLocation, {
-              latitude: seller.latitude,
-              longitude: seller.longitude,
-            }) : null;
+            // Prefer server-calculated distance_km; fallback to client calculation
+            let distance = (typeof item.distance_km === 'number') ? item.distance_km : (
+              seller ? calculateDistance(buyerLocation, {
+                latitude: seller.latitude,
+                longitude: seller.longitude,
+              }) : null
+            );
+            if (distance !== null && distance !== undefined) {
+              distance = parseFloat(Number(distance).toFixed(2));
+            }
             const effectiveRadius = item.delivery_radius_km || maxDeliveryRadius || 40;
 
             return {
@@ -15119,12 +15125,15 @@ function ProductPage() {
               category_name: item.categories?.name || item.category_name || 'Unknown Category',
               images: Array.isArray(item.images) ? item.images : [item.images].filter(Boolean),
               deliveryRadius: effectiveRadius,
-              distance: distance !== null ? parseFloat(distance.toFixed(2)) : null,
+              distance: (distance !== null && distance !== undefined) ? distance : null,
             };
           })
           .filter((item) => {
             if (item.id === product.id) return false;
-            if (item.distance === null || item.distance > item.deliveryRadius) return false;
+            // Use current product's delivery radius instead of related product's radius
+            const currentProductRadius = product.delivery_radius_km || 
+              (product.categories?.max_delivery_radius_km) || 40;
+            if (item.distance === null || item.distance > currentProductRadius) return false;
             if (isCategoryRestricted && !location.state?.fromCategories) return false;
             return true;
           });
