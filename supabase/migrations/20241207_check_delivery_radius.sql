@@ -21,3 +21,8 @@ SELECT
   AVG(max_delivery_radius_km) as avg_radius,
   COUNT(CASE WHEN max_delivery_radius_km IS NULL THEN 1 END) as null_count
 FROM categories;
+
+
+
+
+

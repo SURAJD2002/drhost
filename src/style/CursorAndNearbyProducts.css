@@ -1,0 +1,327 @@
+/* Cursor Behaviors and Nearby Products Styling */
+
+/* Global cursor behaviors */
+* {
+  cursor: default; /* Default cursor for all elements */
+}
+
+/* Clickable elements should have pointer cursor */
+button,
+a,
+[role="button"],
+[tabindex="0"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.product-card,
+.category-card,
+.cart-item,
+.order-item,
+.clickable,
+.navigation-link {
+  cursor: pointer !important;
+}
+
+/* Interactive form elements */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="tel"],
+input[type="url"],
+textarea,
+select {
+  cursor: text;
+}
+
+/* Disabled elements */
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled,
+.disabled {
+  cursor: not-allowed !important;
+}
+
+/* Loading states */
+.loading,
+.spinner {
+  cursor: wait !important;
+}
+
+/* Toast notifications - non-clickable */
+.Toastify__toast,
+.Toastify__toast * {
+  cursor: default !important;
+}
+
+/* Nearby Products Styling */
+.nearby-products-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: var(--background-section);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.nearby-products-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.nearby-products-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.nearby-products-icon {
+  font-size: 1.25rem;
+}
+
+.nearby-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.nearby-product-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+
+.nearby-product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.nearby-product-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.nearby-product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nearby-product-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.nearby-product-price {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin: 0;
+}
+
+.nearby-product-distance {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.nearby-product-seller {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* No nearby products message */
+.no-nearby-products {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+  border-radius: 12px;
+  border: 1px solid #0b74de;
+  margin: 2rem 0;
+}
+
+.no-nearby-products-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.7;
+}
+
+.no-nearby-products-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0b74de;
+  margin-bottom: 0.5rem;
+}
+
+.no-nearby-products-message {
+  font-size: 1rem;
+  color: #1565c0;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Location permission request */
+.location-permission-request {
+  background: linear-gradient(135deg, #fff3e0 0%, #f3e5f5 100%);
+  border: 1px solid #ff9800;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  margin: 2rem 0;
+}
+
+.location-permission-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.location-permission-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ff9800;
+  margin-bottom: 0.5rem;
+}
+
+.location-permission-message {
+  font-size: 1rem;
+  color: #ef6c00;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.location-permission-button {
+  background: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.location-permission-button:hover {
+  background: #f57c00;
+}
+
+/* Loading states for nearby products */
+.nearby-products-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 1rem;
+}
+
+.nearby-products-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--primary-dark);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.nearby-products-loading-text {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .nearby-products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+  
+  .nearby-product-card {
+    padding: 0.75rem;
+  }
+  
+  .nearby-product-image {
+    height: 150px;
+  }
+  
+  .no-nearby-products {
+    padding: 2rem 1rem;
+  }
+  
+  .no-nearby-products-icon {
+    font-size: 2.5rem;
+  }
+  
+  .no-nearby-products-title {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .nearby-products-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .nearby-products-section {
+    padding: 1rem;
+    margin: 1rem 0;
+  }
+}
+
+/* Accessibility improvements */
+.nearby-product-card:focus {
+  outline: 2px solid var(--primary-dark);
+  outline-offset: 2px;
+}
+
+.nearby-product-card:focus-visible {
+  outline: 2px solid var(--primary-dark);
+  outline-offset: 2px;
+}
+
+/* Animation for nearby products */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nearby-product-card {
+  animation: fadeInUp 0.6s ease forwards;
+}
+
+.nearby-product-card:nth-child(1) { animation-delay: 0.1s; }
+.nearby-product-card:nth-child(2) { animation-delay: 0.2s; }
+.nearby-product-card:nth-child(3) { animation-delay: 0.3s; }
+.nearby-product-card:nth-child(4) { animation-delay: 0.4s; }
+.nearby-product-card:nth-child(5) { animation-delay: 0.5s; }
+.nearby-product-card:nth-child(6) { animation-delay: 0.6s; }
+
+
+
+

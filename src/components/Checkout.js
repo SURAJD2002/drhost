@@ -9139,11 +9139,13 @@ function Checkout() {
             )}
           </div>
         </div>
+        <div className="checkout-footer-info bg-gradient-to-r from-blue-600 to-blue-400 text-white text-center rounded-xl py-4 px-3 shadow-md">
+  <p className="mb-1">🔒 <strong>100% Secure Shopping</strong> — Your info stays protected with us</p>
+  <p className="animate-pulse mb-1">
+    🛵 <strong>Local & Lightning Fast Delivery</strong> — Most orders arrive within <strong>3–24 hours!</strong>
+  </p>
+  <p>📍 Delivered straight from nearby sellers — no long waits!</p>
 
-        <div className="checkout-footer-info">
-          <p>🔒 Your personal information is secure</p>
-          <p>📦 Orders typically arrive within 3-5 business days</p>
-          <p>📍 Delivery only available within seller's specified radius</p>
         </div>
       </div>
 

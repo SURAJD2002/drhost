@@ -102,3 +102,8 @@ GRANT EXECUTE ON FUNCTION public.get_related_products_nearby(integer, integer, d
 
 -- Test the function exists
 SELECT 'Function recreated successfully' as status;
+
+
+
+
+

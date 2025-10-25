@@ -40,14 +40,26 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  
+  // Skip caching for POST, PUT, DELETE, and other non-GET requests
+  if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
+  // Only cache static assets
   if (url.protocol.startsWith('http') && url.pathname.match(/\.(html|css|js|png|ico|svg)$/)) {
     event.respondWith(
       caches.match(event.request).then((response) => {
         return response || fetch(event.request).then((networkResponse) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
-            return networkResponse;
-          });
+          // Only cache successful responses
+          if (networkResponse.status === 200) {
+            return caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, networkResponse.clone());
+              return networkResponse;
+            });
+          }
+          return networkResponse;
         });
       })
     );

@@ -44,3 +44,8 @@ SELECT
   AVG(max_delivery_radius_km) as avg_radius
 FROM categories 
 WHERE max_delivery_radius_km IS NOT NULL;
+
+
+
+
+

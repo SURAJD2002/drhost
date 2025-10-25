@@ -7,13 +7,29 @@
   --luxury-dark: #1A1A1A; /* Dark theme background */
   --luxury-gradient-start: #2C2C2C; /* Gradient for luxury elements */
   --luxury-gradient-end: #4A4A4A; /* Gradient for luxury elements */
-  --accent-red: #ef4444; /* Errors, cart badge, offer badge */
+  --accent-red: #ef4444; /* Critical errors only */
   --accent-orange: #f97316; /* Offer badge gradient start */
   --accent-yellow: #facc15; /* Footer icon hover/active */
-  --toastify-color-success: #2ecc71; /* Success toasts */
-  --toastify-color-error: #3d2de9; /* Error toasts */
-  --toastify-color-warning: #f1c40f; /* Warning toasts */
-  --toastify-color-info: #007bff; /* Info toasts */
+  
+  /* Notification Theme Variables */
+  --notify-bg-info: #e3f2fd; /* Light blue background for info notifications */
+  --notify-text-info: #1565c0; /* Dark blue text for info notifications */
+  --notify-bg-success: #e8f5e8; /* Light green background for success notifications */
+  --notify-text-success: #2e7d32; /* Dark green text for success notifications */
+  --notify-bg-warning: #fff3e0; /* Light orange background for warning notifications */
+  --notify-text-warning: #ef6c00; /* Dark orange text for warning notifications */
+  --notify-bg-critical: #ffebee; /* Light red background for critical errors */
+  --notify-text-critical: #c62828; /* Dark red text for critical errors */
+  --notify-border-info: #2196f3; /* Blue border for info notifications */
+  --notify-border-success: #4caf50; /* Green border for success notifications */
+  --notify-border-warning: #ff9800; /* Orange border for warning notifications */
+  --notify-border-critical: #f44336; /* Red border for critical errors */
+  
+  /* Legacy toast colors - updated to use theme variables */
+  --toastify-color-success: #4caf50; /* Success toasts */
+  --toastify-color-error: #ef4444; /* Critical error toasts (red) */
+  --toastify-color-warning: #ff9800; /* Warning toasts */
+  --toastify-color-info: #0b74de; /* Info toasts (blue) */
   --background-main: #f9fafb; /* Main page background */
   --background-section: #FFFFFF; /* Section backgrounds (e.g., categories) */
   --loading-gradient-start: #f5f7fa; /* Loading container gradient start */
@@ -46,6 +62,142 @@
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+}
+
+/* Global Notification Styles */
+.notification {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+  border-left: 4px solid;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.notification.info {
+  background-color: var(--notify-bg-info);
+  color: var(--notify-text-info);
+  border-left-color: var(--notify-border-info);
+}
+
+.notification.success {
+  background-color: var(--notify-bg-success);
+  color: var(--notify-text-success);
+  border-left-color: var(--notify-border-success);
+}
+
+.notification.warning {
+  background-color: var(--notify-bg-warning);
+  color: var(--notify-text-warning);
+  border-left-color: var(--notify-border-warning);
+}
+
+.notification.critical {
+  background-color: var(--notify-bg-critical);
+  color: var(--notify-text-critical);
+  border-left-color: var(--notify-border-critical);
+}
+
+.notification-icon {
+  font-size: 16px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-message {
+  word-wrap: break-word;
+}
+
+.notification-children {
+  margin-top: 4px;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 8px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+  line-height: 1;
+  color: inherit;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+/* App-level error and notification styles */
+.app-error {
+  background-color: var(--notify-bg-critical);
+  color: var(--notify-text-critical);
+  border-left-color: var(--notify-border-critical);
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border-left: 4px solid;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.location-notice {
+  background-color: var(--notify-bg-info);
+  color: var(--notify-text-info);
+  border-left-color: var(--notify-border-info);
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border-left: 4px solid;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.location-notice button {
+  background-color: var(--notify-border-info);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.location-notice button:hover {
+  background-color: var(--primary-dark);
+}
+
+.app-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.app-loading span {
+  margin-top: 8px;
+  color: var(--notify-text-info);
+  font-size: 14px;
 }
 
 /* Navbar */

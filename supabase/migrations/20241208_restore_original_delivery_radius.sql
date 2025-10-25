@@ -45,3 +45,8 @@ SELECT
 FROM categories
 GROUP BY max_delivery_radius_km
 ORDER BY max_delivery_radius_km;
+
+
+
+
+

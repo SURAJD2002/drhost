@@ -22,3 +22,8 @@ SELECT
 FROM information_schema.routines 
 WHERE routine_name = 'get_related_products_nearby'
   AND routine_schema = 'public';
+
+
+
+
+

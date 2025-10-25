@@ -4588,6 +4588,7 @@ import Footer from './Footer';
 import { toast } from 'react-hot-toast';
 import { Helmet } from 'react-helmet-async';
 import debounce from 'lodash/debounce';
+import { calculateCartTotal, formatPrice } from '../utils/priceUtils';
 import icon from '../assets/icon.png';
 
 // Default image URL
@@ -5094,19 +5095,20 @@ function Cart() {
     [cartItems, products, isUpdating, buyerLocation, updateSupabaseCartItem, removeFromSupabaseCart, toast, setCartItems, setProducts, setCartCount, matchProduct]
   );
 
-  // Calculate totals
-  const total = products.reduce((sum, product) => {
+  // Calculate totals using shared price utilities
+  const cartItemsWithPrices = products.map(product => {
     const cartItem = cartItems.find(item => item.id === product.cartId);
     const quantity = cartItem?.quantity || 1;
-    const price = product.price || 0;
-    return sum + price * quantity;
-  }, 0);
+    return {
+      price: product.price || 0,
+      quantity,
+      discount_amount: product.discount_amount || 0
+    };
+  });
 
-  const discountTotal = products.reduce((sum, product) => {
-    const cartItem = cartItems.find(item => item.id === product.cartId);
-    const quantity = cartItem?.quantity || 1;
-    const discount = product.discount_amount || 0;
-    return sum + discount * quantity;
+  const total = calculateCartTotal(cartItemsWithPrices);
+  const discountTotal = cartItemsWithPrices.reduce((sum, item) => {
+    return sum + (item.discount_amount * item.quantity);
   }, 0);
 
   // Run cleanup and fetch on mount or location change
@@ -5213,26 +5215,17 @@ function Cart() {
                     </h3>
                     <div className="cart-item-price-section">
                       <span className="cart-item-price">
-                        ₹{(product.price || 0).toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
+                        {formatPrice(product.price || 0)}
                       </span>
                       {product.original_price && product.original_price > product.price && (
                         <span className="cart-item-original-price">
-                          ₹{product.original_price.toLocaleString('en-IN', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                          })}
+                          {formatPrice(product.original_price)}
                         </span>
                       )}
                     </div>
                     {product.discount_amount > 0 && (
                       <p className="cart-item-discount">
-                        Save ₹{(product.discount_amount * quantity).toLocaleString('en-IN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
+                        Save {formatPrice(product.discount_amount * quantity)}
                       </p>
                     )}
                     <p className="cart-item-stock">
@@ -5274,17 +5267,11 @@ function Cart() {
           </div>
           <div className="cart-total">
             <h3>
-              Subtotal: ₹{total.toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              })}
+              Subtotal: {formatPrice(total)}
             </h3>
             {discountTotal > 0 && (
               <p className="cart-total-discount">
-                Total Savings: ₹{discountTotal.toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
+                Total Savings: {formatPrice(discountTotal)}
               </p>
             )}
             <Link to="/checkout" className="checkout-btn" aria-label="Proceed to checkout">
