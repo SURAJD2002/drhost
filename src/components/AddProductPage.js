@@ -2545,13 +2545,858 @@
 
 
 
+// import React, { useState, useEffect, useCallback, useContext } from 'react';
+// import { useNavigate, useParams } from 'react-router-dom';
+// import { supabase } from '../supabaseClient';
+// import { useForm, useFieldArray } from 'react-hook-form';
+// import { LocationContext } from '../App';
+// import '../style/AddProductPage.css';
+// import '../style/Home.css'; // for toast styling
+// import { toast } from 'react-hot-toast';
+// import Swal from 'sweetalert2';
+// import { Helmet } from 'react-helmet-async';
+// import imageCompression from 'browser-image-compression';
+// import {
+//   calculateFinalPrice,
+//   validatePriceInputs,
+//   validateVariantPricing,
+// } from '../utils/priceUtils';
+
+// // -----------------------------------------------------------------------------
+// // Helper – retry Supabase calls
+// // -----------------------------------------------------------------------------
+// async function retryRequest(fn, attempts = 3, delay = 1000) {
+//   for (let i = 1; i <= attempts; i++) {
+//     try {
+//       return await fn();
+//     } catch (e) {
+//       if (i === attempts) throw e;
+//       await new Promise(r => setTimeout(r, delay * 2 ** (i - 1)));
+//     }
+//   }
+// }
+
+// // -----------------------------------------------------------------------------
+// // Image handling (compression + upload)
+// // -----------------------------------------------------------------------------
+// const compressImage = async file => {
+//   const options = {
+//     maxSizeMB: 0.5,
+//     maxWidthOrHeight: file.size > 2 * 1024 * 1024 ? 1920 : 1080,
+//     useWebWorker: true,
+//     initialQuality: 0.95,
+//     fileType: 'image/webp',
+//   };
+//   const compressed = await imageCompression(file, options);
+//   if (compressed.size / 1024 > 500) throw new Error('Compressed image > 500 KB');
+//   return compressed;
+// };
+
+// const uploadImage = async file => {
+//   if (!file.type.startsWith('image/') || file.size > 5 * 1024 * 1024)
+//     throw new Error('Image must be < 5 MB');
+
+//   const compressed = await compressImage(file);
+//   const name = `products/full/${Date.now()}_${Math.random()
+//     .toString(36)
+//     .substring(2)}.webp`;
+
+//   const { error } = await retryRequest(() =>
+//     supabase.storage.from('product-images').upload(name, compressed, {
+//       contentType: 'image/webp',
+//     })
+//   );
+//   if (error) throw error;
+
+//   const { data } = supabase.storage.from('product-images').getPublicUrl(name);
+//   if (!data.publicUrl) throw new Error('Failed to get public URL');
+//   return data.publicUrl;
+// };
+
+// // -----------------------------------------------------------------------------
+// // Main component
+// // -----------------------------------------------------------------------------
+// export default function AddProductPage() {
+//   const navigate = useNavigate();
+//   const { productId } = useParams();
+//   const { sellerLocation } = useContext(LocationContext);
+//   const isEdit = !!productId;
+
+//   // -----------------------------------------------------------------
+//   // State
+//   // -----------------------------------------------------------------
+//   const [categories, setCategories] = useState([]);
+//   const [imagePreviews, setImagePreviews] = useState({ main: [], variants: {} });
+//   const [primaryIdx, setPrimaryIdx] = useState(null);
+//   const [variantsEnabled, setVariantsEnabled] = useState(false);
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState(null);
+
+//   // -----------------------------------------------------------------
+//   // Form
+//   // -----------------------------------------------------------------
+//   const {
+//     register,
+//     handleSubmit,
+//     control,
+//     watch,
+//     setValue,
+//     reset,
+//     formState: { errors },
+//   } = useForm({
+//     defaultValues: {
+//       title: '',
+//       description: '',
+//       price: '',
+//       commission: '0',
+//       discount: '0',
+//       stock: '',
+//       category_id: '',
+//       deliveryRadius: '',
+//       specifications: [],
+//       variants: [],
+//     },
+//     mode: 'onChange',
+//   });
+
+//   const { fields: variantFields, append: addVariant, remove: delVariant, replace: replaceVariants } =
+//     useFieldArray({
+//       control,
+//       name: 'variants',
+//     });
+//   const { fields: specFields, append: addSpec, remove: delSpec, replace: replaceSpecs } = useFieldArray({
+//     control,
+//     name: 'specifications',
+//   });
+
+//   const watchCat = watch('category_id');
+//   const watchPrice = watch('price');
+//   const watchDiscount = watch('discount');
+//   const watchCommission = watch('commission');
+//   const watchVariants = watch('variants');
+
+//   // -----------------------------------------------------------------
+//   // Real-time validation for product & variants
+//   // -----------------------------------------------------------------
+//   const productValidation = validatePriceInputs(watchPrice, watchDiscount, watchCommission);
+//   const variantValidations = watchVariants.map((v, i) =>
+//     validateVariantPricing(
+//       {
+//         price: v.price,
+//         discount_amount: v.discount || '0',
+//         commission_amount: v.commission || '0',
+//       },
+//       i
+//     )
+//   );
+
+//   // -----------------------------------------------------------------
+//   // Load categories
+//   // -----------------------------------------------------------------
+//   const loadCategories = useCallback(async () => {
+//     try {
+//       const { data, error } = await retryRequest(() =>
+//         supabase.from('categories').select('id,name,variant_attributes,specifications_fields')
+//       );
+//       if (error) throw error;
+//       setCategories(data || []);
+//     } catch (e) {
+//       toast.error('Failed to load categories');
+//     }
+//   }, []);
+
+//   // -----------------------------------------------------------------
+//   // Load existing product (edit mode)
+//   // -----------------------------------------------------------------
+//   const loadProduct = useCallback(async () => {
+//     if (!isEdit) return;
+//     setLoading(true);
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (!session?.user) throw new Error('Login required');
+
+//       const { data: prod, error: pErr } = await retryRequest(() =>
+//         supabase
+//           .from('products')
+//           .select(`
+//             id,title,description,original_price,commission_amount,discount_amount,
+//             stock,category_id,images,specifications,delivery_radius_km
+//           `)
+//           .eq('id', productId)
+//           .eq('seller_id', session.user.id)
+//           .single()
+//       );
+//       if (pErr || !prod) throw new Error('Product not found');
+
+//       setValue('title', prod.title);
+//       setValue('description', prod.description || '');
+//       setValue('price', prod.original_price?.toString() || '');
+//       setValue('commission', prod.commission_amount?.toString() || '0');
+//       setValue('discount', prod.discount_amount?.toString() || '0');
+//       setValue('stock', prod.stock?.toString() || '');
+//       setValue('category_id', prod.category_id?.toString() || '');
+//       setValue('deliveryRadius', prod.delivery_radius_km?.toString() || '');
+//       setImagePreviews(prev => ({ ...prev, main: prod.images || [] }));
+//       setPrimaryIdx(prod.images?.length ? 0 : null);
+//       replaceSpecs(
+//         Object.entries(prod.specifications || {}).map(([k, v]) => ({ key: k, value: v }))
+//       );
+
+//       // Load variants
+//       const { data: vars, error: vErr } = await retryRequest(() =>
+//         supabase
+//           .from('product_variants')
+//           .select('id,attributes,original_price,commission_amount,discount_amount,stock,images')
+//           .eq('product_id', productId)
+//       );
+//       if (vErr) throw vErr;
+
+//       if (vars?.length) {
+//         setVariantsEnabled(true);
+//         const vData = vars.map(v => ({
+//           id: v.id,
+//           ...v.attributes,
+//           price: v.original_price?.toString() || '',
+//           commission: v.commission_amount?.toString() || '0',
+//           discount: v.discount_amount?.toString() || '0',
+//           stock: v.stock?.toString() || '',
+//         }));
+//         replaceVariants(vData);
+//         const imgMap = {};
+//         vars.forEach((v, i) => {
+//           if (v.images?.length) imgMap[i] = v.images;
+//         });
+//         setImagePreviews(prev => ({ ...prev, variants: imgMap }));
+//       }
+//     } catch (e) {
+//       toast.error(e.message);
+//       navigate('/seller');
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [isEdit, productId, setValue, replaceSpecs, replaceVariants, navigate]);
+
+//   useEffect(() => {
+//     loadCategories();
+//     if (isEdit) loadProduct();
+//   }, [loadCategories, loadProduct, isEdit]);
+
+//   // -----------------------------------------------------------------
+//   // Category → specifications sync
+//   // -----------------------------------------------------------------
+//   useEffect(() => {
+//     if (watchCat) {
+//       const cat = categories.find(c => c.id === Number(watchCat)) || {};
+//       const specs = cat.specifications_fields || [];
+//       replaceSpecs(specs.map(f => ({ key: f.key || '', value: '' })));
+//     } else {
+//       replaceSpecs([]);
+//     }
+//   }, [watchCat, categories, replaceSpecs]);
+
+//   // -----------------------------------------------------------------
+//   // Image handling
+//   // -----------------------------------------------------------------
+//   const onMainImages = async e => {
+//     const files = Array.from(e.target.files).slice(0, 10);
+//     if (!files.length) return;
+//     setLoading(true);
+//     try {
+//       const urls = await Promise.all(files.map(uploadImage));
+//       setImagePreviews(p => ({ ...p, main: urls }));
+//       setPrimaryIdx(0);
+//       toast.success('Main images uploaded');
+//     } catch (err) {
+//       toast.error(err.message);
+//       setImagePreviews(p => ({ ...p, main: [] }));
+//       setPrimaryIdx(null);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const onVariantImages = async (e, idx) => {
+//     const files = Array.from(e.target.files).slice(0, 5);
+//     if (!files.length) return;
+//     setLoading(true);
+//     try {
+//       const urls = await Promise.all(files.map(uploadImage));
+//       setImagePreviews(p => ({
+//         ...p,
+//         variants: { ...p.variants, [idx]: urls },
+//       }));
+//       toast.success('Variant images uploaded');
+//     } catch (err) {
+//       toast.error(err.message);
+//       setImagePreviews(p => ({
+//         ...p,
+//         variants: { ...p.variants, [idx]: [] },
+//       }));
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // -----------------------------------------------------------------
+//   // Submit
+//   // -----------------------------------------------------------------
+//   const onSubmit = async data => {
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       const { data: { session } } = await supabase.auth.getSession();
+//       if (!session?.user) throw new Error('Login required');
+//       if (!sellerLocation?.lat || !sellerLocation?.lon) throw new Error('Set store location');
+
+//       // ---------- Product validation ----------
+//       if (!productValidation.isValid) throw new Error(productValidation.error);
+//       const productFinal = calculateFinalPrice(data.price, data.discount, data.commission);
+
+//       // ---------- Variant validation ----------
+//       const validatedVariants = data.variants.map((v, i) => {
+//         const val = validateVariantPricing(
+//           {
+//             price: v.price,
+//             discount_amount: v.discount || '0',
+//             commission_amount: v.commission || '0',
+//           },
+//           i
+//         );
+//         if (!val.isValid) throw new Error(val.error);
+//         return {
+//           ...v,
+//           price: Number(v.price),
+//           discount_amount: Number(v.discount) || 0,
+//           commission_amount: Number(v.commission) || 0,
+//           final_price: val.finalPrice,
+//         };
+//       });
+
+//       // ---------- Images ----------
+//       if (!imagePreviews.main.length) throw new Error('At least one product image required');
+//       const images = primaryIdx != null
+//         ? [imagePreviews.main[primaryIdx], ...imagePreviews.main.filter((_, i) => i !== primaryIdx)]
+//         : imagePreviews.main;
+
+//       // ---------- Specifications ----------
+//       const specs = data.specifications.reduce((obj, s) => {
+//         if (s.key && s.value) obj[s.key.trim()] = s.value.trim();
+//         return obj;
+//       }, {});
+//       if (specFields.length && !Object.keys(specs).length)
+//         throw new Error('At least one specification required');
+
+//       // ---------- Build product payload ----------
+//       const productPayload = {
+//         seller_id: session.user.id,
+//         category_id: Number(data.category_id),
+//         title: data.title.trim(),
+//         description: data.description?.trim() || null,
+//         price: productFinal,
+//         original_price: Number(data.price),
+//         commission_amount: Number(data.commission) || 0,
+//         discount_amount: Number(data.discount) || 0,
+//         stock: Number(data.stock),
+//         images,
+//         specifications: specs,
+//         delivery_radius_km: data.deliveryRadius ? Number(data.deliveryRadius) : null,
+//         latitude: sellerLocation.lat,
+//         longitude: sellerLocation.lon,
+//         is_approved: false,
+//         status: 'active',
+//         updated_at: new Date().toISOString(),
+//       };
+
+//       let newProductId = productId; // Use productId from useParams()
+
+//       if (isEdit) {
+//         const { error } = await retryRequest(() =>
+//           supabase.from('products').update(productPayload).eq('id', productId).eq('seller_id', session.user.id)
+//         );
+//         if (error) throw new Error(`Update failed: ${error.message}`);
+//       } else {
+//         const { data: ins, error } = await retryRequest(() =>
+//           supabase.from('products').insert(productPayload).select('id').single()
+//         );
+//         if (error) throw new Error(`Insert failed: ${error.message}`);
+//         newProductId = ins.id; // Update newProductId for new product
+//       }
+
+//       // ---------- Variants ----------
+//       if (variantsEnabled && validatedVariants.length) {
+//         const cat = categories.find(c => c.id === Number(data.category_id));
+//         const attrs = cat?.variant_attributes || ['attribute1'];
+
+//         for (const [i, v] of validatedVariants.entries()) {
+//           const attributes = attrs.reduce((obj, a) => {
+//             obj[a] = v[a]?.trim() || '';
+//             return obj;
+//           }, {});
+//           if (!Object.values(attributes).some(Boolean))
+//             throw new Error(`Variant ${i + 1}: At least one attribute required`);
+
+//           const payload = {
+//             product_id: newProductId,
+//             attributes,
+//             price: v.final_price,
+//             original_price: v.price,
+//             commission_amount: v.commission_amount,
+//             discount_amount: v.discount_amount,
+//             stock: Number(v.stock),
+//             images: imagePreviews.variants[i] || [],
+//             status: 'active',
+//           };
+
+//           if (v.id) {
+//             const { error } = await retryRequest(() =>
+//               supabase.from('product_variants').update(payload).eq('id', v.id)
+//             );
+//             if (error) throw new Error(`Variant ${i + 1} update failed: ${error.message}`);
+//           } else {
+//             const { error } = await retryRequest(() =>
+//               supabase.from('product_variants').insert(payload)
+//             );
+//             if (error) throw new Error(`Variant ${i + 1} insert failed: ${error.message}`);
+//           }
+//         }
+//       } else if (isEdit) {
+//         // Delete old variants if variants are disabled
+//         const { error } = await retryRequest(() =>
+//           supabase.from('product_variants').delete().eq('product_id', productId)
+//         );
+//         if (error) throw new Error(`Failed to delete old variants: ${error.message}`);
+//       }
+
+//       // ---------- Success ----------
+//       await Swal.fire({
+//         title: isEdit ? 'Product Updated!' : 'Product Added!',
+//         icon: 'success',
+//         confirmButtonColor: '#3085d6',
+//       });
+
+//       reset();
+//       setImagePreviews({ main: [], variants: {} });
+//       setPrimaryIdx(null);
+//       setVariantsEnabled(false);
+//       replaceSpecs([]);
+//       replaceVariants([]);
+//       navigate('/seller');
+//     } catch (e) {
+//       setError(e.message);
+//       toast.error(e.message);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // -----------------------------------------------------------------
+//   // UI helpers
+//   // -----------------------------------------------------------------
+//   const pageTitle = isEdit ? 'Edit Product - Markeet' : 'Add Product - Markeet';
+//   const pageDesc = isEdit
+//     ? 'Edit your product details on Markeet.'
+//     : 'Add a new product to your Markeet seller account.';
+
+//   return (
+//     <div className="add-product-container">
+//       <Helmet>
+//         <title>{pageTitle}</title>
+//         <meta name="description" content={pageDesc} />
+//         <meta name="robots" content="noindex, nofollow" />
+//       </Helmet>
+
+//       <h2 className="add-product-title">{isEdit ? 'Edit Product' : 'Add New Product'}</h2>
+
+//       {error && <p className="error-message">{error}</p>}
+//       {loading && <div className="loading-spinner">Saving…</div>}
+
+//       <form onSubmit={handleSubmit(onSubmit)} className="add-product-form">
+//         {/* ---------- BASIC INFO ---------- */}
+//         <div className="form-group">
+//           <label className="form-label">Product Name *</label>
+//           <input
+//             {...register('title', {
+//               required: 'Required',
+//               maxLength: { value: 200, message: 'Max 200 chars' },
+//             })}
+//             className="form-input"
+//           />
+//           {errors.title && <p className="error-text">{errors.title.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label className="form-label">Description *</label>
+//           <textarea
+//             {...register('description', { required: 'Required', maxLength: 2000 })}
+//             className="form-textarea"
+//           />
+//           {errors.description && <p className="error-text">{errors.description.message}</p>}
+//         </div>
+
+//         {/* ---------- PRICING (product) ---------- */}
+//         <div className="form-group">
+//           <label className="form-label">Original Price (₹) *</label>
+//           <input
+//             type="number"
+//             step="0.01"
+//             {...register('price', {
+//               required: 'Required',
+//               min: { value: 0, message: '≥ 0' },
+//               validate: v => validatePriceInputs(v, watchDiscount, watchCommission).isValid || 'Invalid price',
+//             })}
+//             className="form-input"
+//           />
+//           {errors.price && <p className="error-text">{errors.price.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label className="form-label">Commission (₹) *</label>
+//           <input
+//             type="number"
+//             step="0.01"
+//             {...register('commission', {
+//               required: 'Required',
+//               min: { value: 0, message: '≥ 0' },
+//             })}
+//             className="form-input"
+//           />
+//           {errors.commission && <p className="error-text">{errors.commission.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label className="form-label">Discount (₹) *</label>
+//           <input
+//             type="number"
+//             step="0.01"
+//             {...register('discount', {
+//               required: 'Required',
+//               min: { value: 0, message: '≥ 0' },
+//             })}
+//             className="form-input"
+//           />
+//           {errors.discount && <p className="error-text">{errors.discount.message}</p>}
+//         </div>
+
+//         {productValidation.isValid && (
+//           <div className="form-group">
+//             <label className="form-label">Final Price (₹)</label>
+//             <p className="calculated-price">
+//               {calculateFinalPrice(watchPrice, watchDiscount, watchCommission).toFixed(2)}
+//             </p>
+//           </div>
+//         )}
+//         {!productValidation.isValid && <p className="error-text">{productValidation.error}</p>}
+
+//         {/* ---------- STOCK & DELIVERY ---------- */}
+//         <div className="form-group">
+//           <label className="form-label">Stock *</label>
+//           <input
+//             type="number"
+//             {...register('stock', {
+//               required: 'Required',
+//               min: { value: 0, message: '≥ 0' },
+//             })}
+//             className="form-input"
+//           />
+//           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
+//         </div>
+
+//         <div className="form-group">
+//           <label className="form-label">Delivery Radius (km) (optional)</label>
+//           <input
+//             type="number"
+//             {...register('deliveryRadius', {
+//               min: { value: 1, message: '≥ 1' },
+//               max: { value: 200, message: '≤ 200' },
+//             })}
+//             className="form-input"
+//           />
+//           {errors.deliveryRadius && <p className="error-text">{errors.deliveryRadius.message}</p>}
+//         </div>
+
+//         {/* ---------- CATEGORY ---------- */}
+//         <div className="form-group">
+//           <label className="form-label">Category *</label>
+//           <select
+//             {...register('category_id', { required: 'Required' })}
+//             className="form-select"
+//           >
+//             <option value="">Select…</option>
+//             {categories.map(c => (
+//               <option key={c.id} value={c.id}>
+//                 {c.name}
+//               </option>
+//             ))}
+//           </select>
+//           {errors.category_id && <p className="error-text">{errors.category_id.message}</p>}
+//         </div>
+
+//         {/* ---------- MAIN IMAGES ---------- */}
+//         <div className="form-group">
+//           <label className="form-label">Product Images (max 10) *</label>
+//           <input
+//             type="file"
+//             multiple
+//             accept="image/*"
+//             onChange={onMainImages}
+//             className="form-input"
+//             disabled={loading}
+//           />
+//           {imagePreviews.main.length > 0 && (
+//             <div className="image-preview">
+//               {imagePreviews.main.map((url, i) => (
+//                 <div key={i} className="image-preview-item">
+//                   <img
+//                     src={url}
+//                     alt={`preview ${i + 1}`}
+//                     className={`preview-image ${primaryIdx === i ? 'primary-image' : ''}`}
+//                     onClick={() => setPrimaryIdx(i)}
+//                   />
+//                   {primaryIdx === i && <span className="primary-label">Primary</span>}
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+//         </div>
+
+//         {/* ---------- SPECIFICATIONS ---------- */}
+//         <div className="form-group">
+//           <h3 className="section-title">Specifications</h3>
+//           {specFields.map((f, i) => (
+//             <div key={f.id} className="spec-field">
+//               <input
+//                 {...register(`specifications.${i}.key`, { required: 'Key required' })}
+//                 placeholder="Key"
+//                 className="form-input spec-input"
+//                 defaultValue={f.key}
+//                 disabled={!!f.key}
+//               />
+//               <input
+//                 {...register(`specifications.${i}.value`, { required: 'Value required' })}
+//                 placeholder="Value"
+//                 className="form-input spec-input"
+//               />
+//               <button type="button" onClick={() => delSpec(i)} className="remove-spec-btn">
+//                 Remove
+//               </button>
+//               {errors.specifications?.[i]?.key && (
+//                 <p className="error-text">{errors.specifications[i].key.message}</p>
+//               )}
+//               {errors.specifications?.[i]?.value && (
+//                 <p className="error-text">{errors.specifications[i].value.message}</p>
+//               )}
+//             </div>
+//           ))}
+//           <button
+//             type="button"
+//             onClick={() => addSpec({ key: '', value: '' })}
+//             className="add-spec-btn"
+//           >
+//             Add Specification
+//           </button>
+//         </div>
+
+//         {/* ---------- VARIANTS ---------- */}
+//         <div className="form-group">
+//           <h3 className="section-title">
+//             Variants
+//             <label className="variant-toggle">
+//               <input
+//                 type="checkbox"
+//                 checked={variantsEnabled}
+//                 onChange={e => {
+//                   setVariantsEnabled(e.target.checked);
+//                   if (e.target.checked)
+//                     addVariant({ price: '', commission: '0', discount: '0', stock: '' });
+//                   else {
+//                     replaceVariants([]);
+//                     setImagePreviews(p => ({ ...p, variants: {} }));
+//                   }
+//                 }}
+//               />
+//               Enable
+//             </label>
+//           </h3>
+
+//           {variantsEnabled &&
+//             variantFields.map((field, idx) => {
+//               const cat = categories.find(c => c.id === Number(watchCat));
+//               const attrs = cat?.variant_attributes || ['attribute1'];
+//               const vErr = variantValidations[idx]?.error;
+
+//               return (
+//                 <div key={field.id} className="variant-field">
+//                   {attrs.map(attr => (
+//                     <div key={attr} className="variant-input">
+//                       <label className="form-label">{attr}</label>
+//                       <input
+//                         {...register(`variants.${idx}.${attr}`, { required: `${attr} required` })}
+//                         placeholder={`Enter ${attr}`}
+//                         className="form-input"
+//                       />
+//                       {errors.variants?.[idx]?.[attr] && (
+//                         <p className="error-text">{errors.variants[idx][attr].message}</p>
+//                       )}
+//                     </div>
+//                   ))}
+
+//                   <div className="variant-input">
+//                     <label className="form-label">Price (₹) *</label>
+//                     <input
+//                       type="number"
+//                       step="0.01"
+//                       {...register(`variants.${idx}.price`, {
+//                         required: 'Required',
+//                         min: { value: 0, message: '≥ 0' },
+//                       })}
+//                       placeholder="Enter price"
+//                       className="form-input"
+//                     />
+//                     {errors.variants?.[idx]?.price && (
+//                       <p className="error-text">{errors.variants[idx].price.message}</p>
+//                     )}
+//                   </div>
+
+//                   <div className="variant-input">
+//                     <label className="form-label">Commission (₹) *</label>
+//                     <input
+//                       type="number"
+//                       step="0.01"
+//                       {...register(`variants.${idx}.commission`, {
+//                         required: 'Required',
+//                         min: { value: 0, message: '≥ 0' },
+//                       })}
+//                       placeholder="Enter commission"
+//                       className="form-input"
+//                     />
+//                     {errors.variants?.[idx]?.commission && (
+//                       <p className="error-text">{errors.variants[idx].commission.message}</p>
+//                     )}
+//                   </div>
+
+//                   <div className="variant-input">
+//                     <label className="form-label">Discount (₹) *</label>
+//                     <input
+//                       type="number"
+//                       step="0.01"
+//                       {...register(`variants.${idx}.discount`, {
+//                         required: 'Required',
+//                         min: { value: 0, message: '≥ 0' },
+//                       })}
+//                       placeholder="Enter discount"
+//                       className="form-input"
+//                     />
+//                     {errors.variants?.[idx]?.discount && (
+//                       <p className="error-text">{errors.variants[idx].discount.message}</p>
+//                     )}
+//                   </div>
+
+//                   <div className="variant-input">
+//                     <label className="form-label">Stock *</label>
+//                     <input
+//                       type="number"
+//                       {...register(`variants.${idx}.stock`, {
+//                         required: 'Required',
+//                         min: { value: 0, message: '≥ 0' },
+//                       })}
+//                       placeholder="Enter stock"
+//                       className="form-input"
+//                     />
+//                     {errors.variants?.[idx]?.stock && (
+//                       <p className="error-text">{errors.variants[idx].stock.message}</p>
+//                     )}
+//                   </div>
+
+//                   {/* Final price for this variant */}
+//                   {variantValidations[idx]?.finalPrice != null && !vErr && (
+//                     <div className="variant-input">
+//                       <label className="form-label">Final Price (₹)</label>
+//                       <p className="calculated-price">
+//                         {variantValidations[idx].finalPrice.toFixed(2)}
+//                       </p>
+//                     </div>
+//                   )}
+//                   {vErr && <p className="error-text">{vErr}</p>}
+
+//                   {/* Variant images */}
+//                   <div className="variant-input">
+//                     <label className="form-label">Images (max 5, optional)</label>
+//                     <input
+//                       type="file"
+//                       multiple
+//                       accept="image/*"
+//                       onChange={e => onVariantImages(e, idx)}
+//                       className="form-input"
+//                       disabled={loading}
+//                     />
+//                     {imagePreviews.variants[idx]?.length > 0 && (
+//                       <div className="image-preview">
+//                         {imagePreviews.variants[idx].map((src, i) => (
+//                           <img
+//                             key={i}
+//                             src={src}
+//                             alt={`variant ${idx + 1} preview ${i + 1}`}
+//                             className="preview-image lazy-load"
+//                           />
+//                         ))}
+//                       </div>
+//                     )}
+//                   </div>
+
+//                   <button
+//                     type="button"
+//                     onClick={() => delVariant(idx)}
+//                     className="remove-variant-btn"
+//                   >
+//                     Remove Variant
+//                   </button>
+//                 </div>
+//               );
+//             })}
+
+//           {variantsEnabled && (
+//             <button
+//               type="button"
+//               onClick={() => addVariant({ price: '', commission: '0', discount: '0', stock: '' })}
+//               className="add-variant-btn"
+//             >
+//               Add Variant
+//             </button>
+//           )}
+//         </div>
+
+//         {/* ---------- SUBMIT ---------- */}
+//         <div className="form-actions">
+//           <button
+//             type="submit"
+//             disabled={loading || !productValidation.isValid || variantValidations.some(v => !v.isValid)}
+//             className="submit-btn"
+//           >
+//             {loading ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Product'}
+//           </button>
+//           <button
+//             type="button"
+//             onClick={() => navigate('/seller')}
+//             disabled={loading}
+//             className="cancel-btn"
+//           >
+//             Cancel
+//           </button>
+//         </div>
+//       </form>
+//     </div>
+//   );
+// }
+
+
+
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { LocationContext } from '../App';
 import '../style/AddProductPage.css';
-import '../style/Home.css'; // for toast styling
+import '../style/Home.css';
 import { toast } from 'react-hot-toast';
 import Swal from 'sweetalert2';
 import { Helmet } from 'react-helmet-async';
@@ -2622,9 +3467,7 @@ export default function AddProductPage() {
   const { sellerLocation } = useContext(LocationContext);
   const isEdit = !!productId;
 
-  // -----------------------------------------------------------------
   // State
-  // -----------------------------------------------------------------
   const [categories, setCategories] = useState([]);
   const [imagePreviews, setImagePreviews] = useState({ main: [], variants: {} });
   const [primaryIdx, setPrimaryIdx] = useState(null);
@@ -2632,9 +3475,7 @@ export default function AddProductPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // -----------------------------------------------------------------
   // Form
-  // -----------------------------------------------------------------
   const {
     register,
     handleSubmit,
@@ -2647,7 +3488,7 @@ export default function AddProductPage() {
     defaultValues: {
       title: '',
       description: '',
-      price: '',
+      mrp: '',
       commission: '0',
       discount: '0',
       stock: '',
@@ -2670,19 +3511,17 @@ export default function AddProductPage() {
   });
 
   const watchCat = watch('category_id');
-  const watchPrice = watch('price');
+  const watchMrp = watch('mrp');
   const watchDiscount = watch('discount');
   const watchCommission = watch('commission');
   const watchVariants = watch('variants');
 
-  // -----------------------------------------------------------------
   // Real-time validation for product & variants
-  // -----------------------------------------------------------------
-  const productValidation = validatePriceInputs(watchPrice, watchDiscount, watchCommission);
+  const productValidation = validatePriceInputs(watchMrp, watchDiscount, watchCommission);
   const variantValidations = watchVariants.map((v, i) =>
     validateVariantPricing(
       {
-        price: v.price,
+        mrp: v.mrp,
         discount_amount: v.discount || '0',
         commission_amount: v.commission || '0',
       },
@@ -2690,9 +3529,7 @@ export default function AddProductPage() {
     )
   );
 
-  // -----------------------------------------------------------------
   // Load categories
-  // -----------------------------------------------------------------
   const loadCategories = useCallback(async () => {
     try {
       const { data, error } = await retryRequest(() =>
@@ -2705,9 +3542,7 @@ export default function AddProductPage() {
     }
   }, []);
 
-  // -----------------------------------------------------------------
   // Load existing product (edit mode)
-  // -----------------------------------------------------------------
   const loadProduct = useCallback(async () => {
     if (!isEdit) return;
     setLoading(true);
@@ -2730,7 +3565,7 @@ export default function AddProductPage() {
 
       setValue('title', prod.title);
       setValue('description', prod.description || '');
-      setValue('price', prod.original_price?.toString() || '');
+      setValue('mrp', prod.original_price?.toString() || '');
       setValue('commission', prod.commission_amount?.toString() || '0');
       setValue('discount', prod.discount_amount?.toString() || '0');
       setValue('stock', prod.stock?.toString() || '');
@@ -2756,7 +3591,7 @@ export default function AddProductPage() {
         const vData = vars.map(v => ({
           id: v.id,
           ...v.attributes,
-          price: v.original_price?.toString() || '',
+          mrp: v.original_price?.toString() || '',
           commission: v.commission_amount?.toString() || '0',
           discount: v.discount_amount?.toString() || '0',
           stock: v.stock?.toString() || '',
@@ -2781,9 +3616,7 @@ export default function AddProductPage() {
     if (isEdit) loadProduct();
   }, [loadCategories, loadProduct, isEdit]);
 
-  // -----------------------------------------------------------------
   // Category → specifications sync
-  // -----------------------------------------------------------------
   useEffect(() => {
     if (watchCat) {
       const cat = categories.find(c => c.id === Number(watchCat)) || {};
@@ -2794,9 +3627,7 @@ export default function AddProductPage() {
     }
   }, [watchCat, categories, replaceSpecs]);
 
-  // -----------------------------------------------------------------
   // Image handling
-  // -----------------------------------------------------------------
   const onMainImages = async e => {
     const files = Array.from(e.target.files).slice(0, 10);
     if (!files.length) return;
@@ -2837,9 +3668,7 @@ export default function AddProductPage() {
     }
   };
 
-  // -----------------------------------------------------------------
   // Submit
-  // -----------------------------------------------------------------
   const onSubmit = async data => {
     setLoading(true);
     setError(null);
@@ -2848,15 +3677,15 @@ export default function AddProductPage() {
       if (!session?.user) throw new Error('Login required');
       if (!sellerLocation?.lat || !sellerLocation?.lon) throw new Error('Set store location');
 
-      // ---------- Product validation ----------
+      // Product validation
       if (!productValidation.isValid) throw new Error(productValidation.error);
-      const productFinal = calculateFinalPrice(data.price, data.discount, data.commission);
+      const productFinal = calculateFinalPrice(data.mrp, data.discount, data.commission);
 
-      // ---------- Variant validation ----------
+      // Variant validation
       const validatedVariants = data.variants.map((v, i) => {
         const val = validateVariantPricing(
           {
-            price: v.price,
+            mrp: v.mrp,
             discount_amount: v.discount || '0',
             commission_amount: v.commission || '0',
           },
@@ -2865,20 +3694,20 @@ export default function AddProductPage() {
         if (!val.isValid) throw new Error(val.error);
         return {
           ...v,
-          price: Number(v.price),
+          mrp: Number(v.mrp),
           discount_amount: Number(v.discount) || 0,
           commission_amount: Number(v.commission) || 0,
           final_price: val.finalPrice,
         };
       });
 
-      // ---------- Images ----------
+      // Images
       if (!imagePreviews.main.length) throw new Error('At least one product image required');
       const images = primaryIdx != null
         ? [imagePreviews.main[primaryIdx], ...imagePreviews.main.filter((_, i) => i !== primaryIdx)]
         : imagePreviews.main;
 
-      // ---------- Specifications ----------
+      // Specifications
       const specs = data.specifications.reduce((obj, s) => {
         if (s.key && s.value) obj[s.key.trim()] = s.value.trim();
         return obj;
@@ -2886,14 +3715,14 @@ export default function AddProductPage() {
       if (specFields.length && !Object.keys(specs).length)
         throw new Error('At least one specification required');
 
-      // ---------- Build product payload ----------
+      // Build product payload
       const productPayload = {
         seller_id: session.user.id,
         category_id: Number(data.category_id),
         title: data.title.trim(),
         description: data.description?.trim() || null,
         price: productFinal,
-        original_price: Number(data.price),
+        original_price: Number(data.mrp),
         commission_amount: Number(data.commission) || 0,
         discount_amount: Number(data.discount) || 0,
         stock: Number(data.stock),
@@ -2907,7 +3736,7 @@ export default function AddProductPage() {
         updated_at: new Date().toISOString(),
       };
 
-      let newProductId = productId; // Use productId from useParams()
+      let newProductId = productId;
 
       if (isEdit) {
         const { error } = await retryRequest(() =>
@@ -2919,10 +3748,10 @@ export default function AddProductPage() {
           supabase.from('products').insert(productPayload).select('id').single()
         );
         if (error) throw new Error(`Insert failed: ${error.message}`);
-        newProductId = ins.id; // Update newProductId for new product
+        newProductId = ins.id;
       }
 
-      // ---------- Variants ----------
+      // Variants
       if (variantsEnabled && validatedVariants.length) {
         const cat = categories.find(c => c.id === Number(data.category_id));
         const attrs = cat?.variant_attributes || ['attribute1'];
@@ -2939,7 +3768,7 @@ export default function AddProductPage() {
             product_id: newProductId,
             attributes,
             price: v.final_price,
-            original_price: v.price,
+            original_price: v.mrp,
             commission_amount: v.commission_amount,
             discount_amount: v.discount_amount,
             stock: Number(v.stock),
@@ -2960,14 +3789,13 @@ export default function AddProductPage() {
           }
         }
       } else if (isEdit) {
-        // Delete old variants if variants are disabled
         const { error } = await retryRequest(() =>
           supabase.from('product_variants').delete().eq('product_id', productId)
         );
         if (error) throw new Error(`Failed to delete old variants: ${error.message}`);
       }
 
-      // ---------- Success ----------
+      // Success
       await Swal.fire({
         title: isEdit ? 'Product Updated!' : 'Product Added!',
         icon: 'success',
@@ -2989,9 +3817,7 @@ export default function AddProductPage() {
     }
   };
 
-  // -----------------------------------------------------------------
   // UI helpers
-  // -----------------------------------------------------------------
   const pageTitle = isEdit ? 'Edit Product - Markeet' : 'Add Product - Markeet';
   const pageDesc = isEdit
     ? 'Edit your product details on Markeet.'
@@ -3011,7 +3837,7 @@ export default function AddProductPage() {
       {loading && <div className="loading-spinner">Saving…</div>}
 
       <form onSubmit={handleSubmit(onSubmit)} className="add-product-form">
-        {/* ---------- BASIC INFO ---------- */}
+        {/* BASIC INFO */}
         <div className="form-group">
           <label className="form-label">Product Name *</label>
           <input
@@ -3033,20 +3859,23 @@ export default function AddProductPage() {
           {errors.description && <p className="error-text">{errors.description.message}</p>}
         </div>
 
-        {/* ---------- PRICING (product) ---------- */}
+        {/* PRICING (product) */}
         <div className="form-group">
-          <label className="form-label">Original Price (₹) *</label>
+          <label className="form-label">MRP (₹) *</label>
           <input
             type="number"
             step="0.01"
-            {...register('price', {
-              required: 'Required',
-              min: { value: 0, message: '≥ 0' },
-              validate: v => validatePriceInputs(v, watchDiscount, watchCommission).isValid || 'Invalid price',
+            {...register('mrp', {
+              required: 'MRP is required',
+              min: { value: 0.01, message: 'MRP must be greater than 0' },
+              validate: v =>
+                validatePriceInputs(v, watchDiscount, watchCommission).isValid ||
+                validatePriceInputs(v, watchDiscount, watchCommission).error,
             })}
+            placeholder="Enter MRP (e.g., 100.00)"
             className="form-input"
           />
-          {errors.price && <p className="error-text">{errors.price.message}</p>}
+          {errors.mrp && <p className="error-text">{errors.mrp.message}</p>}
         </div>
 
         <div className="form-group">
@@ -3055,9 +3884,10 @@ export default function AddProductPage() {
             type="number"
             step="0.01"
             {...register('commission', {
-              required: 'Required',
-              min: { value: 0, message: '≥ 0' },
+              required: 'Commission is required',
+              min: { value: 0, message: 'Commission must be non-negative' },
             })}
+            placeholder="Enter commission (e.g., 10.00)"
             className="form-input"
           />
           {errors.commission && <p className="error-text">{errors.commission.message}</p>}
@@ -3069,9 +3899,10 @@ export default function AddProductPage() {
             type="number"
             step="0.01"
             {...register('discount', {
-              required: 'Required',
-              min: { value: 0, message: '≥ 0' },
+              required: 'Discount is required',
+              min: { value: 0, message: 'Discount must be non-negative' },
             })}
+            placeholder="Enter discount (e.g., 20.00)"
             className="form-input"
           />
           {errors.discount && <p className="error-text">{errors.discount.message}</p>}
@@ -3081,21 +3912,22 @@ export default function AddProductPage() {
           <div className="form-group">
             <label className="form-label">Final Price (₹)</label>
             <p className="calculated-price">
-              {calculateFinalPrice(watchPrice, watchDiscount, watchCommission).toFixed(2)}
+              {calculateFinalPrice(watchMrp, watchDiscount, watchCommission).toFixed(2)}
             </p>
           </div>
         )}
         {!productValidation.isValid && <p className="error-text">{productValidation.error}</p>}
 
-        {/* ---------- STOCK & DELIVERY ---------- */}
+        {/* STOCK & DELIVERY */}
         <div className="form-group">
           <label className="form-label">Stock *</label>
           <input
             type="number"
             {...register('stock', {
-              required: 'Required',
-              min: { value: 0, message: '≥ 0' },
+              required: 'Stock is required',
+              min: { value: 0, message: 'Stock must be non-negative' },
             })}
+            placeholder="Enter stock"
             className="form-input"
           />
           {errors.stock && <p className="error-text">{errors.stock.message}</p>}
@@ -3106,19 +3938,20 @@ export default function AddProductPage() {
           <input
             type="number"
             {...register('deliveryRadius', {
-              min: { value: 1, message: '≥ 1' },
-              max: { value: 200, message: '≤ 200' },
+              min: { value: 1, message: 'Must be ≥ 1' },
+              max: { value: 200, message: 'Must be ≤ 200' },
             })}
+            placeholder="Enter delivery radius"
             className="form-input"
           />
           {errors.deliveryRadius && <p className="error-text">{errors.deliveryRadius.message}</p>}
         </div>
 
-        {/* ---------- CATEGORY ---------- */}
+        {/* CATEGORY */}
         <div className="form-group">
           <label className="form-label">Category *</label>
           <select
-            {...register('category_id', { required: 'Required' })}
+            {...register('category_id', { required: 'Category is required' })}
             className="form-select"
           >
             <option value="">Select…</option>
@@ -3131,7 +3964,7 @@ export default function AddProductPage() {
           {errors.category_id && <p className="error-text">{errors.category_id.message}</p>}
         </div>
 
-        {/* ---------- MAIN IMAGES ---------- */}
+        {/* MAIN IMAGES */}
         <div className="form-group">
           <label className="form-label">Product Images (max 10) *</label>
           <input
@@ -3159,7 +3992,7 @@ export default function AddProductPage() {
           )}
         </div>
 
-        {/* ---------- SPECIFICATIONS ---------- */}
+        {/* SPECIFICATIONS */}
         <div className="form-group">
           <h3 className="section-title">Specifications</h3>
           {specFields.map((f, i) => (
@@ -3196,7 +4029,7 @@ export default function AddProductPage() {
           </button>
         </div>
 
-        {/* ---------- VARIANTS ---------- */}
+        {/* VARIANTS */}
         <div className="form-group">
           <h3 className="section-title">
             Variants
@@ -3206,9 +4039,9 @@ export default function AddProductPage() {
                 checked={variantsEnabled}
                 onChange={e => {
                   setVariantsEnabled(e.target.checked);
-                  if (e.target.checked)
-                    addVariant({ price: '', commission: '0', discount: '0', stock: '' });
-                  else {
+                  if (e.target.checked) {
+                    addVariant({ mrp: '', commission: '0', discount: '0', stock: '' });
+                  } else {
                     replaceVariants([]);
                     setImagePreviews(p => ({ ...p, variants: {} }));
                   }
@@ -3241,19 +4074,28 @@ export default function AddProductPage() {
                   ))}
 
                   <div className="variant-input">
-                    <label className="form-label">Price (₹) *</label>
+                    <label className="form-label">MRP (₹) *</label>
                     <input
                       type="number"
                       step="0.01"
-                      {...register(`variants.${idx}.price`, {
-                        required: 'Required',
-                        min: { value: 0, message: '≥ 0' },
+                      {...register(`variants.${idx}.mrp`, {
+                        required: 'MRP is required',
+                        min: { value: 0.01, message: 'MRP must be greater than 0' },
+                        validate: v =>
+                          validateVariantPricing(
+                            {
+                              mrp: v,
+                              discount_amount: watchVariants[idx]?.discount || '0',
+                              commission_amount: watchVariants[idx]?.commission || '0',
+                            },
+                            idx
+                          ).isValid || `Invalid MRP: ${variantValidations[idx]?.error || 'Enter a valid MRP'}`,
                       })}
-                      placeholder="Enter price"
+                      placeholder="Enter MRP (e.g., 100.00)"
                       className="form-input"
                     />
-                    {errors.variants?.[idx]?.price && (
-                      <p className="error-text">{errors.variants[idx].price.message}</p>
+                    {errors.variants?.[idx]?.mrp && (
+                      <p className="error-text">{errors.variants[idx].mrp.message}</p>
                     )}
                   </div>
 
@@ -3263,10 +4105,10 @@ export default function AddProductPage() {
                       type="number"
                       step="0.01"
                       {...register(`variants.${idx}.commission`, {
-                        required: 'Required',
-                        min: { value: 0, message: '≥ 0' },
+                        required: 'Commission is required',
+                        min: { value: 0, message: 'Commission must be non-negative' },
                       })}
-                      placeholder="Enter commission"
+                      placeholder="Enter commission (e.g., 10.00)"
                       className="form-input"
                     />
                     {errors.variants?.[idx]?.commission && (
@@ -3280,10 +4122,10 @@ export default function AddProductPage() {
                       type="number"
                       step="0.01"
                       {...register(`variants.${idx}.discount`, {
-                        required: 'Required',
-                        min: { value: 0, message: '≥ 0' },
+                        required: 'Discount is required',
+                        min: { value: 0, message: 'Discount must be non-negative' },
                       })}
-                      placeholder="Enter discount"
+                      placeholder="Enter discount (e.g., 20.00)"
                       className="form-input"
                     />
                     {errors.variants?.[idx]?.discount && (
@@ -3296,8 +4138,8 @@ export default function AddProductPage() {
                     <input
                       type="number"
                       {...register(`variants.${idx}.stock`, {
-                        required: 'Required',
-                        min: { value: 0, message: '≥ 0' },
+                        required: 'Stock is required',
+                        min: { value: 0, message: 'Stock must be non-negative' },
                       })}
                       placeholder="Enter stock"
                       className="form-input"
@@ -3307,7 +4149,6 @@ export default function AddProductPage() {
                     )}
                   </div>
 
-                  {/* Final price for this variant */}
                   {variantValidations[idx]?.finalPrice != null && !vErr && (
                     <div className="variant-input">
                       <label className="form-label">Final Price (₹)</label>
@@ -3318,7 +4159,6 @@ export default function AddProductPage() {
                   )}
                   {vErr && <p className="error-text">{vErr}</p>}
 
-                  {/* Variant images */}
                   <div className="variant-input">
                     <label className="form-label">Images (max 5, optional)</label>
                     <input
@@ -3357,15 +4197,16 @@ export default function AddProductPage() {
           {variantsEnabled && (
             <button
               type="button"
-              onClick={() => addVariant({ price: '', commission: '0', discount: '0', stock: '' })}
+              onClick={() => addVariant({ mrp: '', commission: '0', discount: '0', stock: '' })}
               className="add-variant-btn"
+              disabled={variantFields.some((_, i) => !variantValidations[i]?.isValid)}
             >
               Add Variant
             </button>
           )}
         </div>
 
-        {/* ---------- SUBMIT ---------- */}
+        {/* SUBMIT */}
         <div className="form-actions">
           <button
             type="submit"
