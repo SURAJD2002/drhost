@@ -5662,7 +5662,7 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { supabase } from '../supabaseClient';
 import { Toaster, toast } from 'react-hot-toast';
 import { LocationContext } from '../App';
-import { useEnhancedNavigation } from '../hooks/scrollManager';
+import { useEnhancedNavigation } from '../hooks/useEnhancedNavigation';
 import '../style/ProductPage.css';
 import { Helmet } from 'react-helmet-async';
 import icon from '../assets/icon.png';
@@ -6620,11 +6620,21 @@ function ProductPage() {
                     key={v.id}
                     className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
                     onClick={() => setSelectedVariantIndex(v.index)}
-                    aria-label={`Select variant: ${v.attributes}`}
+                    aria-label={`Select variant: ${typeof v.attributes === 'object' 
+                      ? Object.entries(v.attributes || {})
+                          .filter(([key, val]) => val && val.toString().trim())
+                          .map(([key, val]) => `${key}: ${val}`)
+                          .join(', ')
+                      : v.attributes || 'Default'}`}
                     role="radio"
                     aria-checked={v.index === selectedVariantIndex}
                   >
-                    {v.attributes}
+                    {typeof v.attributes === 'object' 
+                      ? Object.entries(v.attributes || {})
+                          .filter(([key, val]) => val && val.toString().trim())
+                          .map(([key, val]) => `${key}: ${val}`)
+                          .join(', ')
+                      : v.attributes || 'Default'}
                   </button>
                 ))}
               </div>
