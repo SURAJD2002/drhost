@@ -29,9 +29,17 @@ export const useScrollRestoration = () => {
 
   // Restore scroll position for given route
   const restoreScrollPosition = useCallback((pathname) => {
+    // Skip scroll restoration for product pages to prevent blinking
+    if (pathname.startsWith('/product/')) {
+      return false;
+    }
+
     const savedPosition = scrollPositions.current.get(pathname);
     if (savedPosition) {
-      window.scrollTo(0, savedPosition);
+      // Use requestAnimationFrame to prevent blinking
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: savedPosition, behavior: 'smooth' });
+      });
       return true;
     }
 
@@ -40,7 +48,9 @@ export const useScrollRestoration = () => {
       const savedPositions = JSON.parse(sessionStorage.getItem('scrollPositions') || '{}');
       const position = savedPositions[pathname];
       if (position) {
-        window.scrollTo(0, position);
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: position, behavior: 'smooth' });
+        });
         scrollPositions.current.set(pathname, position);
         return true;
       }

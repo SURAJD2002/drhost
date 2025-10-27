@@ -33,6 +33,66 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Prevent layout shifts and blinking */
+.product-page-container {
+  min-height: 100vh;
+  contain: layout style;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--background-main);
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Prevent scroll restoration blinking */
+.product-page-container {
+  scroll-behavior: smooth;
+  will-change: auto;
+}
+
+/* Ensure smooth transitions */
+.product-page-container * {
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Prevent blinking during state changes */
+.product-page-container {
+  opacity: 1;
+  visibility: visible;
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden;
+}
+
+/* Loading state optimization */
+.loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  background: var(--background-main);
+  opacity: 1;
+  transition: opacity 0.5s ease-in-out;
+  will-change: opacity;
+}
+
+/* Smooth transition to content */
+.product-page-container {
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
+  will-change: opacity;
+}
+
+.product-page-container.loaded {
+  opacity: 1;
+}
+
 body {
   background-color: var(--background-main);
 }
@@ -1339,5 +1399,69 @@ body {
     height: 140px;
     object-fit: contain;
     background-color: var(--background-section);
+  }
+}
+.td-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: var(--background-color, #f8f9fa);
+}
+
+.td-loading-animation {
+  text-align: center;
+}
+
+.td-loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.td-loading-icon {
+  font-size: 48px;
+  color: var(--primary-color, #007bff);
+  animation: spin 2s linear infinite;
+}
+
+.td-loading-dots {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.td-loading-dots span {
+  font-size: 24px;
+  animation: blink 1.4s infinite both;
+}
+
+.td-loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.td-loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes blink {
+  0% {
+    opacity: 0.2;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.2;
   }
 }

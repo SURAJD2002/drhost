@@ -73,3 +73,4 @@ SELECT * FROM public.get_nearby_products(23.7407, 86.4146) LIMIT 3;
 
 
 
+

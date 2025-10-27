@@ -26,7 +26,8 @@ export const useEnhancedNavigation = () => {
   const navigateToProduct = (productId, fromRoute = null) => {
     const state = {
       fromRoute: fromRoute || location.pathname,
-      navigationType: 'product-view'
+      navigationType: 'product-view',
+      disableScrollRestore: true // Disable scroll restoration for product pages
     };
     navigateWithState(`/product/${productId}`, { state });
   };

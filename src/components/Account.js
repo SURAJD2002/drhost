@@ -11426,9 +11426,9 @@ function Account() {
           <p className="td-support-text">
             Contact us at{' '}
             <a href="mailto:support@justorder.com" className="td-policy-link">
-              support@justorder.com
+              support@markeet.com
             </a>{' '}
-            or call 8825287284 (Sunil Rawani) for assistance.{' '}
+            or call 8825287284 (Markeet Team) for assistance.{' '}
             <a href="https://wa.me/918825287284" target="_blank" rel="noopener noreferrer" className="td-whatsapp-link">
               WhatsApp us
             </a>
