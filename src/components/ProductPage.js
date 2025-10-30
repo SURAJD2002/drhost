@@ -12672,8 +12672,1295 @@
 
 
 
+// import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
+// import { useParams, useLocation, Link } from 'react-router-dom';
+// import Slider from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+// import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+// import { supabase } from '../supabaseClient';
+// import { Toaster, toast } from 'react-hot-toast';
+// import { LocationContext } from '../App';
+// import { useEnhancedNavigation } from '../hooks/scrollManager';
+// import '../style/ProductPage.css';
+// import { Helmet } from 'react-helmet-async';
+// import { FaShoppingCart, FaCrown } from 'react-icons/fa';
+// import { getPriceDisplayInfo, formatPrice } from '../utils/priceUtils';
+
+// // Constants
+// const DEFAULT_IMAGE = 'https://dummyimage.com/300';
+// const FULLSCREEN_DEFAULT_IMAGE = 'https://dummyimage.com/1200x800';
+// const CACHE_KEY = 'relatedCache';
+// const TOAST_STYLES = {
+//   error: {
+//     background: '#ff4d4f',
+//     color: '#fff',
+//     fontWeight: '500',
+//     borderRadius: 'var(--border-radius)',
+//     padding: 'calc(var(--spacing-unit) * 2)',
+//   },
+//   success: {
+//     background: '#10b981',
+//     color: '#fff',
+//     fontWeight: '500',
+//     borderRadius: 'var(--border-radius)',
+//     padding: 'calc(var(--spacing-unit) * 2)',
+//   },
+//   loading: {
+//     background: '#3b82f6',
+//     color: '#fff',
+//     fontWeight: '500',
+//     borderRadius: 'var(--border-radius)',
+//     padding: 'calc(var(--spacing-unit) * 2)',
+//   },
+// };
+// const TOAST_DURATION = 4000;
+// const MAX_LOCATION_RETRIES = 3;
+// const MIN_LOADING_DURATION = 500;
+// const DEFAULT_DELIVERY_RADIUS = 40;
+
+// // Utility Functions
+// const formatCurrency = (value) => formatPrice(value);
+
+// const calculateDistance = (userLoc, sellerLoc) => {
+//   if (
+//     !userLoc?.lat ||
+//     !userLoc?.lon ||
+//     !sellerLoc?.latitude ||
+//     !sellerLoc?.longitude ||
+//     sellerLoc.latitude === 0 ||
+//     sellerLoc.longitude === 0
+//   ) {
+//     return null;
+//   }
+//   const R = 6371; // Earth's radius in km
+//   const dLat = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
+//   const dLon = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
+//   const a =
+//     Math.sin(dLat / 2) ** 2 +
+//     Math.cos(userLoc.lat * (Math.PI / 180)) *
+//       Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
+//       Math.sin(dLon / 2) ** 2;
+//   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+//   return parseFloat((R * c).toFixed(2));
+// };
+
+// const shuffleArray = (array) => {
+//   const result = [...array];
+//   for (let i = result.length - 1; i > 0; i--) {
+//     const j = Math.floor(Math.random() * (i + 1));
+//     [result[i], result[j]] = [result[j], result[i]];
+//   }
+//   return result;
+// };
+
+// const safeParseJSON = (key, defaultValue) => {
+//   const item = localStorage.getItem(key);
+//   if (item === null || item === 'undefined') {
+//     return defaultValue;
+//   }
+//   try {
+//     return JSON.parse(item) || defaultValue;
+//   } catch (err) {
+//     return defaultValue;
+//   }
+// };
+
+// const formatSpecValue = (value) => {
+//   if (value === null || value === undefined) return 'N/A';
+//   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+//     return String(value);
+//   }
+//   if (typeof value === 'object') {
+//     return JSON.stringify(value, null, 2).replace(/[{}[\]]/g, '').trim();
+//   }
+//   return 'N/A';
+// };
+
+// // Error Boundary Component
+// class ErrorBoundary extends React.Component {
+//   state = { hasError: false, error: null };
+
+//   static getDerivedStateFromError(error) {
+//     return { hasError: true, error };
+//   }
+
+//   render() {
+//     if (this.state.hasError) {
+//       return (
+//         <div className="error" role="alert" aria-live="assertive">
+//           <h2>Something went wrong</h2>
+//           <p>{this.state.error?.message || 'An unexpected error occurred.'}</p>
+//           <div className="error-actions">
+//             <button
+//               onClick={() => window.location.reload()}
+//               className="retry-btn"
+//               aria-label="Retry loading page"
+//             >
+//               Retry
+//             </button>
+//             <button
+//               onClick={() => window.location.href = '/products'}
+//               className="back-btn"
+//               aria-label="Go to products"
+//             >
+//               Browse Products
+//             </button>
+//           </div>
+//         </div>
+//       );
+//     }
+//     return this.props.children;
+//   }
+// }
+
+// // StarRatingDisplay Component
+// const StarRatingDisplay = React.memo(({ rating = 0 }) => (
+//   <div className="star-rating-display" aria-label={`Rating: ${rating.toFixed(1)} out of 5`}>
+//     {[1, 2, 3, 4, 5].map((star) => (
+//       <span
+//         key={star}
+//         className={`star ${star <= Math.round(rating) ? 'filled' : ''}`}
+//         aria-hidden="true"
+//       >
+//         ★
+//       </span>
+//     ))}
+//   </div>
+// ));
+
+// function ProductPage() {
+//   const { id } = useParams();
+//   const location = useLocation();
+//   const { navigate, goBack: navigateBack, navigateToCategory } = useEnhancedNavigation();
+//   const { buyerLocation, setBuyerLocation } = useContext(LocationContext);
+
+//   // State
+//   const [product, setProduct] = useState(null);
+//   const [variants, setVariants] = useState([]);
+//   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+//   const [error, setError] = useState(null);
+//   const [loading, setLoading] = useState(true);
+//   const [locationLoading, setLocationLoading] = useState(false);
+//   const [locationRetries, setLocationRetries] = useState(0);
+//   const [reviews, setReviews] = useState([]);
+//   const [relatedProducts, setRelatedProducts] = useState([]);
+//   const [isRelatedLoading, setIsRelatedLoading] = useState(false);
+//   const [cart, setCart] = useState(() => safeParseJSON('cart', []));
+//   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
+//   const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
+//   const [imageLoadingStates, setImageLoadingStates] = useState({});
+//   const [isRestricted, setIsRestricted] = useState(false);
+//   const fullScreenSliderRef = useRef(null);
+
+//   // Memoized Values
+//   const getActiveVariant = useMemo(
+//     () =>
+//       variants.length > 0 && selectedVariantIndex >= 0 && selectedVariantIndex < variants.length
+//         ? variants[selectedVariantIndex]
+//         : null,
+//     [variants, selectedVariantIndex]
+//   );
+
+//   const getDisplayedImages = useMemo(() => {
+//     const productImages = product?.images || [];
+//     const variantImages = getActiveVariant?.images || [];
+//     const mergedImages = [...new Set([...productImages, ...variantImages])];
+//     return mergedImages.length > 0 ? mergedImages : [DEFAULT_IMAGE];
+//   }, [product?.images, getActiveVariant]);
+
+//   const isOutOfStock = useMemo(() => {
+//     const stock = getActiveVariant?.stock ?? product?.stock ?? 0;
+//     return stock <= 0;
+//   }, [product?.stock, getActiveVariant]);
+
+//   const isLowStock = useMemo(() => {
+//     const stock = getActiveVariant?.stock ?? product?.stock ?? 0;
+//     return stock > 0 && stock < 5;
+//   }, [product?.stock, getActiveVariant]);
+
+//   const getPriceInfo = useMemo(() => {
+//     const item = getActiveVariant || product;
+//     if (!item) return null;
+//     return getPriceDisplayInfo(item);
+//   }, [product, getActiveVariant]);
+
+//   const averageRating = useMemo(() => {
+//     return reviews.length > 0
+//       ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+//       : 0;
+//   }, [reviews]);
+
+//   const variantAttributes = useMemo(() =>
+//     variants
+//       .map((v, index) => ({
+//         id: v.id,
+//         index,
+//         attributes: Object.entries(v.attributes || {})
+//           .filter(([key, val]) => val && val.toString().trim() && key !== 'attribute1')
+//           .map(([key, val]) => `${key}: ${val}`)
+//           .join(', '),
+//       }))
+//       .filter((v) => v.attributes),
+//     [variants]
+//   );
+
+//   // Callbacks
+//   const checkNetworkStatus = useCallback(() => {
+//     if (!navigator.onLine) {
+//       toast.error('No internet connection. Please check your network.', {
+//         duration: TOAST_DURATION,
+//         position: 'top-center',
+//         style: TOAST_STYLES.error,
+//       });
+//       return false;
+//     }
+//     return true;
+//   }, []);
+
+//   const retryLocationDetection = useCallback(() => {
+//     if (locationLoading || locationRetries >= MAX_LOCATION_RETRIES) {
+//       if (locationRetries >= MAX_LOCATION_RETRIES) {
+//         const defaultLocation = { lat: 12.9716, lon: 77.5946 };
+//         setBuyerLocation(defaultLocation);
+//         setLocationLoading(false);
+//         setLocationRetries(0);
+//         try {
+//           localStorage.setItem('buyerLocation', JSON.stringify(defaultLocation));
+//         } catch (err) {
+//         }
+//         toast.error('Maximum location attempts reached. Using default location (Bengaluru).', {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//       }
+//       return;
+//     }
+
+//     setLocationLoading(true);
+//     setLocationRetries((prev) => prev + 1);
+
+//     if (navigator.geolocation) {
+//       navigator.geolocation.getCurrentPosition(
+//         (position) => {
+//           const detectedLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
+//           setBuyerLocation(detectedLocation);
+//           setLocationLoading(false);
+//           setLocationRetries(0);
+//           try {
+//             localStorage.setItem('buyerLocation', JSON.stringify(detectedLocation));
+//           } catch (err) {
+//           }
+//         },
+//         (error) => {
+//           const defaultLocation = { lat: 12.9716, lon: 77.5946 };
+//           setBuyerLocation(defaultLocation);
+//           setLocationLoading(false);
+//           try {
+//             localStorage.setItem('buyerLocation', JSON.stringify(defaultLocation));
+//           } catch (err) {
+//           }
+//           toast.error(`Location detection failed: ${error.message}. Using default location (Bengaluru).`, {
+//             duration: TOAST_DURATION,
+//             position: 'top-center',
+//             style: TOAST_STYLES.error,
+//           });
+//         },
+//         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+//       );
+//     } else {
+//       const defaultLocation = { lat: 12.9716, lon: 77.5946 };
+//       setBuyerLocation(defaultLocation);
+//       setLocationLoading(false);
+//       try {
+//         localStorage.setItem('buyerLocation', JSON.stringify(defaultLocation));
+//       } catch (err) {
+//       }
+//       toast.error('Geolocation not supported. Using default location (Bengaluru).', {
+//         duration: TOAST_DURATION,
+//         position: 'top-center',
+//         style: TOAST_STYLES.error,
+//       });
+//     }
+//   }, [locationRetries, setBuyerLocation]);
+
+//   const fetchProductReviews = useCallback(async (productId) => {
+//     try {
+//       const { data: reviewsData, error: reviewsError } = await supabase
+//         .from('reviews')
+//         .select(`
+//           id, rating, review_text, reply_text, created_at,
+//           profiles!reviews_reviewer_id_fkey(full_name)
+//         `)
+//         .eq('product_id', productId)
+//         .order('created_at', { ascending: false });
+//       if (reviewsError) throw new Error(`Reviews fetch error: ${reviewsError.message}`);
+
+//       return (reviewsData || []).map((review) => ({
+//         ...review,
+//         reviewer_name: review.profiles?.full_name || 'Anonymous',
+//       }));
+//     } catch (err) {
+//       toast.error('Failed to load reviews. Please try again later.', {
+//         duration: TOAST_DURATION,
+//         position: 'top-center',
+//         style: TOAST_STYLES.error,
+//       });
+//       return [];
+//     }
+//   }, []);
+
+//   const fetchProductAndVariants = useCallback(async () => {
+//     if (!checkNetworkStatus()) {
+//       setError('No internet connection.');
+//       setLoading(false);
+//       return;
+//     }
+
+//     if (!id || isNaN(parseInt(id, 10))) {
+//       setError('Invalid product ID.');
+//       setLoading(false);
+//       toast.error('Invalid product ID.', {
+//         duration: TOAST_DURATION,
+//         position: 'top-center',
+//         style: TOAST_STYLES.error,
+//       });
+//       navigate('/products');
+//       return;
+//     }
+
+//     if (!buyerLocation?.lat || !buyerLocation?.lon) {
+//       retryLocationDetection();
+//       return;
+//     }
+
+//     setLoading(true);
+//     setError(null);
+//     const startTime = Date.now();
+
+//     try {
+//       const { data: productData, error: productError } = await supabase
+//         .from('products')
+//         .select(`
+//           id, title, description, price, original_price, discount_amount, images, stock, status,
+//           delivery_radius_km, latitude, longitude, specifications, seller_id,
+//           sellers(id, store_name, latitude, longitude),
+//           categories(id, name, is_restricted, max_delivery_radius_km)
+//         `)
+//         .eq('id', parseInt(id, 10))
+//         .eq('is_approved', true)
+//         .eq('status', 'active')
+//         .is('deleted_at', null)
+//         .maybeSingle();
+//       if (productError) throw new Error(`Product fetch error: ${productError.message}`);
+//       if (!productData) {
+//         throw new Error('Product not found.');
+//       }
+
+//       const distance = calculateDistance(buyerLocation, {
+//         latitude: productData.sellers?.latitude || productData.latitude,
+//         longitude: productData.sellers?.longitude || productData.longitude,
+//       });
+//       const effectiveRadius = productData.delivery_radius_km || productData.categories?.max_delivery_radius_km || DEFAULT_DELIVERY_RADIUS;
+//       if (distance === null || distance > effectiveRadius) {
+//         setError(`Product not available in your area (${distance?.toFixed(2) || 'unknown'} km > ${effectiveRadius} km).`);
+//         toast.error(`Product not available in your area.`, {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//         navigate('/products');
+//         return;
+//       }
+
+//       // Restricted products should behave normally on product page; no blocking or special toasts
+
+//       const normalizedSpecifications = {};
+//       if (productData.specifications && typeof productData.specifications === 'object') {
+//         Object.entries(productData.specifications).forEach(([key, value]) => {
+//           normalizedSpecifications[key] = formatSpecValue(value);
+//         });
+//       }
+
+//       const normalizedProduct = {
+//         ...productData,
+//         price: parseFloat(productData.price) || parseFloat(productData.original_price - (productData.discount_amount || 0)) || 0,
+//         original_price: parseFloat(productData.original_price) || null,
+//         discount_amount: parseFloat(productData.discount_amount) || 0,
+//         category_name: productData.categories?.name || 'Unknown Category',
+//         category_id: productData.categories?.id || null,
+//         images: Array.isArray(productData.images) ? productData.images : [productData.images].filter(Boolean) || [DEFAULT_IMAGE],
+//         specifications: normalizedSpecifications,
+//       };
+//       setProduct(normalizedProduct);
+//       setIsRestricted(productData.categories?.is_restricted || false);
+
+//       const { data: variantData, error: variantError } = await supabase
+//         .from('product_variants')
+//         .select('id, product_id, price, original_price, discount_amount, stock, attributes, images, status')
+//         .eq('product_id', parseInt(id, 10))
+//         .eq('status', 'active')
+//         .is('deleted_at', null);
+//       if (variantError) throw new Error(`Variants fetch error: ${variantError.message}`);
+
+//       const validVariants = (variantData || [])
+//         .map((variant) => ({
+//           ...variant,
+//           price: parseFloat(variant.price) || 0,
+//           original_price: parseFloat(variant.original_price) || null,
+//           discount_amount: parseFloat(variant.discount_amount) || 0,
+//           stock: variant.stock ?? 0,
+//           images: Array.isArray(variant.images) ? variant.images : [variant.images].filter(Boolean) || normalizedProduct.images,
+//         }))
+//         .filter((variant) => {
+//           const attributes = variant.attributes || {};
+//           return Object.values(attributes).some((val) => val && val.toString().trim());
+//         });
+//       setVariants(validVariants);
+//       setSelectedVariantIndex(validVariants.length > 0 ? 0 : -1);
+
+//       const reviewsData = await fetchProductReviews(parseInt(id, 10));
+//       setReviews(reviewsData);
+
+//       const elapsed = Date.now() - startTime;
+//       const remaining = MIN_LOADING_DURATION - elapsed;
+//       if (remaining > 0) {
+//         await new Promise((resolve) => setTimeout(resolve, remaining));
+//       }
+//     } catch (err) {
+//       setError(err.message || 'Failed to load product.');
+//       toast.error(err.message || 'Failed to load product.', {
+//         duration: TOAST_DURATION,
+//         position: 'top-center',
+//         style: TOAST_STYLES.error,
+//       });
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [id, buyerLocation, fetchProductReviews, navigate, navigateToCategory, location.state, checkNetworkStatus, retryLocationDetection, locationLoading]);
+
+//   const fetchRelatedProducts = useCallback(
+//     async (currentProduct, retryCount = 0) => {
+//       if (!currentProduct?.id || !currentProduct.category_id || !checkNetworkStatus()) {
+//         setRelatedProducts([]);
+//         setIsRelatedLoading(false);
+//         return;
+//       }
+
+//       if (!buyerLocation?.lat || !buyerLocation?.lon) {
+//         setRelatedProducts([]);
+//         setIsRelatedLoading(false);
+//         toast.error('Location required to show related products. Please enable location or retry.', {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//         retryLocationDetection();
+//         return;
+//       }
+
+//       setIsRelatedLoading(true);
+//       const cacheKey = `${currentProduct.id}-${currentProduct.category_id}-${Math.round(buyerLocation.lat * 1000) / 1000}-${Math.round(buyerLocation.lon * 1000) / 1000}`;
+//       const relatedCache = safeParseJSON(CACHE_KEY, {});
+
+//       if (relatedCache[cacheKey]) {
+//         setRelatedProducts(shuffleArray(relatedCache[cacheKey]));
+//         setIsRelatedLoading(false);
+//         return;
+//       }
+
+//       try {
+//         const { data: nonRestrictedCategories, error: categoryError } = await supabase
+//           .from('categories')
+//           .select('id')
+//           .eq('is_restricted', false);
+//         if (categoryError) throw new Error(`Category fetch error: ${categoryError.message}`);
+//         const nonRestrictedCategoryIds = nonRestrictedCategories.map((cat) => cat.id);
+
+//         const isCategoryRestricted = !nonRestrictedCategoryIds.includes(currentProduct.category_id);
+//         if (isCategoryRestricted && !location.state?.fromCategories) {
+//           setRelatedProducts([]);
+//           setIsRelatedLoading(false);
+//           return;
+//         }
+
+//         const { data: relatedData, error: relatedError } = await supabase
+//           .from('products')
+//           .select(`
+//             id, title, price, original_price, discount_amount, images, seller_id, category_id,
+//             delivery_radius_km, categories(name, max_delivery_radius_km),
+//             sellers(latitude, longitude)
+//           `)
+//           .eq('category_id', currentProduct.category_id)
+//           .neq('id', currentProduct.id)
+//           .eq('is_approved', true)
+//           .eq('status', 'active')
+//           .is('deleted_at', null)
+//           .limit(10);
+//         if (relatedError) throw new Error(`Related products fetch error: ${relatedError.message}`);
+
+//         if (!relatedData || relatedData.length === 0) {
+//           setRelatedProducts([]);
+//           setIsRelatedLoading(false);
+//           return;
+//         }
+
+//         const validRelatedData = relatedData.filter((item) => item.category_id != null);
+//         let categoryData = [];
+//         if (validRelatedData.some((item) => !item.categories?.max_delivery_radius_km)) {
+//           const categoryIds = [...new Set(validRelatedData.map((item) => item.category_id))];
+//           const { data: fetchedCategoryData, error: catDataError } = await supabase
+//             .from('categories')
+//             .select('id, max_delivery_radius_km')
+//             .in('id', categoryIds);
+//           if (catDataError) throw new Error(`Category data fetch error: ${catDataError.message}`);
+//           categoryData = fetchedCategoryData || [];
+//         }
+
+//         const normalized = validRelatedData
+//           .map((item) => {
+//             const seller = item.sellers || {};
+//             const maxDeliveryRadius =
+//               item.categories?.max_delivery_radius_km ||
+//               categoryData.find((c) => c.id === item.category_id)?.max_delivery_radius_km ||
+//               DEFAULT_DELIVERY_RADIUS;
+//             const distance = calculateDistance(buyerLocation, {
+//               latitude: seller.latitude || item.latitude,
+//               longitude: seller.longitude || item.longitude,
+//             });
+//             return {
+//               ...item,
+//               price: parseFloat(item.price) || parseFloat(item.original_price - (item.discount_amount || 0)) || 0,
+//               original_price: parseFloat(item.original_price) || null,
+//               discount_amount: parseFloat(item.discount_amount) || 0,
+//               category_name: item.categories?.name || 'Unknown Category',
+//               images: Array.isArray(item.images) ? item.images : [item.images].filter(Boolean) || [DEFAULT_IMAGE],
+//               deliveryRadius: maxDeliveryRadius,
+//               distance: distance != null ? parseFloat(distance.toFixed(2)) : null,
+//             };
+//           })
+//           .filter((item) => {
+//             if (item.id === currentProduct.id) return false;
+//             const effectiveRadius = currentProduct.delivery_radius_km || currentProduct.categories?.max_delivery_radius_km || DEFAULT_DELIVERY_RADIUS;
+//             return item.distance != null && item.distance <= effectiveRadius && !(isCategoryRestricted && !location.state?.fromCategories);
+//           });
+
+//         const shuffled = shuffleArray(normalized).slice(0, 8);
+//         relatedCache[cacheKey] = shuffled;
+//         try {
+//           localStorage.setItem(CACHE_KEY, JSON.stringify(relatedCache));
+//         } catch (err) {
+//         }
+//         setRelatedProducts(shuffled);
+//       } catch (err) {
+//         if (retryCount < 2) {
+//           setTimeout(() => fetchRelatedProducts(currentProduct, retryCount + 1), 1000);
+//           return;
+//         }
+//         toast.error('Unable to load related products.', {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//         setRelatedProducts([]);
+//       } finally {
+//         setIsRelatedLoading(false);
+//       }
+//     },
+//     [checkNetworkStatus, buyerLocation, location.state, retryLocationDetection]
+//   );
+
+//   const handleImageClick = useCallback(
+//     (index) => {
+//       setFullScreenImageIndex(index);
+//       setIsFullScreenOpen(true);
+//       setImageLoadingStates((prev) => ({ ...prev, [index]: true }));
+//       const images = getDisplayedImages;
+//       const preloadIndices = [
+//         index,
+//         index === 0 ? images.length - 1 : index - 1,
+//         index === images.length - 1 ? 0 : index + 1,
+//       ];
+//       preloadIndices.forEach((i) => {
+//         const img = new Image();
+//         img.src = images[i];
+//       });
+//     },
+//     [getDisplayedImages]
+//   );
+
+//   const handleCloseFullScreen = useCallback(() => {
+//     setIsFullScreenOpen(false);
+//     setImageLoadingStates({});
+//   }, []);
+
+//   const handleKeyDown = useCallback(
+//     (e) => {
+//       if (!isFullScreenOpen) return;
+//       if (e.key === 'Escape') handleCloseFullScreen();
+//       else if (e.key === 'ArrowLeft') fullScreenSliderRef.current?.slickPrev();
+//       else if (e.key === 'ArrowRight') fullScreenSliderRef.current?.slickNext();
+//     },
+//     [isFullScreenOpen, handleCloseFullScreen]
+//   );
+
+//   const addToCart = useCallback(
+//     async (redirectToCart = false) => {
+//       if (!product || isOutOfStock) {
+//         toast.error(isOutOfStock ? 'This item is out of stock.' : 'Product not available.', {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//         return;
+//       }
+//       // Restricted products behave normally; no blocking
+
+//       const activeVariant = getActiveVariant;
+//       const variantId = activeVariant ? activeVariant.id : null;
+
+//       if (variantId != null && !Number.isInteger(variantId)) {
+//         toast.error('Invalid variant selection.', {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//         return;
+//       }
+
+//       const cartItem = {
+//         id: product.id,
+//         cartId: null,
+//         title: product.title || product.name || 'Product',
+//         selectedVariant: activeVariant ? { ...activeVariant } : null,
+//         variantId,
+//         price: activeVariant?.price || product.price,
+//         original_price: activeVariant?.original_price || product.original_price || null,
+//         discount_amount: activeVariant?.discount_amount || product.discount_amount || 0,
+//         images: getDisplayedImages,
+//         stock: activeVariant?.stock ?? product.stock,
+//         quantity: 1,
+//         uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
+//       };
+
+//       try {
+//         const { data: { session } } = await supabase.auth.getSession();
+//         let updatedCart = [...cart];
+
+//         if (session) {
+//           const userId = session.user.id;
+//           let query = supabase
+//             .from('cart')
+//             .select('id, quantity')
+//             .eq('user_id', userId)
+//             .eq('product_id', product.id);
+
+//           if (variantId != null) query = query.eq('variant_id', variantId);
+//           else query = query.is('variant_id', null);
+
+//           const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
+//           if (fetchError && fetchError.code !== 'PGRST116') {
+//             throw new Error('Failed to check cart');
+//           }
+
+//           const newQuantity = (existingCartItem?.quantity || 0) + 1;
+//           if (newQuantity > cartItem.stock) {
+//             toast.error('Exceeds available stock.', {
+//               duration: TOAST_DURATION,
+//               position: 'top-center',
+//               style: TOAST_STYLES.error,
+//             });
+//             return;
+//           }
+
+//           if (existingCartItem) {
+//             const { data, error: upsertError } = await supabase
+//               .from('cart')
+//               .update({ quantity: newQuantity })
+//               .eq('id', existingCartItem.id)
+//               .select()
+//               .single();
+//             if (upsertError) throw new Error('Failed to update cart');
+//             cartItem.cartId = data.id;
+//           } else {
+//             const { data, error: insertError } = await supabase
+//               .from('cart')
+//               .insert({
+//                 user_id: userId,
+//                 product_id: product.id,
+//                 variant_id: variantId,
+//                 quantity: 1,
+//                 price: cartItem.price,
+//                 title: cartItem.title,
+//               })
+//               .select()
+//               .single();
+//             if (insertError) throw new Error('Failed to add to cart');
+//             cartItem.cartId = data.id;
+//           }
+//         }
+
+//         const existingLocalItemIndex = cart.findIndex((item) => item.uniqueKey === cartItem.uniqueKey);
+//         if (existingLocalItemIndex !== -1) {
+//           updatedCart = cart.map((item, index) =>
+//             index === existingLocalItemIndex
+//               ? { ...item, quantity: item.quantity + 1, cartId: cartItem.cartId }
+//               : item
+//           );
+//         } else {
+//           updatedCart = [...cart, cartItem];
+//         }
+
+//         setCart(updatedCart);
+//         try {
+//           localStorage.setItem('cart', JSON.stringify(updatedCart));
+//         } catch (err) {
+//         }
+//         toast.success(`${cartItem.title} added to cart!`, {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.success,
+//         });
+
+//         if (redirectToCart) {
+//           toast.loading('Redirecting to cart...', {
+//             duration: 2000,
+//             position: 'top-center',
+//             style: TOAST_STYLES.loading,
+//           });
+//           setTimeout(() => navigate('/cart'), 2000);
+//         }
+//       } catch (err) {
+//         toast.error('Failed to add to cart. Please try again.', {
+//           duration: TOAST_DURATION,
+//           position: 'top-center',
+//           style: TOAST_STYLES.error,
+//         });
+//       }
+//     },
+//     [product, cart, navigate, navigateToCategory, isRestricted, location.state, getActiveVariant, getDisplayedImages, isOutOfStock]
+//   );
+
+//   // Effects
+//   useEffect(() => {
+//     const storedLocation = safeParseJSON('buyerLocation', null);
+//     if (storedLocation?.lat && storedLocation?.lon) {
+//       setBuyerLocation(storedLocation);
+//     } else {
+//       retryLocationDetection();
+//     }
+//   }, [setBuyerLocation, retryLocationDetection]);
+
+//   useEffect(() => {
+//     if (!id || !buyerLocation?.lat || !buyerLocation?.lon || locationLoading) {
+//       return;
+//     }
+//     let isMounted = true;
+//     fetchProductAndVariants().then(() => {
+//       if (!isMounted) return;
+//     });
+//     return () => {
+//       isMounted = false;
+//     };
+//   }, [id, buyerLocation, locationLoading, fetchProductAndVariants]);
+
+//   useEffect(() => {
+//     if (product && buyerLocation?.lat && buyerLocation?.lon && !locationLoading) {
+//       fetchRelatedProducts(product);
+//     }
+//   }, [product, buyerLocation, locationLoading, fetchRelatedProducts]);
+
+//   useEffect(() => {
+//     window.addEventListener('keydown', handleKeyDown);
+//     return () => window.removeEventListener('keydown', handleKeyDown);
+//   }, [handleKeyDown]);
+
+//   // Render
+//   const renderContent = () => {
+//     if (loading || locationLoading) {
+//       return (
+//         <div className="td-loading-container">
+//           <div className="td-loading-animation">
+//             <div className="td-loading-box">
+//               <FaShoppingCart className="td-loading-icon" />
+//               <span>Getting your product ready…</span>
+//             </div>
+//             <div className="td-loading-dots">
+//               <span>.</span>
+//               <span>.</span>
+//               <span>.</span>
+//             </div>
+//           </div>
+//         </div>
+//       );
+//     }
+
+//     if (error || !product) {
+//       return (
+//         <div className="error" role="alert" aria-live="assertive">
+//           <h2>Product not found</h2>
+//           <p>{error || 'The requested product could not be loaded.'}</p>
+//           <div className="error-actions">
+//             <button
+//               onClick={retryLocationDetection}
+//               className="retry-btn"
+//               aria-label="Retry location detection"
+//               disabled={locationLoading}
+//             >
+//               Retry Location
+//             </button>
+//             <button
+//               onClick={() => navigate('/products')}
+//               className="back-btn"
+//               aria-label="Back to products"
+//             >
+//               Browse Products
+//             </button>
+//           </div>
+//         </div>
+//       );
+//     }
+
+//     const displayedImages = getDisplayedImages;
+//     const productName = product.title || product.name || 'Product';
+//     const productDescription = product.description?.split(';')[0]?.trim() || `Buy ${productName} on Markeet.`;
+//     const productUrl = `https://www.markeet.com/product/${id}`;
+//     const availability = isOutOfStock ? 'http://schema.org/OutOfStock' : 'http://schema.org/InStock';
+
+//     return (
+//       <div className="product-page-container loaded">
+//         <Helmet>
+//           <title>{`${productName} - Markeet`}</title>
+//           <meta name="description" content={productDescription} />
+//           <meta name="keywords" content={`${productName}, ${product.category_name}, ecommerce, Markeet`} />
+//           <link rel="canonical" href={productUrl} />
+//           <meta property="og:title" content={`${productName} - Markeet`} />
+//           <meta property="og:description" content={productDescription} />
+//           <meta property="og:image" content={displayedImages[0] || DEFAULT_IMAGE} />
+//           <meta property="og:url" content={productUrl} />
+//           <meta property="og:type" content="product" />
+//           <script type="application/ld+json">
+//             {JSON.stringify({
+//               '@context': 'https://schema.org',
+//               '@type': 'Product',
+//               name: productName,
+//               description: productDescription,
+//               image: displayedImages,
+//               category: product.category_name,
+//               offers: {
+//                 '@type': 'Offer',
+//                 price: (getActiveVariant?.price || product.price) / 100,
+//                 priceCurrency: 'INR',
+//                 availability,
+//                 seller: {
+//                   '@type': 'Organization',
+//                   name: product.sellers?.store_name || 'Markeet Seller',
+//                 },
+//               },
+//               aggregateRating: reviews.length > 0
+//                 ? {
+//                     '@type': 'AggregateRating',
+//                     ratingValue: averageRating.toFixed(1),
+//                     reviewCount: reviews.length,
+//                   }
+//                 : null,
+//               review: reviews.map((r) => ({
+//                 '@type': 'Review',
+//                 author: { '@type': 'Person', name: r.reviewer_name },
+//                 reviewRating: { '@type': 'Rating', ratingValue: r.rating },
+//                 reviewBody: r.review_text,
+//                 datePublished: r.created_at,
+//               })),
+//             })}
+//           </script>
+//         </Helmet>
+
+//         <button
+//           onClick={() => {
+//             const state = location.state || {};
+//             if (state.fromCategory && state.categoryId) {
+//               navigateToCategory(`/products?category=${state.categoryId}`, { state: { ...state, fromCategories: true } });
+//             } else {
+//               navigateBack();
+//             }
+//           }}
+//           className="enhanced-back-btn"
+//           aria-label="Back to previous page"
+//         >
+//           ← Back
+//         </button>
+
+//         <div className="main-content">
+//           <div className="product-image-section">
+//             <div className="image-slider-container">
+//               {displayedImages.length > 1 ? (
+//                 <Slider
+//                   dots
+//                   infinite
+//                   speed={500}
+//                   slidesToShow={1}
+//                   slidesToScroll={1}
+//                   arrows
+//                   autoplay={false}
+//                   className="image-slider"
+//                 >
+//                   {displayedImages.map((img, index) => (
+//                     <div key={index} className="slider-image-wrapper">
+//                       <img
+//                         src={img}
+//                         alt={`${productName} ${index + 1}`}
+//                         onClick={() => handleImageClick(index)}
+//                         onError={(e) => (e.target.src = DEFAULT_IMAGE)}
+//                         className="clickable-image"
+//                         role="button"
+//                         tabIndex={0}
+//                         aria-label={`View ${productName} ${index + 1} in full screen`}
+//                         onKeyDown={(e) => e.key === 'Enter' && handleImageClick(index)}
+//                         loading="lazy"
+//                       />
+//                     </div>
+//                   ))}
+//                 </Slider>
+//               ) : (
+//                 <div className="single-image-wrapper">
+//                   <img
+//                     src={displayedImages[0]}
+//                     alt={productName}
+//                     onClick={() => handleImageClick(0)}
+//                     onError={(e) => (e.target.src = DEFAULT_IMAGE)}
+//                     className="clickable-image"
+//                     role="button"
+//                     tabIndex={0}
+//                     aria-label={`View ${productName} in full screen`}
+//                     onKeyDown={(e) => e.key === 'Enter' && handleImageClick(0)}
+//                     loading="lazy"
+//                   />
+//                 </div>
+//               )}
+//             </div>
+//           </div>
+
+//           <div className="product-details-section">
+//             <h1 className="product-title">{productName}</h1>
+//             <div className={`price-section ${getPriceInfo?.hasDiscount ? 'offer-highlight' : ''}`}>
+//               {getPriceInfo?.hasDiscount && <span className="deal-label">Special Offer</span>}
+//               <div className="price-details">
+//                 <span className="current-price">{getPriceInfo?.formattedFinal}</span>
+//                 {getPriceInfo?.hasDiscount && (
+//                   <>
+//                     <span className="original-price">{getPriceInfo?.formattedOriginal}</span>
+//                     <span className="discount">Save {getPriceInfo?.formattedSavings}</span>
+//                   </>
+//                 )}
+//               </div>
+//             </div>
+//             {isLowStock && (
+//               <p className="low-stock-warning" aria-live="polite">
+//                 Hurry! Only {getActiveVariant?.stock || product.stock} left in stock.
+//               </p>
+//             )}
+//             {isOutOfStock && (
+//               <p className="low-stock-warning" aria-live="polite">
+//                 Out of stock
+//               </p>
+//             )}
+//             <ul className="product-highlights">
+//               {product.description?.split(';').filter(Boolean).map((point, index) => (
+//                 <li key={index}>{point.trim()}</li>
+//               )) || <li>No description available.</li>}
+//             </ul>
+//             {variantAttributes.length > 0 && (
+//               <div className="variant-section">
+//                 <h4 id="variant-section-label">Select Variant</h4>
+//                 <div role="radiogroup" aria-labelledby="variant-section-label" className="variant-options">
+//                   {variantAttributes.map((v) => (
+//                     <button
+//                       key={v.id}
+//                       className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
+//                       onClick={() => setSelectedVariantIndex(v.index)}
+//                       aria-label={`Select variant: ${v.attributes || 'Default'}`}
+//                       role="radio"
+//                       aria-checked={v.index === selectedVariantIndex}
+//                       disabled={variants[v.index].stock <= 0}
+//                     >
+//                       {v.attributes || 'Default'}
+//                       {variants[v.index].stock <= 5 && variants[v.index].stock > 0 && (
+//                         <span> (Low stock: {variants[v.index].stock})</span>
+//                       )}
+//                       {variants[v.index].stock === 0 && <span> (Out of stock)</span>}
+//                     </button>
+//                   ))}
+//                 </div>
+//                 {getActiveVariant && (
+//                   <p className="variant-price-info">
+//                     Selected variant price: {formatCurrency(getActiveVariant.price)}
+//                   </p>
+//                 )}
+//               </div>
+//             )}
+//             <div className="action-buttons">
+//               <button
+//                 onClick={() => addToCart(false)}
+//                 className="add-to-cart-button"
+//                 disabled={isOutOfStock}
+//                 aria-label={`Add ${productName} to cart`}
+//               >
+//                 {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+//               </button>
+//               <button
+//                 onClick={() => addToCart(true)}
+//                 className="buy-now-button"
+//                 disabled={isOutOfStock}
+//                 aria-label={`Buy ${productName} now`}
+//               >
+//                 Buy Now
+//               </button>
+//             </div>
+//             <div className="seller-info">
+//               <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
+//               <Link
+//                 to={`/seller/${product.seller_id}`}
+//                 className="seller-link"
+//                 aria-label={`View profile of ${product.sellers?.store_name || 'seller'}`}
+//               >
+//                 View Seller Profile
+//               </Link>
+//             </div>
+//           </div>
+//         </div>
+
+//         {isFullScreenOpen && (
+//           <div
+//             className="full-screen-image"
+//             role="dialog"
+//             aria-label="Full screen viewer"
+//             onClick={handleCloseFullScreen}
+//           >
+//             <div className="full-screen-slider-container" onClick={(e) => e.stopPropagation()}>
+//               <Slider
+//                 ref={fullScreenSliderRef}
+//                 dots={false}
+//                 infinite
+//                 speed={500}
+//                 slidesToShow={1}
+//                 slidesToScroll={1}
+//                 arrows={false}
+//                 initialSlide={fullScreenImageIndex}
+//                 afterChange={setFullScreenImageIndex}
+//               >
+//                 {displayedImages.map((img, index) => (
+//                   <div key={index} className="full-screen-slide">
+//                     <TransformWrapper initialScale={1} minScale={0.5} maxScale={4} wheel={{ step: 0.1 }} pinch={{ step: 5 }}>
+//                       {({ zoomIn, zoomOut, resetTransform }) => (
+//                         <>
+//                           <TransformComponent wrapperClass="transform-wrapper">
+//                             {imageLoadingStates[index] && (
+//                               <div className="image-loading-spinner">
+//                                 <svg className="premium-spinner" viewBox="0 0 50 50" aria-hidden="true">
+//                                   <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
+//                                 </svg>
+//                               </div>
+//                             )}
+//                             <img
+//                               src={img}
+//                               alt={`${productName} ${index + 1}`}
+//                               onError={(e) => (e.target.src = FULLSCREEN_DEFAULT_IMAGE)}
+//                               onLoad={() => setImageLoadingStates((prev) => ({ ...prev, [index]: false }))}
+//                               className="full-screen-image-content"
+//                               loading="eager"
+//                             />
+//                           </TransformComponent>
+//                           <div className="zoom-controls">
+//                             <button className="zoom-btn" onClick={() => zoomIn()} aria-label="Zoom in">
+//                               +
+//                             </button>
+//                             <button className="zoom-btn" onClick={() => zoomOut()} aria-label="Zoom out">
+//                               -
+//                             </button>
+//                             <button className="zoom-btn" onClick={() => resetTransform()} aria-label="Reset zoom">
+//                               ↺
+//                             </button>
+//                           </div>
+//                         </>
+//                       )}
+//                     </TransformWrapper>
+//                   </div>
+//                 ))}
+//               </Slider>
+//               {displayedImages.length > 1 && (
+//                 <>
+//                   <button
+//                     className="full-screen-nav-btn prev"
+//                     onClick={() => fullScreenSliderRef.current?.slickPrev()}
+//                     aria-label="Previous"
+//                   >
+//                     ❮
+//                   </button>
+//                   <button
+//                     className="full-screen-nav-btn next"
+//                     onClick={() => fullScreenSliderRef.current?.slickNext()}
+//                     aria-label="Next"
+//                   >
+//                     ❯
+//                   </button>
+//                   <div className="full-screen-dots">
+//                     {displayedImages.map((_, index) => (
+//                       <button
+//                         key={index}
+//                         className={`full-screen-dot ${index === fullScreenImageIndex ? 'active' : ''}`}
+//                         onClick={() => fullScreenSliderRef.current?.slickGoTo(index)}
+//                         aria-label={`Go to image ${index + 1}`}
+//                         aria-current={index === fullScreenImageIndex}
+//                       />
+//                     ))}
+//                   </div>
+//                 </>
+//               )}
+//             </div>
+//             <button
+//               className="full-screen-close-btn"
+//               onClick={handleCloseFullScreen}
+//               aria-label="Close full screen viewer"
+//             >
+//               ×
+//             </button>
+//           </div>
+//         )}
+
+//         <div className="ratings-reviews-section">
+//           <h3>Ratings & Reviews</h3>
+//           <div className="rating-score">
+//             <StarRatingDisplay rating={averageRating} />
+//             <span className="rating-count">
+//               ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
+//             </span>
+//           </div>
+//           {reviews.length > 0 ? (
+//             reviews.map((review) => (
+//               <div key={review.id} className="review-item">
+//                 <div className="review-header">
+//                   <span className="review-author">{review.reviewer_name}</span>
+//                   <StarRatingDisplay rating={review.rating} />
+//                 </div>
+//                 <p className="review-text">{review.review_text}</p>
+//                 {review.reply_text && <p className="review-reply">Seller Reply: {review.reply_text}</p>}
+//                 <time className="review-date" dateTime={review.created_at}>
+//                   {new Date(review.created_at).toLocaleDateString('en-IN', {
+//                     year: 'numeric',
+//                     month: 'long',
+//                     day: 'numeric',
+//                   })}
+//                 </time>
+//               </div>
+//             ))
+//           ) : (
+//             <p className="no-reviews">No reviews yet.</p>
+//           )}
+//         </div>
+
+//         <div className="specifications-section">
+//           <h3>Specifications</h3>
+//           {product.specifications && Object.keys(product.specifications).length > 0 ? (
+//             <div className="specifications-list">
+//               {Object.entries(product.specifications).map(([key, value], index) => (
+//                 <div key={index} className="spec-item">
+//                   <span className="spec-key" data-full-text={key}>{key}</span>
+//                   <span className="spec-value" data-full-text={value}>{value}</span>
+//                 </div>
+//               ))}
+//             </div>
+//           ) : (
+//             <p className="no-specs">No specifications available.</p>
+//           )}
+//         </div>
+
+//         <div className="related-products-section">
+//           <h3>Related Products</h3>
+//           {isRelatedLoading ? (
+//             <div className="related-products-loading">
+//               <p>Fetching related products...</p>
+//               <div className="related-products-grid">
+//                 {[...Array(4)].map((_, index) => (
+//                   <div key={index} className="related-product-skeleton">
+//                     <div className="skeleton-image" />
+//                     <div className="skeleton-text" />
+//                     <div className="skeleton-text short" />
+//                   </div>
+//                 ))}
+//               </div>
+//             </div>
+//           ) : relatedProducts.length > 0 ? (
+//             <div className="related-products-grid">
+//               {relatedProducts.map((item, index) => (
+//                 <div
+//                   key={item.id}
+//                   className="related-product-card"
+//                   onClick={() => navigate(`/product/${item.id}`, { state: { fromCategories: location.state?.fromCategories } })}
+//                   role="button"
+//                   tabIndex={0}
+//                   onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${item.id}`, { state: { fromCategories: location.state?.fromCategories } })}
+//                   aria-label={`View ${item.title} in ${item.category_name}`}
+//                   style={{ animationDelay: `${index * 0.1}s` }}
+//                 >
+//                   <div className="related-product-image-wrapper">
+//                     {item.discount_amount > 0 && (
+//                       <span className="related-offer-badge">
+//                         <span className="offer-label">Offer!</span>
+//                         Save {formatCurrency(item.discount_amount)}
+//                       </span>
+//                     )}
+//                     <img
+//                       src={item.images?.[0] || DEFAULT_IMAGE}
+//                       alt={item.title}
+//                       onError={(e) => (e.target.src = DEFAULT_IMAGE)}
+//                       className="related-product-image"
+//                       loading="lazy"
+//                     />
+//                   </div>
+//                   <div className="related-product-info">
+//                     <h4 className="related-product-title">{item.title}</h4>
+//                     <div className="related-product-price-section">
+//                       <p className="related-product-price">{formatCurrency(item.price)}</p>
+//                       {item.original_price && item.original_price > item.price && (
+//                         <p className="related-product-original-price">{formatCurrency(item.original_price)}</p>
+//                       )}
+//                     </div>
+//                     <p className="related-product-category">{item.category_name}</p>
+//                     {item.distance != null && (
+//                       <p className="related-product-distance">{item.distance.toFixed(1)} km away</p>
+//                     )}
+//                   </div>
+//                 </div>
+//               ))}
+//             </div>
+//           ) : (
+//             <div className="related-products-empty">
+//               <p className="no-specs">No related products available in your area.</p>
+//               <p className="no-specs-subtitle">Try browsing other categories or check back later.</p>
+//             </div>
+//           )}
+//         </div>
+
+//         <FaCrown className="product-icon premium-icon" aria-label="Markeet Premium" />
+//       </div>
+//     );
+//   };
+
+//   return (
+//     <ErrorBoundary>
+//       <Toaster position="top-center" toastOptions={{ duration: TOAST_DURATION, ariaProps: { role: 'alert', 'aria-live': 'assertive' } }} />
+//       {renderContent()}
+//     </ErrorBoundary>
+//   );
+// }
+
+// export default React.memo(ProductPage);
+
+
+
 import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from 'react';
-import { useParams, useLocation, Link, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
@@ -12681,7 +13968,6 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { supabase } from '../supabaseClient';
 import { Toaster, toast } from 'react-hot-toast';
 import { LocationContext } from '../App';
-import { useEnhancedNavigation } from '../hooks/scrollManager';
 import '../style/ProductPage.css';
 import { Helmet } from 'react-helmet-async';
 import { FaShoppingCart, FaCrown } from 'react-icons/fa';
@@ -12692,27 +13978,8 @@ const DEFAULT_IMAGE = 'https://dummyimage.com/300';
 const FULLSCREEN_DEFAULT_IMAGE = 'https://dummyimage.com/1200x800';
 const CACHE_KEY = 'relatedCache';
 const TOAST_STYLES = {
-  error: {
-    background: '#ff4d4f',
-    color: '#fff',
-    fontWeight: '500',
-    borderRadius: 'var(--border-radius)',
-    padding: 'calc(var(--spacing-unit) * 2)',
-  },
-  success: {
-    background: '#10b981',
-    color: '#fff',
-    fontWeight: '500',
-    borderRadius: 'var(--border-radius)',
-    padding: 'calc(var(--spacing-unit) * 2)',
-  },
-  loading: {
-    background: '#3b82f6',
-    color: '#fff',
-    fontWeight: '500',
-    borderRadius: 'var(--border-radius)',
-    padding: 'calc(var(--spacing-unit) * 2)',
-  },
+  error: { background: '#ff4d4f', color: '#fff', fontWeight: '500', borderRadius: 'var(--border-radius)', padding: 'calc(var(--spacing-unit) * 2)' },
+  success: { background: '#10b981', color: '#fff', fontWeight: '500', borderRadius: 'var(--border-radius)', padding: 'calc(var(--spacing-unit) * 2)' },
 };
 const TOAST_DURATION = 4000;
 const MAX_LOCATION_RETRIES = 3;
@@ -12721,26 +13988,14 @@ const DEFAULT_DELIVERY_RADIUS = 40;
 
 // Utility Functions
 const formatCurrency = (value) => formatPrice(value);
-
 const calculateDistance = (userLoc, sellerLoc) => {
-  if (
-    !userLoc?.lat ||
-    !userLoc?.lon ||
-    !sellerLoc?.latitude ||
-    !sellerLoc?.longitude ||
-    sellerLoc.latitude === 0 ||
-    sellerLoc.longitude === 0
-  ) {
+  if (!userLoc?.lat || !userLoc?.lon || !sellerLoc?.latitude || !sellerLoc?.longitude || sellerLoc.latitude === 0 || sellerLoc.longitude === 0) {
     return null;
   }
-  const R = 6371; // Earth's radius in km
+  const R = 6371;
   const dLat = ((sellerLoc.latitude - userLoc.lat) * Math.PI) / 180;
   const dLon = ((sellerLoc.longitude - userLoc.lon) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(userLoc.lat * (Math.PI / 180)) *
-      Math.cos(sellerLoc.latitude * (Math.PI / 180)) *
-      Math.sin(dLon / 2) ** 2;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(userLoc.lat * (Math.PI / 180)) * Math.cos(sellerLoc.latitude * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return parseFloat((R * c).toFixed(2));
 };
@@ -12756,35 +14011,21 @@ const shuffleArray = (array) => {
 
 const safeParseJSON = (key, defaultValue) => {
   const item = localStorage.getItem(key);
-  if (item === null || item === 'undefined') {
-    return defaultValue;
-  }
-  try {
-    return JSON.parse(item) || defaultValue;
-  } catch (err) {
-    return defaultValue;
-  }
+  if (item === null || item === 'undefined') return defaultValue;
+  try { return JSON.parse(item) || defaultValue; } catch { return defaultValue; }
 };
 
 const formatSpecValue = (value) => {
   if (value === null || value === undefined) return 'N/A';
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
-  if (typeof value === 'object') {
-    return JSON.stringify(value, null, 2).replace(/[{}[\]]/g, '').trim();
-  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') return JSON.stringify(value, null, 2).replace(/[{}[\]]/g, '').trim();
   return 'N/A';
 };
 
-// Error Boundary Component
+// Error Boundary
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
   render() {
     if (this.state.hasError) {
       return (
@@ -12792,20 +14033,8 @@ class ErrorBoundary extends React.Component {
           <h2>Something went wrong</h2>
           <p>{this.state.error?.message || 'An unexpected error occurred.'}</p>
           <div className="error-actions">
-            <button
-              onClick={() => window.location.reload()}
-              className="retry-btn"
-              aria-label="Retry loading page"
-            >
-              Retry
-            </button>
-            <button
-              onClick={() => window.location.href = '/products'}
-              className="back-btn"
-              aria-label="Go to products"
-            >
-              Browse Products
-            </button>
+            <button onClick={() => window.location.reload()} className="retry-btn">Retry</button>
+            <button onClick={() => window.location.href = '/products'} className="back-btn">Browse Products</button>
           </div>
         </div>
       );
@@ -12814,17 +14043,11 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// StarRatingDisplay Component
+// Star Rating
 const StarRatingDisplay = React.memo(({ rating = 0 }) => (
   <div className="star-rating-display" aria-label={`Rating: ${rating.toFixed(1)} out of 5`}>
     {[1, 2, 3, 4, 5].map((star) => (
-      <span
-        key={star}
-        className={`star ${star <= Math.round(rating) ? 'filled' : ''}`}
-        aria-hidden="true"
-      >
-        ★
-      </span>
+      <span key={star} className={`star ${star <= Math.round(rating) ? 'filled' : ''}`}>★</span>
     ))}
   </div>
 ));
@@ -12833,7 +14056,6 @@ function ProductPage() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { navigate: enhancedNavigate, goBack: navigateBack, navigateToCategory = navigate } = useEnhancedNavigation();
   const { buyerLocation, setBuyerLocation } = useContext(LocationContext);
 
   // State
@@ -12851,69 +14073,44 @@ function ProductPage() {
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false);
   const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
   const [imageLoadingStates, setImageLoadingStates] = useState({});
-  const [isRestricted, setIsRestricted] = useState(false);
   const fullScreenSliderRef = useRef(null);
 
   // Memoized Values
-  const getActiveVariant = useMemo(
-    () =>
-      variants.length > 0 && selectedVariantIndex >= 0 && selectedVariantIndex < variants.length
-        ? variants[selectedVariantIndex]
-        : null,
-    [variants, selectedVariantIndex]
-  );
-
+  const getActiveVariant = useMemo(() => variants[selectedVariantIndex] || null, [variants, selectedVariantIndex]);
   const getDisplayedImages = useMemo(() => {
     const productImages = product?.images || [];
     const variantImages = getActiveVariant?.images || [];
-    const mergedImages = [...new Set([...productImages, ...variantImages])];
-    return mergedImages.length > 0 ? mergedImages : [DEFAULT_IMAGE];
+    const merged = [...new Set([...productImages, ...variantImages])];
+    return merged.length > 0 ? merged : [DEFAULT_IMAGE];
   }, [product?.images, getActiveVariant]);
 
-  const isOutOfStock = useMemo(() => {
-    const stock = getActiveVariant?.stock ?? product?.stock ?? 0;
-    return stock <= 0;
-  }, [product?.stock, getActiveVariant]);
-
+  const isOutOfStock = useMemo(() => (getActiveVariant?.stock ?? product?.stock ?? 0) <= 0, [product?.stock, getActiveVariant]);
   const isLowStock = useMemo(() => {
     const stock = getActiveVariant?.stock ?? product?.stock ?? 0;
     return stock > 0 && stock < 5;
   }, [product?.stock, getActiveVariant]);
 
-  const getPriceInfo = useMemo(() => {
-    const item = getActiveVariant || product;
-    if (!item) return null;
-    return getPriceDisplayInfo(item);
-  }, [product, getActiveVariant]);
-
-  const averageRating = useMemo(() => {
-    return reviews.length > 0
-      ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
-      : 0;
-  }, [reviews]);
+  const getPriceInfo = useMemo(() => getPriceDisplayInfo(getActiveVariant || product), [product, getActiveVariant]);
+  const averageRating = useMemo(() => reviews.length > 0 ? reviews.reduce((s, r) => s + (r.rating || 0), 0) / reviews.length : 0, [reviews]);
 
   const variantAttributes = useMemo(() =>
     variants
-      .map((v, index) => ({
+      .map((v, i) => ({
         id: v.id,
-        index,
+        index: i,
         attributes: Object.entries(v.attributes || {})
-          .filter(([key, val]) => val && val.toString().trim() && key !== 'attribute1')
-          .map(([key, val]) => `${key}: ${val}`)
+          .filter(([k, val]) => val && val.toString().trim() && k !== 'attribute1')
+          .map(([k, val]) => `${k}: ${val}`)
           .join(', '),
       }))
-      .filter((v) => v.attributes),
+      .filter(v => v.attributes),
     [variants]
   );
 
   // Callbacks
   const checkNetworkStatus = useCallback(() => {
     if (!navigator.onLine) {
-      toast.error('No internet connection. Please check your network.', {
-        duration: TOAST_DURATION,
-        position: 'top-center',
-        style: TOAST_STYLES.error,
-      });
+      toast.error('No internet connection.', { duration: TOAST_DURATION, style: TOAST_STYLES.error });
       return false;
     }
     return true;
@@ -12922,126 +14119,64 @@ function ProductPage() {
   const retryLocationDetection = useCallback(() => {
     if (locationLoading || locationRetries >= MAX_LOCATION_RETRIES) {
       if (locationRetries >= MAX_LOCATION_RETRIES) {
-        const defaultLocation = { lat: 12.9716, lon: 77.5946 };
-        setBuyerLocation(defaultLocation);
+        const defaultLoc = { lat: 12.9716, lon: 77.5946 };
+        setBuyerLocation(defaultLoc);
         setLocationLoading(false);
         setLocationRetries(0);
-        try {
-          localStorage.setItem('buyerLocation', JSON.stringify(defaultLocation));
-        } catch (err) {
-        }
-        toast.error('Maximum location attempts reached. Using default location (Bengaluru).', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
+        localStorage.setItem('buyerLocation', JSON.stringify(defaultLoc));
+        toast.error('Using default location (Bengaluru).', { style: TOAST_STYLES.error });
       }
       return;
     }
-
     setLocationLoading(true);
-    setLocationRetries((prev) => prev + 1);
-
+    setLocationRetries(p => p + 1);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const detectedLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
-          setBuyerLocation(detectedLocation);
-          setLocationLoading(false);
-          setLocationRetries(0);
-          try {
-            localStorage.setItem('buyerLocation', JSON.stringify(detectedLocation));
-          } catch (err) {
-          }
+        pos => {
+          const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          setBuyerLocation(loc); setLocationLoading(false); setLocationRetries(0);
+          localStorage.setItem('buyerLocation', JSON.stringify(loc));
         },
-        (error) => {
-          const defaultLocation = { lat: 12.9716, lon: 77.5946 };
-          setBuyerLocation(defaultLocation);
-          setLocationLoading(false);
-          try {
-            localStorage.setItem('buyerLocation', JSON.stringify(defaultLocation));
-          } catch (err) {
-          }
-          toast.error(`Location detection failed: ${error.message}. Using default location (Bengaluru).`, {
-            duration: TOAST_DURATION,
-            position: 'top-center',
-            style: TOAST_STYLES.error,
-          });
+        () => {
+          const defaultLoc = { lat: 12.9716, lon: 77.5946 };
+          setBuyerLocation(defaultLoc); setLocationLoading(false);
+          localStorage.setItem('buyerLocation', JSON.stringify(defaultLoc));
+          toast.error('Location failed. Using default (Bengaluru).', { style: TOAST_STYLES.error });
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     } else {
-      const defaultLocation = { lat: 12.9716, lon: 77.5946 };
-      setBuyerLocation(defaultLocation);
-      setLocationLoading(false);
-      try {
-        localStorage.setItem('buyerLocation', JSON.stringify(defaultLocation));
-      } catch (err) {
-      }
-      toast.error('Geolocation not supported. Using default location (Bengaluru).', {
-        duration: TOAST_DURATION,
-        position: 'top-center',
-        style: TOAST_STYLES.error,
-      });
+      const defaultLoc = { lat: 12.9716, lon: 77.5946 };
+      setBuyerLocation(defaultLoc); setLocationLoading(false);
+      localStorage.setItem('buyerLocation', JSON.stringify(defaultLoc));
+      toast.error('Geolocation not supported.', { style: TOAST_STYLES.error });
     }
-  }, [locationRetries, setBuyerLocation]);
+  }, [locationRetries, setBuyerLocation, locationLoading]);
 
   const fetchProductReviews = useCallback(async (productId) => {
     try {
-      const { data: reviewsData, error: reviewsError } = await supabase
+      const { data, error } = await supabase
         .from('reviews')
-        .select(`
-          id, rating, review_text, reply_text, created_at,
-          profiles!reviews_reviewer_id_fkey(full_name)
-        `)
+        .select(`id, rating, review_text, reply_text, created_at, profiles!reviews_reviewer_id_fkey(full_name)`)
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
-      if (reviewsError) throw new Error(`Reviews fetch error: ${reviewsError.message}`);
-
-      return (reviewsData || []).map((review) => ({
-        ...review,
-        reviewer_name: review.profiles?.full_name || 'Anonymous',
-      }));
-    } catch (err) {
-      toast.error('Failed to load reviews. Please try again later.', {
-        duration: TOAST_DURATION,
-        position: 'top-center',
-        style: TOAST_STYLES.error,
-      });
+      if (error) throw error;
+      return (data || []).map(r => ({ ...r, reviewer_name: r.profiles?.full_name || 'Anonymous' }));
+    } catch {
+      toast.error('Failed to load reviews.', { style: TOAST_STYLES.error });
       return [];
     }
   }, []);
 
   const fetchProductAndVariants = useCallback(async () => {
-    if (!checkNetworkStatus()) {
-      setError('No internet connection.');
-      setLoading(false);
-      return;
-    }
+    if (!checkNetworkStatus()) { setError('No internet.'); setLoading(false); return; }
+    if (!id || isNaN(parseInt(id, 10))) { setError('Invalid ID.'); setLoading(false); navigate('/products'); return; }
+    if (!buyerLocation?.lat || !buyerLocation?.lon) { retryLocationDetection(); return; }
 
-    if (!id || isNaN(parseInt(id, 10))) {
-      setError('Invalid product ID.');
-      setLoading(false);
-      toast.error('Invalid product ID.', {
-        duration: TOAST_DURATION,
-        position: 'top-center',
-        style: TOAST_STYLES.error,
-      });
-      navigate('/products');
-      return;
-    }
-
-    if (!buyerLocation?.lat || !buyerLocation?.lon) {
-      retryLocationDetection();
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    const startTime = Date.now();
-
+    setLoading(true); setError(null);
+    const start = Date.now();
     try {
-      const { data: productData, error: productError } = await supabase
+      const { data: productData, error: pErr } = await supabase
         .from('products')
         .select(`
           id, title, description, price, original_price, discount_amount, images, stock, status,
@@ -13054,439 +14189,241 @@ function ProductPage() {
         .eq('status', 'active')
         .is('deleted_at', null)
         .maybeSingle();
-      if (productError) throw new Error(`Product fetch error: ${productError.message}`);
-      if (!productData) {
-        throw new Error('Product not found.');
-      }
+      if (pErr || !productData) throw new Error('Product not found.');
 
       const distance = calculateDistance(buyerLocation, {
         latitude: productData.sellers?.latitude || productData.latitude,
         longitude: productData.sellers?.longitude || productData.longitude,
       });
-      const effectiveRadius = productData.delivery_radius_km || productData.categories?.max_delivery_radius_km || DEFAULT_DELIVERY_RADIUS;
-      if (distance === null || distance > effectiveRadius) {
-        setError(`Product not available in your area (${distance?.toFixed(2) || 'unknown'} km > ${effectiveRadius} km).`);
-        toast.error(`Product not available in your area.`, {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
+      const radius = productData.delivery_radius_km || productData.categories?.max_delivery_radius_km || DEFAULT_DELIVERY_RADIUS;
+      if (distance === null || distance > radius) {
+        setError(`Not available in your area (${distance?.toFixed(2)} km).`);
+        toast.error('Product not available in your area.', { style: TOAST_STYLES.error });
         navigate('/products');
         return;
       }
 
-      if (productData.categories?.is_restricted && !location.state?.fromCategories) {
-        setError('Please access this restricted category via the Categories page.');
-        toast.error('Please access this restricted category via the Categories page.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
-        navigateToCategory('/categories', { state: { fromCategories: true } });
-        return;
-      }
-
-      const normalizedSpecifications = {};
-      if (productData.specifications && typeof productData.specifications === 'object') {
-        Object.entries(productData.specifications).forEach(([key, value]) => {
-          normalizedSpecifications[key] = formatSpecValue(value);
-        });
+      const specs = {};
+      if (productData.specifications) {
+        Object.entries(productData.specifications).forEach(([k, v]) => { specs[k] = formatSpecValue(v); });
       }
 
       const normalizedProduct = {
         ...productData,
-        price: parseFloat(productData.price) || parseFloat(productData.original_price - (productData.discount_amount || 0)) || 0,
+        price: parseFloat(productData.price) || 0,
         original_price: parseFloat(productData.original_price) || null,
         discount_amount: parseFloat(productData.discount_amount) || 0,
-        category_name: productData.categories?.name || 'Unknown Category',
+        category_name: productData.categories?.name || 'Unknown',
         category_id: productData.categories?.id || null,
         images: Array.isArray(productData.images) ? productData.images : [productData.images].filter(Boolean) || [DEFAULT_IMAGE],
-        specifications: normalizedSpecifications,
+        specifications: specs,
       };
       setProduct(normalizedProduct);
-      setIsRestricted(productData.categories?.is_restricted || false);
 
-      const { data: variantData, error: variantError } = await supabase
+      const { data: vData, error: vErr } = await supabase
         .from('product_variants')
         .select('id, product_id, price, original_price, discount_amount, stock, attributes, images, status')
         .eq('product_id', parseInt(id, 10))
         .eq('status', 'active')
         .is('deleted_at', null);
-      if (variantError) throw new Error(`Variants fetch error: ${variantError.message}`);
+      if (vErr) throw vErr;
 
-      const validVariants = (variantData || [])
-        .map((variant) => ({
-          ...variant,
-          price: parseFloat(variant.price) || 0,
-          original_price: parseFloat(variant.original_price) || null,
-          discount_amount: parseFloat(variant.discount_amount) || 0,
-          stock: variant.stock ?? 0,
-          images: Array.isArray(variant.images) ? variant.images : [variant.images].filter(Boolean) || normalizedProduct.images,
+      const validVariants = (vData || [])
+        .map(v => ({
+          ...v,
+          price: parseFloat(v.price) || 0,
+          original_price: parseFloat(v.original_price) || null,
+          discount_amount: parseFloat(v.discount_amount) || 0,
+          stock: v.stock ?? 0,
+          images: Array.isArray(v.images) ? v.images : [v.images].filter(Boolean) || normalizedProduct.images,
         }))
-        .filter((variant) => {
-          const attributes = variant.attributes || {};
-          return Object.values(attributes).some((val) => val && val.toString().trim());
-        });
+        .filter(v => Object.values(v.attributes || {}).some(val => val && val.toString().trim()));
       setVariants(validVariants);
       setSelectedVariantIndex(validVariants.length > 0 ? 0 : -1);
 
-      const reviewsData = await fetchProductReviews(parseInt(id, 10));
-      setReviews(reviewsData);
+      const reviews = await fetchProductReviews(parseInt(id, 10));
+      setReviews(reviews);
 
-      const elapsed = Date.now() - startTime;
-      const remaining = MIN_LOADING_DURATION - elapsed;
-      if (remaining > 0) {
-        await new Promise((resolve) => setTimeout(resolve, remaining));
-      }
+      const elapsed = Date.now() - start;
+      if (elapsed < MIN_LOADING_DURATION) await new Promise(r => setTimeout(r, MIN_LOADING_DURATION - elapsed));
     } catch (err) {
-      setError(err.message || 'Failed to load product.');
-      toast.error(err.message || 'Failed to load product.', {
-        duration: TOAST_DURATION,
-        position: 'top-center',
-        style: TOAST_STYLES.error,
-      });
+      setError(err.message || 'Failed to load.');
+      toast.error(err.message || 'Failed to load.', { style: TOAST_STYLES.error });
     } finally {
       setLoading(false);
     }
-  }, [id, buyerLocation, fetchProductReviews, navigate, navigateToCategory, location.state, checkNetworkStatus, retryLocationDetection, locationLoading]);
+  }, [id, buyerLocation, checkNetworkStatus, retryLocationDetection, fetchProductReviews, navigate]);
 
-  const fetchRelatedProducts = useCallback(
-    async (currentProduct, retryCount = 0) => {
-      if (!currentProduct?.id || !currentProduct.category_id || !checkNetworkStatus()) {
-        setRelatedProducts([]);
-        setIsRelatedLoading(false);
-        return;
-      }
+  const fetchRelatedProducts = useCallback(async (currentProduct) => {
+    if (!currentProduct?.id || !currentProduct.category_id || !checkNetworkStatus()) {
+      setRelatedProducts([]); setIsRelatedLoading(false); return;
+    }
+    if (!buyerLocation?.lat || !buyerLocation?.lon) {
+      setRelatedProducts([]); setIsRelatedLoading(false);
+      toast.error('Location required.', { style: TOAST_STYLES.error });
+      retryLocationDetection(); return;
+    }
 
-      if (!buyerLocation?.lat || !buyerLocation?.lon) {
-        setRelatedProducts([]);
-        setIsRelatedLoading(false);
-        toast.error('Location required to show related products. Please enable location or retry.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
-        retryLocationDetection();
-        return;
-      }
+    setIsRelatedLoading(true);
+    const cacheKey = `${currentProduct.id}-${currentProduct.category_id}-${Math.round(buyerLocation.lat * 1000)}-${Math.round(buyerLocation.lon * 1000)}`;
+    const cache = safeParseJSON(CACHE_KEY, {});
+    if (cache[cacheKey]) { setRelatedProducts(shuffleArray(cache[cacheKey])); setIsRelatedLoading(false); return; }
 
-      setIsRelatedLoading(true);
-      const cacheKey = `${currentProduct.id}-${currentProduct.category_id}-${Math.round(buyerLocation.lat * 1000) / 1000}-${Math.round(buyerLocation.lon * 1000) / 1000}`;
-      const relatedCache = safeParseJSON(CACHE_KEY, {});
+    try {
+      const { data: relatedData } = await supabase
+        .from('products')
+        .select(`
+          id, title, price, original_price, discount_amount, images, seller_id, category_id,
+          delivery_radius_km, categories(name, max_delivery_radius_km), sellers(latitude, longitude)
+        `)
+        .eq('category_id', currentProduct.category_id)
+        .neq('id', currentProduct.id)
+        .eq('is_approved', true)
+        .eq('status', 'active')
+        .is('deleted_at', null)
+        .limit(10);
 
-      if (relatedCache[cacheKey]) {
-        setRelatedProducts(shuffleArray(relatedCache[cacheKey]));
-        setIsRelatedLoading(false);
-        return;
-      }
+      if (!relatedData?.length) { setRelatedProducts([]); setIsRelatedLoading(false); return; }
 
-      try {
-        const { data: nonRestrictedCategories, error: categoryError } = await supabase
-          .from('categories')
-          .select('id')
-          .eq('is_restricted', false);
-        if (categoryError) throw new Error(`Category fetch error: ${categoryError.message}`);
-        const nonRestrictedCategoryIds = nonRestrictedCategories.map((cat) => cat.id);
+      const normalized = relatedData
+        .map(item => {
+          const seller = item.sellers || {};
+          const maxRadius = item.categories?.max_delivery_radius_km || DEFAULT_DELIVERY_RADIUS;
+          const distance = calculateDistance(buyerLocation, { latitude: seller.latitude, longitude: seller.longitude });
+          return {
+            ...item,
+            price: parseFloat(item.price) || 0,
+            original_price: parseFloat(item.original_price) || null,
+            discount_amount: parseFloat(item.discount_amount) || 0,
+            category_name: item.categories?.name || 'Unknown',
+            images: Array.isArray(item.images) ? item.images : [item.images].filter(Boolean) || [DEFAULT_IMAGE],
+            deliveryRadius: maxRadius,
+            distance: distance != null ? parseFloat(distance.toFixed(2)) : null,
+          };
+        })
+        .filter(item => item.distance != null && item.distance <= (currentProduct.delivery_radius_km || DEFAULT_DELIVERY_RADIUS));
 
-        const isCategoryRestricted = !nonRestrictedCategoryIds.includes(currentProduct.category_id);
-        if (isCategoryRestricted && !location.state?.fromCategories) {
-          setRelatedProducts([]);
-          setIsRelatedLoading(false);
+      const shuffled = shuffleArray(normalized).slice(0, 8);
+      cache[cacheKey] = shuffled;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      setRelatedProducts(shuffled);
+    } catch {
+      toast.error('Failed to load related products.', { style: TOAST_STYLES.error });
+      setRelatedProducts([]);
+    } finally {
+      setIsRelatedLoading(false);
+    }
+  }, [checkNetworkStatus, buyerLocation, retryLocationDetection]);
+
+  const handleImageClick = useCallback((index) => {
+    setFullScreenImageIndex(index);
+    setIsFullScreenOpen(true);
+    setImageLoadingStates(prev => ({ ...prev, [index]: true }));
+    const images = getDisplayedImages;
+    [index, index === 0 ? images.length - 1 : index - 1, index === images.length - 1 ? 0 : index + 1]
+      .forEach(i => { const img = new Image(); img.src = images[i]; });
+  }, [getDisplayedImages]);
+
+  const handleCloseFullScreen = useCallback(() => { setIsFullScreenOpen(false); setImageLoadingStates({}); }, []);
+  const handleKeyDown = useCallback((e) => {
+    if (!isFullScreenOpen) return;
+    if (e.key === 'Escape') handleCloseFullScreen();
+    else if (e.key === 'ArrowLeft') fullScreenSliderRef.current?.slickPrev();
+    else if (e.key === 'ArrowRight') fullScreenSliderRef.current?.slickNext();
+  }, [isFullScreenOpen, handleCloseFullScreen]);
+
+  // ADD TO CART + BUY NOW
+  const addToCart = useCallback(async (redirectToCart = false) => {
+    if (!product || isOutOfStock) {
+      toast.error(isOutOfStock ? 'Out of stock.' : 'Product not available.', { style: TOAST_STYLES.error });
+      return;
+    }
+
+    const activeVariant = getActiveVariant;
+    const variantId = activeVariant?.id || null;
+    if (variantId != null && !Number.isInteger(variantId)) {
+      toast.error('Invalid variant.', { style: TOAST_STYLES.error });
+      return;
+    }
+
+    const cartItem = {
+      id: product.id,
+      cartId: null,
+      title: product.title || 'Product',
+      selectedVariant: activeVariant ? { ...activeVariant } : null,
+      variantId,
+      price: activeVariant?.price || product.price,
+      original_price: activeVariant?.original_price || product.original_price || null,
+      discount_amount: activeVariant?.discount_amount || product.discount_amount || 0,
+      images: getDisplayedImages,
+      stock: activeVariant?.stock ?? product.stock,
+      quantity: 1,
+      uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
+    };
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      let updatedCart = [...cart];
+
+      if (session) {
+        const userId = session.user.id;
+        let query = supabase.from('cart').select('id, quantity').eq('user_id', userId).eq('product_id', product.id);
+        if (variantId) query = query.eq('variant_id', variantId); else query = query.is('variant_id', null);
+        const { data: existing, error: fetchErr } = await query.maybeSingle();
+        if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr;
+
+        const newQty = (existing?.quantity || 0) + 1;
+        if (newQty > cartItem.stock) {
+          toast.error('Exceeds stock.', { style: TOAST_STYLES.error });
           return;
         }
 
-        const { data: relatedData, error: relatedError } = await supabase
-          .from('products')
-          .select(`
-            id, title, price, original_price, discount_amount, images, seller_id, category_id,
-            delivery_radius_km, categories(name, max_delivery_radius_km),
-            sellers(latitude, longitude)
-          `)
-          .eq('category_id', currentProduct.category_id)
-          .neq('id', currentProduct.id)
-          .eq('is_approved', true)
-          .eq('status', 'active')
-          .is('deleted_at', null)
-          .limit(10);
-        if (relatedError) throw new Error(`Related products fetch error: ${relatedError.message}`);
-
-        if (!relatedData || relatedData.length === 0) {
-          setRelatedProducts([]);
-          setIsRelatedLoading(false);
-          return;
-        }
-
-        const validRelatedData = relatedData.filter((item) => item.category_id != null);
-        let categoryData = [];
-        if (validRelatedData.some((item) => !item.categories?.max_delivery_radius_km)) {
-          const categoryIds = [...new Set(validRelatedData.map((item) => item.category_id))];
-          const { data: fetchedCategoryData, error: catDataError } = await supabase
-            .from('categories')
-            .select('id, max_delivery_radius_km')
-            .in('id', categoryIds);
-          if (catDataError) throw new Error(`Category data fetch error: ${catDataError.message}`);
-          categoryData = fetchedCategoryData || [];
-        }
-
-        const normalized = validRelatedData
-          .map((item) => {
-            const seller = item.sellers || {};
-            const maxDeliveryRadius =
-              item.categories?.max_delivery_radius_km ||
-              categoryData.find((c) => c.id === item.category_id)?.max_delivery_radius_km ||
-              DEFAULT_DELIVERY_RADIUS;
-            const distance = calculateDistance(buyerLocation, {
-              latitude: seller.latitude || item.latitude,
-              longitude: seller.longitude || item.longitude,
-            });
-            return {
-              ...item,
-              price: parseFloat(item.price) || parseFloat(item.original_price - (item.discount_amount || 0)) || 0,
-              original_price: parseFloat(item.original_price) || null,
-              discount_amount: parseFloat(item.discount_amount) || 0,
-              category_name: item.categories?.name || 'Unknown Category',
-              images: Array.isArray(item.images) ? item.images : [item.images].filter(Boolean) || [DEFAULT_IMAGE],
-              deliveryRadius: maxDeliveryRadius,
-              distance: distance != null ? parseFloat(distance.toFixed(2)) : null,
-            };
-          })
-          .filter((item) => {
-            if (item.id === currentProduct.id) return false;
-            const effectiveRadius = currentProduct.delivery_radius_km || currentProduct.categories?.max_delivery_radius_km || DEFAULT_DELIVERY_RADIUS;
-            return item.distance != null && item.distance <= effectiveRadius && !(isCategoryRestricted && !location.state?.fromCategories);
-          });
-
-        const shuffled = shuffleArray(normalized).slice(0, 8);
-        relatedCache[cacheKey] = shuffled;
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(relatedCache));
-        } catch (err) {
-        }
-        setRelatedProducts(shuffled);
-      } catch (err) {
-        if (retryCount < 2) {
-          setTimeout(() => fetchRelatedProducts(currentProduct, retryCount + 1), 1000);
-          return;
-        }
-        toast.error('Unable to load related products.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
-        setRelatedProducts([]);
-      } finally {
-        setIsRelatedLoading(false);
-      }
-    },
-    [checkNetworkStatus, buyerLocation, location.state, retryLocationDetection]
-  );
-
-  const handleImageClick = useCallback(
-    (index) => {
-      setFullScreenImageIndex(index);
-      setIsFullScreenOpen(true);
-      setImageLoadingStates((prev) => ({ ...prev, [index]: true }));
-      const images = getDisplayedImages;
-      const preloadIndices = [
-        index,
-        index === 0 ? images.length - 1 : index - 1,
-        index === images.length - 1 ? 0 : index + 1,
-      ];
-      preloadIndices.forEach((i) => {
-        const img = new Image();
-        img.src = images[i];
-      });
-    },
-    [getDisplayedImages]
-  );
-
-  const handleCloseFullScreen = useCallback(() => {
-    setIsFullScreenOpen(false);
-    setImageLoadingStates({});
-  }, []);
-
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (!isFullScreenOpen) return;
-      if (e.key === 'Escape') handleCloseFullScreen();
-      else if (e.key === 'ArrowLeft') fullScreenSliderRef.current?.slickPrev();
-      else if (e.key === 'ArrowRight') fullScreenSliderRef.current?.slickNext();
-    },
-    [isFullScreenOpen, handleCloseFullScreen]
-  );
-
-  const addToCart = useCallback(
-    async (redirectToCart = false) => {
-      if (!product || isOutOfStock) {
-        toast.error(isOutOfStock ? 'This item is out of stock.' : 'Product not available.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
-        return;
-      }
-      if (isRestricted && !location.state?.fromCategories) {
-        toast.error('Please access this restricted category via the Categories page.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
-        navigateToCategory('/categories', { state: { fromCategories: true } });
-        return;
-      }
-
-      const activeVariant = getActiveVariant;
-      const variantId = activeVariant ? activeVariant.id : null;
-
-      if (variantId != null && !Number.isInteger(variantId)) {
-        toast.error('Invalid variant selection.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
-        return;
-      }
-
-      const cartItem = {
-        id: product.id,
-        cartId: null,
-        title: product.title || product.name || 'Product',
-        selectedVariant: activeVariant ? { ...activeVariant } : null,
-        variantId,
-        price: activeVariant?.price || product.price,
-        original_price: activeVariant?.original_price || product.original_price || null,
-        discount_amount: activeVariant?.discount_amount || product.discount_amount || 0,
-        images: getDisplayedImages,
-        stock: activeVariant?.stock ?? product.stock,
-        quantity: 1,
-        uniqueKey: `${product.id}-${variantId || 'no-variant'}`,
-      };
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        let updatedCart = [...cart];
-
-        if (session) {
-          const userId = session.user.id;
-          let query = supabase
-            .from('cart')
-            .select('id, quantity')
-            .eq('user_id', userId)
-            .eq('product_id', product.id);
-
-          if (variantId != null) query = query.eq('variant_id', variantId);
-          else query = query.is('variant_id', null);
-
-          const { data: existingCartItem, error: fetchError } = await query.maybeSingle();
-          if (fetchError && fetchError.code !== 'PGRST116') {
-            throw new Error('Failed to check cart');
-          }
-
-          const newQuantity = (existingCartItem?.quantity || 0) + 1;
-          if (newQuantity > cartItem.stock) {
-            toast.error('Exceeds available stock.', {
-              duration: TOAST_DURATION,
-              position: 'top-center',
-              style: TOAST_STYLES.error,
-            });
-            return;
-          }
-
-          if (existingCartItem) {
-            const { data, error: upsertError } = await supabase
-              .from('cart')
-              .update({ quantity: newQuantity })
-              .eq('id', existingCartItem.id)
-              .select()
-              .single();
-            if (upsertError) throw new Error('Failed to update cart');
-            cartItem.cartId = data.id;
-          } else {
-            const { data, error: insertError } = await supabase
-              .from('cart')
-              .insert({
-                user_id: userId,
-                product_id: product.id,
-                variant_id: variantId,
-                quantity: 1,
-                price: cartItem.price,
-                title: cartItem.title,
-              })
-              .select()
-              .single();
-            if (insertError) throw new Error('Failed to add to cart');
-            cartItem.cartId = data.id;
-          }
-        }
-
-        const existingLocalItemIndex = cart.findIndex((item) => item.uniqueKey === cartItem.uniqueKey);
-        if (existingLocalItemIndex !== -1) {
-          updatedCart = cart.map((item, index) =>
-            index === existingLocalItemIndex
-              ? { ...item, quantity: item.quantity + 1, cartId: cartItem.cartId }
-              : item
-          );
+        if (existing) {
+          const { data } = await supabase.from('cart').update({ quantity: newQty }).eq('id', existing.id).select().single();
+          cartItem.cartId = data.id;
         } else {
-          updatedCart = [...cart, cartItem];
+          const { data } = await supabase.from('cart').insert({
+            user_id: userId, product_id: product.id, variant_id: variantId, quantity: 1, price: cartItem.price, title: cartItem.title
+          }).select().single();
+          cartItem.cartId = data.id;
         }
-
-        setCart(updatedCart);
-        try {
-          localStorage.setItem('cart', JSON.stringify(updatedCart));
-        } catch (err) {
-        }
-        toast.success(`${cartItem.title} added to cart!`, {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.success,
-        });
-
-        if (redirectToCart) {
-          toast.loading('Redirecting to cart...', {
-            duration: 2000,
-            position: 'top-center',
-            style: TOAST_STYLES.loading,
-          });
-          setTimeout(() => navigate('/cart'), 2000);
-        }
-      } catch (err) {
-        toast.error('Failed to add to cart. Please try again.', {
-          duration: TOAST_DURATION,
-          position: 'top-center',
-          style: TOAST_STYLES.error,
-        });
       }
-    },
-    [product, cart, navigate, navigateToCategory, isRestricted, location.state, getActiveVariant, getDisplayedImages, isOutOfStock]
-  );
+
+      const idx = cart.findIndex(i => i.uniqueKey === cartItem.uniqueKey);
+      if (idx !== -1) {
+        updatedCart = cart.map((item, i) => i === idx ? { ...item, quantity: item.quantity + 1, cartId: cartItem.cartId } : item);
+      } else {
+        updatedCart = [...cart, cartItem];
+      }
+
+      setCart(updatedCart);
+      localStorage.setItem('cart', JSON.stringify(updatedCart));
+
+      toast.success(`${cartItem.title} added to cart!`, { duration: 1500, style: TOAST_STYLES.success });
+
+      if (redirectToCart) {
+        navigate('/cart'); // INSTANT REDIRECT
+      }
+    } catch {
+      toast.error('Failed to add to cart.', { style: TOAST_STYLES.error });
+    }
+  }, [product, cart, getActiveVariant, getDisplayedImages, isOutOfStock, navigate]);
 
   // Effects
   useEffect(() => {
-    const storedLocation = safeParseJSON('buyerLocation', null);
-    if (storedLocation?.lat && storedLocation?.lon) {
-      setBuyerLocation(storedLocation);
-    } else {
-      retryLocationDetection();
-    }
+    const loc = safeParseJSON('buyerLocation', null);
+    if (loc?.lat && loc?.lon) setBuyerLocation(loc); else retryLocationDetection();
   }, [setBuyerLocation, retryLocationDetection]);
 
   useEffect(() => {
-    if (!id || !buyerLocation?.lat || !buyerLocation?.lon || locationLoading) {
-      return;
-    }
-    let isMounted = true;
-    fetchProductAndVariants().then(() => {
-      if (!isMounted) return;
-    });
-    return () => {
-      isMounted = false;
-    };
+    if (!id || !buyerLocation?.lat || locationLoading) return;
+    let mounted = true;
+    fetchProductAndVariants().then(() => { if (!mounted) return; });
+    return () => { mounted = false; };
   }, [id, buyerLocation, locationLoading, fetchProductAndVariants]);
 
   useEffect(() => {
-    if (product && buyerLocation?.lat && buyerLocation?.lon && !locationLoading) {
-      fetchRelatedProducts(product);
-    }
+    if (product && buyerLocation?.lat && !locationLoading) fetchRelatedProducts(product);
   }, [product, buyerLocation, locationLoading, fetchRelatedProducts]);
 
   useEffect(() => {
@@ -13504,11 +14441,7 @@ function ProductPage() {
               <FaShoppingCart className="td-loading-icon" />
               <span>Getting your product ready…</span>
             </div>
-            <div className="td-loading-dots">
-              <span>.</span>
-              <span>.</span>
-              <span>.</span>
-            </div>
+            <div className="td-loading-dots"><span>.</span><span>.</span><span>.</span></div>
           </div>
         </div>
       );
@@ -13516,80 +14449,47 @@ function ProductPage() {
 
     if (error || !product) {
       return (
-        <div className="error" role="alert" aria-live="assertive">
+        <div className="error" role="alert">
           <h2>Product not found</h2>
-          <p>{error || 'The requested product could not be loaded.'}</p>
+          <p>{error || 'Could not load product.'}</p>
           <div className="error-actions">
-            <button
-              onClick={retryLocationDetection}
-              className="retry-btn"
-              aria-label="Retry location detection"
-              disabled={locationLoading}
-            >
-              Retry Location
-            </button>
-            <button
-              onClick={() => navigate('/products')}
-              className="back-btn"
-              aria-label="Back to products"
-            >
-              Browse Products
-            </button>
+            <button onClick={retryLocationDetection} className="retry-btn" disabled={locationLoading}>Retry Location</button>
+            <button onClick={() => navigate('/products')} className="back-btn">Browse Products</button>
           </div>
         </div>
       );
     }
 
-    const displayedImages = getDisplayedImages;
-    const productName = product.title || product.name || 'Product';
-    const productDescription = product.description?.split(';')[0]?.trim() || `Buy ${productName} on Markeet.`;
-    const productUrl = `https://www.markeet.com/product/${id}`;
+    const images = getDisplayedImages;
+    const name = product.title || 'Product';
+    const desc = product.description?.split(';')[0]?.trim() || `Buy ${name} on Markeet.`;
+    const url = `https://www.markeet.com/product/${id}`;
     const availability = isOutOfStock ? 'http://schema.org/OutOfStock' : 'http://schema.org/InStock';
 
     return (
       <div className="product-page-container loaded">
         <Helmet>
-          <title>{`${productName} - Markeet`}</title>
-          <meta name="description" content={productDescription} />
-          <meta name="keywords" content={`${productName}, ${product.category_name}, ecommerce, Markeet`} />
-          <link rel="canonical" href={productUrl} />
-          <meta property="og:title" content={`${productName} - Markeet`} />
-          <meta property="og:description" content={productDescription} />
-          <meta property="og:image" content={displayedImages[0] || DEFAULT_IMAGE} />
-          <meta property="og:url" content={productUrl} />
+          <title>{`${name} - Markeet`}</title>
+          <meta name="description" content={desc} />
+          <link rel="canonical" href={url} />
+          <meta property="og:title" content={`${name} - Markeet`} />
+          <meta property="og:description" content={desc} />
+          <meta property="og:image" content={images[0] || DEFAULT_IMAGE} />
+          <meta property="og:url" content={url} />
           <meta property="og:type" content="product" />
           <script type="application/ld+json">
             {JSON.stringify({
               '@context': 'https://schema.org',
               '@type': 'Product',
-              name: productName,
-              description: productDescription,
-              image: displayedImages,
-              category: product.category_name,
+              name, description: desc, image: images, category: product.category_name,
               offers: {
                 '@type': 'Offer',
                 price: (getActiveVariant?.price || product.price) / 100,
                 priceCurrency: 'INR',
                 availability,
-                seller: {
-                  '@type': 'Organization',
-                  name: product.sellers?.store_name || 'Markeet Seller',
-                },
+                seller: { '@type': 'Organization', name: product.sellers?.store_name || 'Markeet Seller' }
               },
-              aggregateRating: reviews.length > 0
-                ? {
-                    '@type': 'AggregateRating',
-                    ratingValue: averageRating.toFixed(1),
-                    reviewCount: reviews.length,
-                  }
-                : null,
-              review: reviews.map((r) => ({
-                '@type': 'Review',
-                author: { '@type': 'Person', name: r.reviewer_name },
-                reviewRating: { '@type': 'Rating', ratingValue: r.rating },
-                reviewBody: r.review_text,
-                datePublished: r.created_at,
-              })),
+              aggregateRating: reviews.length > 0 ? { '@type': 'AggregateRating', ratingValue: averageRating.toFixed(1), reviewCount: reviews.length } : null,
             })}
           </script>
         </Helmet>
@@ -13598,13 +14498,12 @@ function ProductPage() {
           onClick={() => {
             const state = location.state || {};
             if (state.fromCategory && state.categoryId) {
-              navigateToCategory(`/products?category=${state.categoryId}`, { state: { ...state, fromCategories: true } });
+              navigate(`/products?category=${state.categoryId}`, { state: { ...state, fromCategories: true } });
             } else {
-              navigateBack();
+              navigate(-1);
             }
           }}
           className="enhanced-back-btn"
-          aria-label="Back to previous page"
         >
           ← Back
         </button>
@@ -13612,55 +14511,22 @@ function ProductPage() {
         <div className="main-content">
           <div className="product-image-section">
             <div className="image-slider-container">
-              {displayedImages.length > 1 ? (
-                <Slider
-                  dots
-                  infinite
-                  speed={500}
-                  slidesToShow={1}
-                  slidesToScroll={1}
-                  arrows
-                  autoplay={false}
-                  className="image-slider"
-                >
-                  {displayedImages.map((img, index) => (
-                    <div key={index} className="slider-image-wrapper">
-                      <img
-                        src={img}
-                        alt={`${productName} ${index + 1}`}
-                        onClick={() => handleImageClick(index)}
-                        onError={(e) => (e.target.src = DEFAULT_IMAGE)}
-                        className="clickable-image"
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`View ${productName} ${index + 1} in full screen`}
-                        onKeyDown={(e) => e.key === 'Enter' && handleImageClick(index)}
-                        loading="lazy"
-                      />
+              {images.length > 1 ? (
+                <Slider dots infinite speed={500} slidesToShow={1} slidesToScroll={1} arrows className="image-slider">
+                  {images.map((img, i) => (
+                    <div key={i} className="slider-image-wrapper">
+                      <img src={img} alt={`${name} ${i + 1}`} onClick={() => handleImageClick(i)} onError={e => e.target.src = DEFAULT_IMAGE} className="clickable-image" loading="lazy" />
                     </div>
                   ))}
                 </Slider>
               ) : (
-                <div className="single-image-wrapper">
-                  <img
-                    src={displayedImages[0]}
-                    alt={productName}
-                    onClick={() => handleImageClick(0)}
-                    onError={(e) => (e.target.src = DEFAULT_IMAGE)}
-                    className="clickable-image"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`View ${productName} in full screen`}
-                    onKeyDown={(e) => e.key === 'Enter' && handleImageClick(0)}
-                    loading="lazy"
-                  />
-                </div>
+                <img src={images[0]} alt={name} onClick={() => handleImageClick(0)} onError={e => e.target.src = DEFAULT_IMAGE} className="clickable-image" loading="lazy" />
               )}
             </div>
           </div>
 
           <div className="product-details-section">
-            <h1 className="product-title">{productName}</h1>
+            <h1 className="product-title">{name}</h1>
             <div className={`price-section ${getPriceInfo?.hasDiscount ? 'offer-highlight' : ''}`}>
               {getPriceInfo?.hasDiscount && <span className="deal-label">Special Offer</span>}
               <div className="price-details">
@@ -13673,132 +14539,68 @@ function ProductPage() {
                 )}
               </div>
             </div>
-            {isLowStock && (
-              <p className="low-stock-warning" aria-live="polite">
-                Hurry! Only {getActiveVariant?.stock || product.stock} left in stock.
-              </p>
-            )}
-            {isOutOfStock && (
-              <p className="low-stock-warning" aria-live="polite">
-                Out of stock
-              </p>
-            )}
+
+            {isLowStock && <p className="low-stock-warning">Hurry! Only {getActiveVariant?.stock || product.stock} left.</p>}
+            {isOutOfStock && <p className="low-stock-warning">Out of stock</p>}
+
             <ul className="product-highlights">
-              {product.description?.split(';').filter(Boolean).map((point, index) => (
-                <li key={index}>{point.trim()}</li>
-              )) || <li>No description available.</li>}
+              {product.description?.split(';').filter(Boolean).map((p, i) => <li key={i}>{p.trim()}</li>) || <li>No description.</li>}
             </ul>
+
             {variantAttributes.length > 0 && (
               <div className="variant-section">
-                <h4 id="variant-section-label">Select Variant</h4>
-                <div role="radiogroup" aria-labelledby="variant-section-label" className="variant-options">
-                  {variantAttributes.map((v) => (
+                <h4>Select Variant</h4>
+                <div role="radiogroup" className="variant-options">
+                  {variantAttributes.map(v => (
                     <button
                       key={v.id}
                       className={`variant-button ${v.index === selectedVariantIndex ? 'active' : ''}`}
                       onClick={() => setSelectedVariantIndex(v.index)}
-                      aria-label={`Select variant: ${v.attributes || 'Default'}`}
-                      role="radio"
-                      aria-checked={v.index === selectedVariantIndex}
                       disabled={variants[v.index].stock <= 0}
                     >
-                      {v.attributes || 'Default'}
-                      {variants[v.index].stock <= 5 && variants[v.index].stock > 0 && (
-                        <span> (Low stock: {variants[v.index].stock})</span>
-                      )}
-                      {variants[v.index].stock === 0 && <span> (Out of stock)</span>}
+                      {v.attributes}
+                      {variants[v.index].stock <= 5 && variants[v.index].stock > 0 && ` (Low: ${variants[v.index].stock})`}
+                      {variants[v.index].stock === 0 && ' (Out)'}
                     </button>
                   ))}
                 </div>
-                {getActiveVariant && (
-                  <p className="variant-price-info">
-                    Selected variant price: {formatCurrency(getActiveVariant.price)}
-                  </p>
-                )}
               </div>
             )}
+
             <div className="action-buttons">
-              <button
-                onClick={() => addToCart(false)}
-                className="add-to-cart-button"
-                disabled={isOutOfStock}
-                aria-label={`Add ${productName} to cart`}
-              >
+              <button onClick={() => addToCart(false)} className="add-to-cart-button" disabled={isOutOfStock}>
                 {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
               </button>
-              <button
-                onClick={() => addToCart(true)}
-                className="buy-now-button"
-                disabled={isOutOfStock}
-                aria-label={`Buy ${productName} now`}
-              >
+              <button onClick={() => addToCart(true)} className="buy-now-button" disabled={isOutOfStock}>
                 Buy Now
               </button>
             </div>
+
             <div className="seller-info">
-              <p>Seller: {product.sellers?.store_name || 'Unknown Seller'}</p>
-              <Link
-                to={`/seller/${product.seller_id}`}
-                className="seller-link"
-                aria-label={`View profile of ${product.sellers?.store_name || 'seller'}`}
-              >
-                View Seller Profile
-              </Link>
+              <p>Seller: {product.sellers?.store_name || 'Unknown'}</p>
+              <Link to={`/seller/${product.seller_id}`} className="seller-link">View Profile</Link>
             </div>
           </div>
         </div>
 
+        {/* Fullscreen Viewer */}
         {isFullScreenOpen && (
-          <div
-            className="full-screen-image"
-            role="dialog"
-            aria-label="Full screen viewer"
-            onClick={handleCloseFullScreen}
-          >
-            <div className="full-screen-slider-container" onClick={(e) => e.stopPropagation()}>
-              <Slider
-                ref={fullScreenSliderRef}
-                dots={false}
-                infinite
-                speed={500}
-                slidesToShow={1}
-                slidesToScroll={1}
-                arrows={false}
-                initialSlide={fullScreenImageIndex}
-                afterChange={setFullScreenImageIndex}
-              >
-                {displayedImages.map((img, index) => (
-                  <div key={index} className="full-screen-slide">
-                    <TransformWrapper initialScale={1} minScale={0.5} maxScale={4} wheel={{ step: 0.1 }} pinch={{ step: 5 }}>
+          <div className="full-screen-image" onClick={handleCloseFullScreen}>
+            <div className="full-screen-slider-container" onClick={e => e.stopPropagation()}>
+              <Slider ref={fullScreenSliderRef} dots={false} infinite speed={500} slidesToShow={1} initialSlide={fullScreenImageIndex} afterChange={setFullScreenImageIndex}>
+                {images.map((img, i) => (
+                  <div key={i} className="full-screen-slide">
+                    <TransformWrapper initialScale={1} minScale={0.5} maxScale={4}>
                       {({ zoomIn, zoomOut, resetTransform }) => (
                         <>
                           <TransformComponent wrapperClass="transform-wrapper">
-                            {imageLoadingStates[index] && (
-                              <div className="image-loading-spinner">
-                                <svg className="premium-spinner" viewBox="0 0 50 50" aria-hidden="true">
-                                  <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" />
-                                </svg>
-                              </div>
-                            )}
-                            <img
-                              src={img}
-                              alt={`${productName} ${index + 1}`}
-                              onError={(e) => (e.target.src = FULLSCREEN_DEFAULT_IMAGE)}
-                              onLoad={() => setImageLoadingStates((prev) => ({ ...prev, [index]: false }))}
-                              className="full-screen-image-content"
-                              loading="eager"
-                            />
+                            {imageLoadingStates[i] && <div className="image-loading-spinner"><svg className="premium-spinner" viewBox="0 0 50 50"><circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5" /></svg></div>}
+                            <img src={img} alt={`${name} ${i + 1}`} onError={e => e.target.src = FULLSCREEN_DEFAULT_IMAGE} onLoad={() => setImageLoadingStates(p => ({ ...p, [i]: false }))} className="full-screen-image-content" loading="eager" />
                           </TransformComponent>
                           <div className="zoom-controls">
-                            <button className="zoom-btn" onClick={() => zoomIn()} aria-label="Zoom in">
-                              +
-                            </button>
-                            <button className="zoom-btn" onClick={() => zoomOut()} aria-label="Zoom out">
-                              -
-                            </button>
-                            <button className="zoom-btn" onClick={() => resetTransform()} aria-label="Reset zoom">
-                              ↺
-                            </button>
+                            <button onClick={() => zoomIn()}>+</button>
+                            <button onClick={() => zoomOut()}>-</button>
+                            <button onClick={() => resetTransform()}>Reset</button>
                           </div>
                         </>
                       )}
@@ -13806,101 +14608,49 @@ function ProductPage() {
                   </div>
                 ))}
               </Slider>
-              {displayedImages.length > 1 && (
+              {images.length > 1 && (
                 <>
-                  <button
-                    className="full-screen-nav-btn prev"
-                    onClick={() => fullScreenSliderRef.current?.slickPrev()}
-                    aria-label="Previous"
-                  >
-                    ❮
-                  </button>
-                  <button
-                    className="full-screen-nav-btn next"
-                    onClick={() => fullScreenSliderRef.current?.slickNext()}
-                    aria-label="Next"
-                  >
-                    ❯
-                  </button>
-                  <div className="full-screen-dots">
-                    {displayedImages.map((_, index) => (
-                      <button
-                        key={index}
-                        className={`full-screen-dot ${index === fullScreenImageIndex ? 'active' : ''}`}
-                        onClick={() => fullScreenSliderRef.current?.slickGoTo(index)}
-                        aria-label={`Go to image ${index + 1}`}
-                        aria-current={index === fullScreenImageIndex}
-                      />
-                    ))}
-                  </div>
+                  <button className="full-screen-nav-btn prev" onClick={() => fullScreenSliderRef.current?.slickPrev()}>Previous</button>
+                  <button className="full-screen-nav-btn next" onClick={() => fullScreenSliderRef.current?.slickNext()}>Next</button>
                 </>
               )}
             </div>
-            <button
-              className="full-screen-close-btn"
-              onClick={handleCloseFullScreen}
-              aria-label="Close full screen viewer"
-            >
-              ×
-            </button>
+            <button className="full-screen-close-btn" onClick={handleCloseFullScreen}>×</button>
           </div>
         )}
 
+        {/* Reviews, Specs, Related */}
         <div className="ratings-reviews-section">
           <h3>Ratings & Reviews</h3>
-          <div className="rating-score">
-            <StarRatingDisplay rating={averageRating} />
-            <span className="rating-count">
-              ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
-            </span>
-          </div>
-          {reviews.length > 0 ? (
-            reviews.map((review) => (
-              <div key={review.id} className="review-item">
-                <div className="review-header">
-                  <span className="review-author">{review.reviewer_name}</span>
-                  <StarRatingDisplay rating={review.rating} />
-                </div>
-                <p className="review-text">{review.review_text}</p>
-                {review.reply_text && <p className="review-reply">Seller Reply: {review.reply_text}</p>}
-                <time className="review-date" dateTime={review.created_at}>
-                  {new Date(review.created_at).toLocaleDateString('en-IN', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
-                </time>
-              </div>
-            ))
-          ) : (
-            <p className="no-reviews">No reviews yet.</p>
-          )}
+          <div className="rating-score"><StarRatingDisplay rating={averageRating} /> <span>({reviews.length} reviews)</span></div>
+          {reviews.length > 0 ? reviews.map(r => (
+            <div key={r.id} className="review-item">
+              <div className="review-header"><span>{r.reviewer_name}</span><StarRatingDisplay rating={r.rating} /></div>
+              <p>{r.review_text}</p>
+              {r.reply_text && <p className="review-reply">Reply: {r.reply_text}</p>}
+            </div>
+          )) : <p>No reviews yet.</p>}
         </div>
 
         <div className="specifications-section">
           <h3>Specifications</h3>
           {product.specifications && Object.keys(product.specifications).length > 0 ? (
             <div className="specifications-list">
-              {Object.entries(product.specifications).map(([key, value], index) => (
-                <div key={index} className="spec-item">
-                  <span className="spec-key" data-full-text={key}>{key}</span>
-                  <span className="spec-value" data-full-text={value}>{value}</span>
-                </div>
+              {Object.entries(product.specifications).map(([k, v]) => (
+                <div key={k} className="spec-item"><span className="spec-key">{k}</span><span className="spec-value">{v}</span></div>
               ))}
             </div>
-          ) : (
-            <p className="no-specs">No specifications available.</p>
-          )}
+          ) : <p>No specifications.</p>}
         </div>
 
         <div className="related-products-section">
           <h3>Related Products</h3>
           {isRelatedLoading ? (
             <div className="related-products-loading">
-              <p>Fetching related products...</p>
+              <p>Fetching...</p>
               <div className="related-products-grid">
-                {[...Array(4)].map((_, index) => (
-                  <div key={index} className="related-product-skeleton">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="related-product-skeleton">
                     <div className="skeleton-image" />
                     <div className="skeleton-text" />
                     <div className="skeleton-text short" />
@@ -13910,64 +14660,33 @@ function ProductPage() {
             </div>
           ) : relatedProducts.length > 0 ? (
             <div className="related-products-grid">
-              {relatedProducts.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="related-product-card"
-                  onClick={() => navigate(`/product/${item.id}`, { state: { fromCategories: location.state?.fromCategories } })}
-                  role="button"
-                  tabIndex={0}
-                  onKeyPress={(e) => e.key === 'Enter' && navigate(`/product/${item.id}`, { state: { fromCategories: location.state?.fromCategories } })}
-                  aria-label={`View ${item.title} in ${item.category_name}`}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                >
+              {relatedProducts.map((item, i) => (
+                <div key={item.id} className="related-product-card" onClick={() => navigate(`/product/${item.id}`)} style={{ animationDelay: `${i * 0.1}s` }}>
                   <div className="related-product-image-wrapper">
-                    {item.discount_amount > 0 && (
-                      <span className="related-offer-badge">
-                        <span className="offer-label">Offer!</span>
-                        Save {formatCurrency(item.discount_amount)}
-                      </span>
-                    )}
-                    <img
-                      src={item.images?.[0] || DEFAULT_IMAGE}
-                      alt={item.title}
-                      onError={(e) => (e.target.src = DEFAULT_IMAGE)}
-                      className="related-product-image"
-                      loading="lazy"
-                    />
+                    {item.discount_amount > 0 && <span className="related-offer-badge">Save {formatCurrency(item.discount_amount)}</span>}
+                    <img src={item.images[0] || DEFAULT_IMAGE} alt={item.title} onError={e => e.target.src = DEFAULT_IMAGE} className="related-product-image" loading="lazy" />
                   </div>
                   <div className="related-product-info">
-                    <h4 className="related-product-title">{item.title}</h4>
-                    <div className="related-product-price-section">
-                      <p className="related-product-price">{formatCurrency(item.price)}</p>
-                      {item.original_price && item.original_price > item.price && (
-                        <p className="related-product-original-price">{formatCurrency(item.original_price)}</p>
-                      )}
-                    </div>
-                    <p className="related-product-category">{item.category_name}</p>
-                    {item.distance != null && (
-                      <p className="related-product-distance">{item.distance.toFixed(1)} km away</p>
-                    )}
+                    <h4>{item.title}</h4>
+                    <p className="related-product-price">{formatCurrency(item.price)}</p>
+                    {item.original_price > item.price && <p className="related-product-original-price">{formatCurrency(item.original_price)}</p>}
+                    <p>{item.category_name}</p>
+                    {item.distance != null && <p>{item.distance.toFixed(1)} km away</p>}
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="related-products-empty">
-              <p className="no-specs">No related products available in your area.</p>
-              <p className="no-specs-subtitle">Try browsing other categories or check back later.</p>
-            </div>
-          )}
+          ) : <p>No related products in your area.</p>}
         </div>
 
-        <FaCrown className="product-icon premium-icon" aria-label="Markeet Premium" />
+        <FaCrown className="product-icon premium-icon" />
       </div>
     );
   };
 
   return (
     <ErrorBoundary>
-      <Toaster position="top-center" toastOptions={{ duration: TOAST_DURATION, ariaProps: { role: 'alert', 'aria-live': 'assertive' } }} />
+      <Toaster position="top-center" toastOptions={{ duration: TOAST_DURATION }} />
       {renderContent()}
     </ErrorBoundary>
   );

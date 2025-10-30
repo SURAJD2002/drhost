@@ -170,3 +170,4 @@ COMMENT ON FUNCTION validate_variant_prices IS 'Trigger function to validate var
 
 
 
+

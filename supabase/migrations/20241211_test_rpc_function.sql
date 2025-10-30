@@ -28,3 +28,4 @@ WHERE routine_name = 'get_related_products_nearby'
 
 
 
+

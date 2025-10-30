@@ -119,3 +119,4 @@ The Home.js component is now lint-free and ready for production! 🎉
 
 
 
+

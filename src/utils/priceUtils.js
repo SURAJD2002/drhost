@@ -516,14 +516,32 @@ export function calculateCartTotal(items) {
  * Get price display information
  * @param {object} item - Item with mrp, discount_amount, commission_amount
  * @returns {object} Price display details
- */
+ */// ... बाकी functions वही रहें ...
+
 export function getPriceDisplayInfo(item) {
-  const mrp = Number(item.mrp) || Number(item.original_price) || 0; // Fallback to original_price
+  if (!item || typeof item !== 'object') {
+    return {
+      originalPrice: 0,
+      finalPrice: 0,
+      discountAmount: 0,
+      commissionAmount: 0,
+      savings: 0,
+      discountPercentage: 0,
+      hasDiscount: false,
+      formattedOriginal: '₹0.00',
+      formattedFinal: '₹0.00',
+      formattedSavings: '₹0.00',
+    };
+  }
+
+  const mrp = Number(item.mrp) || Number(item.original_price) || 0;
   const discount = Number(item.discount_amount) || 0;
   const commission = Number(item.commission_amount) || 0;
+
   const final = calculateFinalPrice(mrp, discount, commission);
   const savings = calculateSavings(mrp, final);
   const perc = calculateDiscountPercentage(mrp, final);
+
   return {
     originalPrice: mrp,
     finalPrice: final,
@@ -537,17 +555,3 @@ export function getPriceDisplayInfo(item) {
     formattedSavings: formatPrice(savings),
   };
 }
-
-/* Export as default for easy import */
-const priceUtils = {
-  calculateFinalPrice,
-  validatePriceInputs,
-  formatPrice,
-  calculateDiscountPercentage,
-  calculateSavings,
-  validateVariantPricing,
-  calculateItemTotal,
-  calculateCartTotal,
-  getPriceDisplayInfo,
-};
-export default priceUtils;

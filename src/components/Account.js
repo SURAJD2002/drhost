@@ -10304,6 +10304,7 @@
 import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
+import { safeSignOut } from '../utils/authHelpers';
 import { LocationContext } from '../App';
 import { Helmet } from 'react-helmet-async';
 import { FaUser } from 'react-icons/fa';
@@ -10896,7 +10897,7 @@ function Account() {
   // Handle logout
   const handleLogout = useCallback(async () => {
     try {
-      await supabase.auth.signOut();
+      await safeSignOut(supabase);
       setSellerLocation(null); // Reset location context
       setLocationMessage('Logged out successfully.');
       navigate('/', { replace: true }); // Redirect to homepage
@@ -11428,7 +11429,7 @@ function Account() {
             <a href="mailto:support@justorder.com" className="td-policy-link">
               support@markeet.com
             </a>{' '}
-            or call 8825287284 (Markeet Team) for assistance.{' '}
+            or call 8825287284 (Markeet Teama) for assistance.{' '}
             <a href="https://wa.me/918825287284" target="_blank" rel="noopener noreferrer" className="td-whatsapp-link">
               WhatsApp us
             </a>

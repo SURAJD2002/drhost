@@ -4702,7 +4702,7 @@ function Cart() {
     } catch (e) {
       toast.error('Failed to clean up cart. Some items may not display.', { duration: 3000 });
     }
-  }, [buyerLocation, toast]);
+  }, [buyerLocation]);
 
   // Fetch cart items and build display rows
   const fetchCartItems = useCallback(async () => {
@@ -4856,7 +4856,7 @@ function Cart() {
     } finally {
       setLoading(false);
     }
-  }, [buyerLocation, setCartCount, setCartItems, setProducts, toast]);
+  }, [buyerLocation, setCartCount, setCartItems, setProducts]);
 
   // Update Supabase cart item
   const updateSupabaseCartItem = async (userId, cartId, productId, updatedItem, operation) => {

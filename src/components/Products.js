@@ -4007,25 +4007,7 @@ function Products() {
         .eq('id', parseInt(categoryId, 10))
         .single();
       if (error) throw error;
-      if (data?.is_restricted && !location.state?.fromCategories) {
-        toast(`Please select the ${data.name} category from the categories page to view products.`, {
-          duration: 4000,
-          position: 'top-center',
-          style: {
-            background: 'var(--toastify-color-info)',
-            color: '#fff',
-            fontWeight: 'bold',
-            borderRadius: '8px',
-            padding: '16px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-          },
-        });
-        setError(`Please select the ${data.name} category to view products.`);
-        setProducts([]);
-        setLoading(false);
-        navigate('/categories');
-        return false;
-      }
+      // Allow restricted categories on category page regardless of entry path
       setCategoryName(data?.name || '');
       return true;
     } catch (err) {
@@ -4044,7 +4026,7 @@ function Products() {
       setError('Failed to fetch category details.');
       return false;
     }
-  }, [categoryId, navigate, location.state]);
+  }, [categoryId, navigate]);
 
   const fetchRelatedCategories = useCallback(async () => {
     if (!categoryId || categoryId === 'undefined' || isNaN(parseInt(categoryId, 10))) {

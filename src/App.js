@@ -2583,6 +2583,7 @@ import React, { createContext, useState, useEffect, useCallback, useRef } from '
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from './supabaseClient';
+import { safeSignOut } from './utils/authHelpers';
 import { HelmetProvider } from 'react-helmet-async';
 import { Toaster } from 'react-hot-toast';
 import Header from './components/Header';
@@ -2613,7 +2614,7 @@ function App() {
   const [initialized, setInitialized] = useState(false);
   const [sessionResolved, setSessionResolved] = useState(false);
   const [locationReady, setLocationReady] = useState(false);
-  const [locationPermission, setLocationPermission] = useState(null);
+  const [, setLocationPermission] = useState(null);
   const lastUserId = useRef(null);
   const authSubscription = useRef(null);
   const hasInitialized = useRef(false);
@@ -2844,7 +2845,7 @@ function App() {
 
   const handleLogout = useCallback(async () => {
     try {
-      await supabase.auth.signOut();
+      await safeSignOut(supabase);
       window.location.href = '/auth';
     } catch (e) {
       setError(`Logout failed: ${e.message}`);
